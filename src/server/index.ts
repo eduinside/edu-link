@@ -723,6 +723,10 @@ api.patch('/links/:id', async (c) => {
         if (activeStatus === 1 && !pass && !expiration) {
             await c.env.URL_CACHE.put(baseS, updatedUrl);
             if (updatedCustomSlug) await c.env.URL_CACHE.put(updatedCustomSlug, updatedUrl);
+            // 이전 custom_slug가 변경/제거된 경우 KV에서도 삭제
+            if (link.custom_slug && link.custom_slug !== updatedCustomSlug) {
+                await c.env.URL_CACHE.delete(link.custom_slug);
+            }
         } else {
             await c.env.URL_CACHE.delete(baseS);
             if (link.custom_slug) await c.env.URL_CACHE.delete(link.custom_slug);
@@ -768,16 +772,17 @@ api.delete('/links/:id', async (c) => {
         return c.json({ success: false, error: '?몄쬆?ъ슜???덈꺼 2) 沅뚰븳 ?댁긽留??⑥텞 留곹겕瑜???젣?????덉뒿?덈떎.' }, 403);
     }
     try {
-        const link = await c.env.DB.prepare("SELECT id, slug FROM urls WHERE id = ? AND user_id = ?")
+        const link = await c.env.DB.prepare("SELECT id, slug, base_slug, custom_slug FROM urls WHERE id = ? AND user_id = ?")
             .bind(id, user.id)
-            .first<{ id: number; slug: string }>();
+            .first<{ id: number; slug: string; base_slug: string | null; custom_slug: string | null }>();
 
         if (!link) {
             return c.json({ success: false, error: '?대떦 留곹겕瑜?李얠쓣 ???녾굅??沅뚰븳???놁뒿?덈떎.' }, 404);
         }
 
         await c.env.DB.prepare("DELETE FROM urls WHERE id = ?").bind(id).run();
-        await c.env.URL_CACHE.delete(link.slug);
+        await c.env.URL_CACHE.delete(link.base_slug || link.slug);
+        if (link.custom_slug) await c.env.URL_CACHE.delete(link.custom_slug);
 
         return c.json({ success: true, message: '?⑥텞 留곹겕媛 ??젣?섏뿀?듬땲??' });
     } catch (err: any) {
@@ -1373,8 +1378,8 @@ app.get('/:slug', async (c) => {
             c.executionCtx.waitUntil((async () => {
                 try {
                     if (!urlRecord) {
-                        urlRecord = await c.env.DB.prepare("SELECT id FROM urls WHERE slug = ?")
-                            .bind(slug)
+                        urlRecord = await c.env.DB.prepare("SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?")
+                            .bind(slug, slug, slug)
                             .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null }>();
                     }
 
@@ -1406,6 +1411,7 @@ app.get('/:slug', async (c) => {
                 }
             })());
 
+            c.header('Cache-Control', 'no-store');
             return c.redirect(destination, 307);
         }
     } catch (err) {

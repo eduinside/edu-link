@@ -674,11 +674,6 @@ export default function Landing() {
                       {isExpanded && (
                         <div className="mt-2 pt-2.5 border-t border-slate-100 text-[11px] text-slate-600 leading-relaxed whitespace-pre-line animate-fade-in">
                           {notice.content}
-                          
-                          <div className="mt-4 p-2 bg-slate-50 rounded-xl text-[9px] text-slate-400 flex items-center gap-1">
-                            <Megaphone className="w-3 h-3 text-slate-300" />
-                            <span>최고관리자 권한으로 공지사항의 수정/등록이 가능합니다.</span>
-                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -749,24 +744,6 @@ export default function Landing() {
             </div>
 
             <CardContent className="p-6 space-y-4">
-              {/* 카카오 로그인 버튼 */}
-              <button
-                type="button"
-                onClick={() => { window.location.href = '/api/auth/kakao'; }}
-                className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-2xl font-bold text-sm transition-all shadow-sm"
-                style={{ backgroundColor: '#FEE500', color: '#3C1E1E' }}
-              >
-                <span className="text-base leading-none font-black">K</span>
-                카카오 계정으로 로그인
-              </button>
-
-              {/* 구분선 */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-slate-100" />
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">또는 이메일 OTP</span>
-                <div className="flex-1 h-px bg-slate-100" />
-              </div>
-
               {authError && (
                 <div className="p-3 bg-danger-50 border border-danger-100 rounded-xl text-[10px] text-danger-600 font-bold">
                   {authError}

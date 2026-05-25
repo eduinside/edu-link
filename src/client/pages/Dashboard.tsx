@@ -980,51 +980,43 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-                
-                {/* 좌측 컬럼: 세로형 통계 카드 */}
-                <div className="lg:col-span-1 space-y-4">
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-xs text-slate-400 font-bold">생성된 단축주소</p>
-                        <h3 className="text-2xl font-extrabold text-slate-800 font-display">{links.length}개</h3>
-                      </div>
-                      <div className="bg-blue-50 p-2.5 rounded-2xl text-blue-600">
-                        <Link2 className="w-5 h-5" />
-                      </div>
-                    </CardContent>
-                  </Card>
+              {/* 통계 카드 — 가로 3열 */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                  <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                    <div className="bg-blue-50 p-2.5 rounded-2xl text-blue-600">
+                      <Link2 className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-800 font-display">{links.length}개</h3>
+                    <p className="text-[11px] text-slate-400 font-bold">생성된 단축주소</p>
+                  </CardContent>
+                </Card>
 
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-xs text-slate-400 font-bold">누적 접속(클릭) 수</p>
-                        <h3 className="text-2xl font-extrabold text-slate-800 font-display">{totalClicks}회</h3>
-                      </div>
-                      <div className="bg-emerald-50 p-2.5 rounded-2xl text-emerald-600">
-                        <BarChart3 className="w-5 h-5" />
-                      </div>
-                    </CardContent>
-                  </Card>
+                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                  <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                    <div className="bg-emerald-50 p-2.5 rounded-2xl text-emerald-600">
+                      <BarChart3 className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-800 font-display">{totalClicks}회</h3>
+                    <p className="text-[11px] text-slate-400 font-bold">누적 접속(클릭) 수</p>
+                  </CardContent>
+                </Card>
 
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-xs text-slate-400 font-bold">활성 링크 비율</p>
-                        <h3 className="text-2xl font-extrabold text-slate-800 font-display">
-                          {links.length > 0 ? Math.round((links.filter(l => l.is_active === 1).length / links.length) * 100) : 0}%
-                        </h3>
-                      </div>
-                      <div className="bg-purple-50 p-2.5 rounded-2xl text-purple-600">
-                        <Globe className="w-5 h-5" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                  <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                    <div className="bg-purple-50 p-2.5 rounded-2xl text-purple-600">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-800 font-display">
+                      {links.length > 0 ? Math.round((links.filter(l => l.is_active === 1).length / links.length) * 100) : 0}%
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-bold">활성 링크 비율</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                {/* 우측 컬럼: 링크 입력바 및 링크 목록 */}
-                <div className="lg:col-span-3 space-y-6">
+              {/* 링크 입력바 및 링크 목록 */}
+              <div className="space-y-6">
                   
                   {/* 간이 주소 입력바 */}
                   <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
@@ -1663,8 +1655,6 @@ export default function Dashboard() {
                   </div>
  
                 </div>
- 
-              </div>
             </>
           )}
 
