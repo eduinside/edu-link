@@ -1141,7 +1141,7 @@ app.post('/api/v1/shorten', async (c) => {
             .join('');
 
         // D1?먯꽌 ?쒖꽦?붾맂 ??諛??뚯쑀 ?ъ슜??李얘린
-        const keyRecord = await c.env.DB.prepare(`SELECT k.id, u.level FROM api_keys k JOIN users u ON k.user_id = u.id WHERE k.key_hash = ? AND k.is_active = 1`
+        const keyRecord = await c.env.DB.prepare(`SELECT k.id, k.user_id, u.level FROM api_keys k JOIN users u ON k.user_id = u.id WHERE k.key_hash = ? AND k.is_active = 1`
         )
         .bind(keyHash)
         .first<{ user_id: number; level: number }>();
