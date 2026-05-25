@@ -1193,8 +1193,17 @@ async function handleQrRequest(slug: string, requestUrl: string, env: Env): Prom
         if (record && record.is_active === 1) {
             const host = new URL(requestUrl).host;
             const shortUrl = `https://${host}/${slug}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&data=${encodeURIComponent(shortUrl)}`;
-            return Response.redirect(qrUrl, 302);
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&format=png&data=${encodeURIComponent(shortUrl)}`;
+            // Worker가 직접 fetch → PNG 바이트를 dgedu.link 도메인으로 반환 (사용자 망에서 외부 API 차단 무관)
+            const qrRes = await fetch(qrApiUrl);
+            if (qrRes.ok) {
+                return new Response(qrRes.body, {
+                    headers: {
+                        'Content-Type': 'image/png',
+                        'Cache-Control': 'public, max-age=86400',
+                    },
+                });
+            }
         }
     } catch (e) {
         console.error('[qr] DB error:', e);

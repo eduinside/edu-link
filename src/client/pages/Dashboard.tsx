@@ -124,6 +124,9 @@ export default function Dashboard() {
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [newExpiresMode, setNewExpiresMode] = useState<'none'|'24h'|'7d'|'custom'>('none');
   const [useNewPassword, setUseNewPassword] = useState(false);
+
+  // QR 모달
+  const [qrModalLink, setQrModalLink] = useState<LinkItem | null>(null);
   
   // API Key 발급 상태
   const [newKeyName, setNewKeyName] = useState('');
@@ -1159,7 +1162,7 @@ export default function Dashboard() {
                                       variant="flat"
                                       color="secondary"
                                       isIconOnly
-                                      onClick={() => window.open(`/qr/${link.base_slug || link.slug}`, '_blank')}
+                                      onClick={() => setQrModalLink(link)}
                                       className="rounded-lg w-8 h-8 min-w-0 p-0"
                                     >
                                       <QrCode className="w-3.5 h-3.5" />
@@ -2311,6 +2314,84 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {/* QR 코드 모달 */}
+      {qrModalLink && (() => {
+        const qrSlug = qrModalLink.base_slug || qrModalLink.slug;
+        const displaySlug = qrModalLink.custom_slug || qrSlug;
+        const shortUrl = `${window.location.protocol}//${window.location.host}/${displaySlug}`;
+        return (
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setQrModalLink(null)}
+          >
+            <Card
+              className="max-w-sm w-full border border-slate-200/40 shadow-2xl rounded-3xl bg-white animate-fade-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CardContent className="p-6 flex flex-col items-center gap-4">
+                <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-indigo-600" />
+                    <h4 className="font-bold text-sm text-slate-800">QR 코드</h4>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="light"
+                    isIconOnly
+                    onClick={() => setQrModalLink(null)}
+                    className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400"
+                  >
+                    ✕
+                  </Button>
+                </div>
+
+                <div className="bg-white border-2 border-slate-100 rounded-2xl p-3 shadow-sm">
+                  <img
+                    src={`/qr/${qrSlug}`}
+                    alt={`QR for /${displaySlug}`}
+                    className="w-64 h-64 block"
+                  />
+                </div>
+
+                <div className="w-full text-center space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">단축주소</p>
+                  <code className="text-sm font-mono font-bold text-indigo-600 break-all">{shortUrl}</code>
+                </div>
+
+                <div className="w-full flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="default"
+                    className="flex-1 rounded-xl font-bold text-xs"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shortUrl);
+                      setSuccessMsg('주소가 복사되었습니다.');
+                      setTimeout(() => setSuccessMsg(''), 1500);
+                    }}
+                  >
+                    🔗 주소 복사
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="primary"
+                    className="flex-1 rounded-xl font-bold text-xs"
+                    onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = `/qr/${qrSlug}`;
+                      a.download = `${displaySlug}-qr.png`;
+                      a.click();
+                    }}
+                  >
+                    ⬇ PNG 저장
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* 🗝 발급 키 1회 노출 모달 */}
       {showKeyResultModal && generatedKeyResult && (
