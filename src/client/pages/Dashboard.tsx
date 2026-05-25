@@ -1201,6 +1201,19 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
+                                        <Tooltip content="링크 열기">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="default"
+                                            isIconOnly
+                                            onClick={() => window.open(openUrl, '_blank')}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                          >
+                                            <ExternalLink className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+
                                         <Tooltip content="QR 코드">
                                           <Button
                                             size="sm"
@@ -1238,19 +1251,6 @@ export default function Dashboard() {
                                             disabled={user && user.level < 2}
                                           >
                                             <Edit3 className="w-3 h-3" />
-                                          </Button>
-                                        </Tooltip>
-
-                                        <Tooltip content="원본 이동">
-                                          <Button
-                                            size="sm"
-                                            variant="flat"
-                                            color="default"
-                                            isIconOnly
-                                            onClick={() => window.open(openUrl, '_blank')}
-                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
-                                          >
-                                            <ExternalLink className="w-3 h-3" />
                                           </Button>
                                         </Tooltip>
 
@@ -2457,13 +2457,8 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* QR 코드 모달 */}
-      {qrModalLink && (
-        <QrModal
-          link={qrModalLink}
-          onClose={() => setQrModalLink(null)}
-        />
-      )}
+      {/* QR 코드 드로어 */}
+      <QrDrawer link={qrModalLink} onClose={() => setQrModalLink(null)} />
 
       {/* 🗝 발급 키 1회 노출 모달 */}
       {showKeyResultModal && generatedKeyResult && (
@@ -2598,11 +2593,10 @@ function StatsBarChart({ dailyClicks }: { dailyClicks: { date: string; clicks: n
   );
 }
 
-// QR 모달 — 복사 애니메이션 + 렌더된 이미지 직접 다운로드 + 원본 슬러그 URL 사용
-function QrModal({ link, onClose }: { link: LinkItem; onClose: () => void }) {
-  // 사용자 슬러그가 있어도 QR/표시 URL은 항상 원본(base_slug) 사용
-  const qrSlug = link.base_slug || link.slug;
-  const shortUrl = `${window.location.protocol}//${window.location.host}/${qrSlug}`;
+// QR 드로어 — 우측 슬라이드 드로어 + 복사 애니메이션 + PNG 다운로드 + 원본 슬러그 기준
+function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => void }) {
+  const qrSlug = link ? (link.base_slug || link.slug) : '';
+  const shortUrl = link ? `${window.location.protocol}//${window.location.host}/${qrSlug}` : '';
   const imgRef = useRef<HTMLImageElement>(null);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -2615,14 +2609,13 @@ function QrModal({ link, onClose }: { link: LinkItem; onClose: () => void }) {
     } catch {}
   };
 
-  // 화면에 렌더된 <img>를 canvas로 그려서 그대로 PNG 다운로드 (서버 응답 무관)
+  // 화면에 렌더된 <img>를 canvas로 그려서 PNG 다운로드 (서버 응답 무관)
   const handleDownload = async () => {
-    if (downloading) return;
+    if (downloading || !link) return;
     setDownloading(true);
     try {
       const img = imgRef.current;
       if (!img || !img.complete || img.naturalWidth === 0) {
-        // 아직 로드 안 됐으면 잠깐 대기
         await new Promise((r) => setTimeout(r, 300));
       }
       const target = imgRef.current!;
@@ -2652,68 +2645,104 @@ function QrModal({ link, onClose }: { link: LinkItem; onClose: () => void }) {
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <Card
-        className="max-w-sm w-full border border-slate-200/40 shadow-2xl rounded-3xl bg-white animate-fade-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardContent className="p-6 flex flex-col items-center gap-4">
-          <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <QrCode className="w-4 h-4 text-indigo-600" />
-              <h4 className="font-bold text-sm text-slate-800">QR 코드</h4>
+    <div className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${link ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+      <div
+        className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${link ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+        <div className={`w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 transform ${link ? 'translate-x-0' : 'translate-x-full'}`}>
+          {link && (
+            <div className="h-full flex flex-col">
+              {/* 헤더 */}
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                <div className="space-y-0.5 min-w-0">
+                  <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                    QR 코드
+                  </h3>
+                  <p className="text-[10px] text-indigo-600 font-bold font-mono truncate">
+                    dgedu.link/{qrSlug}
+                    {link.custom_slug && <span className="text-slate-400 font-normal"> · /{link.custom_slug}</span>}
+                  </p>
+                </div>
+                <Button
+                  size="sm" variant="light" isIconOnly
+                  onClick={onClose}
+                  className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                >✕</Button>
+              </div>
+
+              {/* 컨텐츠 */}
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-6">
+                {/* QR 이미지 */}
+                <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 shadow-sm">
+                  <img
+                    ref={imgRef}
+                    src={`/qr/${qrSlug}`}
+                    alt={`QR for /${qrSlug}`}
+                    className="w-64 h-64 block"
+                  />
+                </div>
+
+                {/* 단축주소 표시 */}
+                <div className="w-full text-center space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">단축주소 (원본 슬러그)</p>
+                  <code className="text-sm font-mono font-bold text-indigo-600 break-all">{shortUrl}</code>
+                </div>
+
+                {/* 복사 + 다운로드 버튼 */}
+                <div className="w-full flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={copied ? 'solid' : 'flat'}
+                    color={copied ? 'success' : 'default'}
+                    className={`flex-1 rounded-xl font-bold text-xs transition-all duration-300 ${copied ? 'scale-[1.02]' : ''}`}
+                    startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    onClick={handleCopy}
+                  >
+                    {copied ? '복사됨!' : '주소 복사'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="primary"
+                    className="flex-1 rounded-xl font-bold text-xs"
+                    onClick={handleDownload}
+                    isLoading={downloading}
+                  >
+                    ⬇ PNG 저장
+                  </Button>
+                </div>
+
+                {/* 링크 기본 정보 */}
+                <div className="w-full bg-slate-50 rounded-2xl p-4 space-y-3 text-xs">
+                  {link.title && (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-slate-400 font-bold flex-shrink-0">제목</span>
+                      <span className="text-slate-800 font-semibold text-right break-words max-w-[240px]">{link.title}</span>
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-slate-400 font-bold flex-shrink-0">원본 주소</span>
+                    <a
+                      href={link.original_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                    >
+                      {link.original_url}
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                    <span className="text-slate-400 font-bold">누적 클릭</span>
+                    <span className="text-slate-800 font-extrabold text-base">{link.click_count ?? 0}<span className="text-xs font-normal text-slate-400 ml-1">회</span></span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <Button
-              size="sm"
-              variant="light"
-              isIconOnly
-              onClick={onClose}
-              className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400"
-            >
-              ✕
-            </Button>
-          </div>
-
-          <div className="bg-white border-2 border-slate-100 rounded-2xl p-3 shadow-sm">
-            <img
-              ref={imgRef}
-              src={`/qr/${qrSlug}`}
-              alt={`QR for /${qrSlug}`}
-              className="w-64 h-64 block"
-            />
-          </div>
-
-          <div className="w-full text-center space-y-1">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">단축주소 (원본 슬러그)</p>
-            <code className="text-sm font-mono font-bold text-indigo-600 break-all">{shortUrl}</code>
-          </div>
-
-          <div className="w-full flex gap-2 pt-1">
-            <Button
-              size="sm"
-              variant={copied ? 'solid' : 'flat'}
-              color={copied ? 'success' : 'default'}
-              className={`flex-1 rounded-xl font-bold text-xs transition-all duration-300 ${copied ? 'scale-[1.02]' : ''}`}
-              startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              onClick={handleCopy}
-            >
-              {copied ? '복사됨!' : '주소 복사'}
-            </Button>
-            <Button
-              size="sm"
-              color="primary"
-              className="flex-1 rounded-xl font-bold text-xs"
-              onClick={handleDownload}
-              isLoading={downloading}
-            >
-              ⬇ PNG 저장
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
