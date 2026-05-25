@@ -29,8 +29,9 @@ import { useNavigate } from 'react-router-dom';
 
 interface PublicLink {
   slug: string;
+  custom_slug: string | null;
+  title: string | null;
   original_url: string;
-  click_count: number;
   created_at: string;
 }
 
@@ -312,8 +313,11 @@ export default function Landing() {
   };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const utc = dateStr.replace(' ', 'T') + (dateStr.includes('Z') || dateStr.includes('+') ? '' : 'Z');
+    return new Date(utc).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    });
   };
 
   return (
@@ -548,21 +552,21 @@ export default function Landing() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {publicLinks.map((link) => {
-                  const shortUrl = `https://${window.location.host}/${link.slug}`;
-                  const isLinkCopied = copiedSlug === link.slug;
+                  const effectiveSlug = link.custom_slug || link.slug;
+                  const shortUrl = `${window.location.protocol}//${window.location.host}/${effectiveSlug}`;
+                  const isLinkCopied = copiedSlug === effectiveSlug;
                   return (
                     <Card key={link.slug} className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-300 rounded-2xl group overflow-hidden">
                       <CardContent className="p-4 flex flex-col justify-between h-full gap-3">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-display font-extrabold text-lg text-indigo-600 break-all">
-                              /{link.slug}
-                            </span>
-                            <Chip size="sm" color="default" variant="flat" className="text-[10px] text-slate-500 font-semibold">
-                              👁 {link.click_count} clicks
-                            </Chip>
-                          </div>
-                          
+                        <div className="space-y-1">
+                          {link.title && (
+                            <p className="text-xs font-bold text-slate-700 truncate w-full" title={link.title}>
+                              {link.title}
+                            </p>
+                          )}
+                          <span className="font-display font-extrabold text-lg text-indigo-600 break-all">
+                            /{effectiveSlug}
+                          </span>
                           <p className="text-[10px] font-mono text-slate-400 truncate w-full" title={link.original_url}>
                             {getDomain(link.original_url)}
                           </p>
@@ -572,7 +576,7 @@ export default function Landing() {
                           <span className="text-[9px] text-slate-400 font-medium">
                             {formatDate(link.created_at)}
                           </span>
-                          
+
                           <div className="flex gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
                             <Button
                               size="sm"
@@ -580,7 +584,7 @@ export default function Landing() {
                               color={isLinkCopied ? 'success' : 'default'}
                               isIconOnly
                               className="w-7 h-7 min-w-0 p-0 rounded-lg"
-                              onClick={() => handleCopyPublicLink(link.slug, shortUrl)}
+                              onClick={() => handleCopyPublicLink(effectiveSlug, shortUrl)}
                             >
                               {isLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
                             </Button>
@@ -590,7 +594,7 @@ export default function Landing() {
                               color="primary"
                               isIconOnly
                               className="w-7 h-7 min-w-0 p-0 rounded-lg"
-                              onClick={() => window.open(`/${link.slug}`, '_blank')}
+                              onClick={() => window.open(`/${effectiveSlug}`, '_blank')}
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </Button>

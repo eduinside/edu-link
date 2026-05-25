@@ -84,10 +84,22 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   // 현재일시를 YYYY-MM-DDTHH:MM 형식으로 반환하는 헬퍼
-  const getCurrentDateTimeString = () => {
-    const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
-    return localISOTime;
+  // datetime-local input용 KST 문자열 반환 (offsetMs: 미래 오프셋)
+  const getKSTDateTimeString = (offsetMs = 0) => {
+    const kst = new Date(Date.now() + offsetMs + 9 * 60 * 60 * 1000);
+    return kst.toISOString().slice(0, 16);
+  };
+  const getCurrentDateTimeString = () => getKSTDateTimeString(0);
+
+  // expires_at 모드 → UTC 문자열 변환 (서버 전송용)
+  const resolveExpiresAt = (mode: string, customVal: string): string | null => {
+    if (mode === '24h') return new Date(Date.now() + 24*60*60*1000).toISOString().replace('T',' ').split('.')[0];
+    if (mode === '7d')  return new Date(Date.now() + 7*24*60*60*1000).toISOString().replace('T',' ').split('.')[0];
+    if (mode === 'custom' && customVal) {
+      // datetime-local 값(KST)을 UTC로 변환
+      return new Date(customVal).toISOString().replace('T',' ').split('.')[0];
+    }
+    return null;
   };
 
   const [user, setUser] = useState<User | null>(null);
@@ -108,7 +120,7 @@ export default function Dashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
-  const [useNewExpires, setUseNewExpires] = useState(false);
+  const [newExpiresMode, setNewExpiresMode] = useState<'none'|'24h'|'7d'|'custom'>('none');
   const [useNewPassword, setUseNewPassword] = useState(false);
   
   // API Key 발급 상태
@@ -128,7 +140,7 @@ export default function Dashboard() {
   const [editExpiresAt, setEditExpiresAt] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [useEditExpires, setUseEditExpires] = useState(false);
+  const [editExpiresMode, setEditExpiresMode] = useState<'none'|'24h'|'7d'|'custom'>('none');
   const [useEditPassword, setUseEditPassword] = useState(false);
   // 편집용 커스텀 슬러그
   const [useEditCustomSlug, setUseEditCustomSlug] = useState(false);
@@ -381,7 +393,7 @@ export default function Dashboard() {
         title: newTitle,
         description: newDesc,
         is_public: newPublic,
-        expires_at: useNewExpires ? (newExpiresAt || null) : null,
+        expires_at: resolveExpiresAt(newExpiresMode, newExpiresAt),
         password: useNewPassword ? (newPassword || null) : null
       };
       if (useCustomSlug && newSlug) {
@@ -404,7 +416,7 @@ export default function Dashboard() {
         setUseCustomSlug(false);
         setNewPublic(false);
         setNewExpiresAt(getCurrentDateTimeString());
-        setUseNewExpires(false);
+        setNewExpiresMode('none');
         setUseNewPassword(false);
         setNewPassword('');
         setIsCreateDrawerOpen(false);
@@ -446,7 +458,7 @@ export default function Dashboard() {
           description: editDesc,
           is_active: editActive,
           is_public: editPublic,
-          expires_at: useEditExpires ? (editExpiresAt === '' ? null : editExpiresAt) : '',
+          expires_at: resolveExpiresAt(editExpiresMode, editExpiresAt),
           password: useEditPassword ? (editPassword || null) : ''
         })
       });
@@ -648,7 +660,7 @@ export default function Dashboard() {
     setEditActive(link.is_active === 1);
     setEditPublic(link.is_public === 1);
     const hasExpiry = !!link.expires_at;
-    setUseEditExpires(hasExpiry);
+    setEditExpiresMode(hasExpiry ? 'custom' : 'none');
     setEditExpiresAt(link.expires_at || getCurrentDateTimeString());
     const hasPassword = !!link.password;
     setUseEditPassword(hasPassword);
@@ -697,8 +709,13 @@ export default function Dashboard() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '사용 이력 없음';
-    const d = new Date(dateStr);
-    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    // DB는 UTC 저장, Z를 붙여 명시적으로 UTC 파싱 후 KST 표시
+    const utc = dateStr.replace(' ', 'T') + (dateStr.includes('Z') || dateStr.includes('+') ? '' : 'Z');
+    return new Date(utc).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    });
   };
 
   const totalClicks = links.reduce((sum, item) => sum + item.click_count, 0);
@@ -1325,22 +1342,22 @@ export default function Dashboard() {
  
                                 {/* 자동 종료일시 */}
                                 <div className="space-y-2 pt-2 border-t border-slate-100">
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      id="useEditExpires"
-                                      checked={useEditExpires}
-                                      onChange={(e) => {
-                                        setUseEditExpires(e.target.checked);
-                                        if (e.target.checked) setEditExpiresAt(editExpiresAt || getCurrentDateTimeString());
-                                      }}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                    />
-                                    <label htmlFor="useEditExpires" className="font-bold text-slate-600 select-none flex items-center gap-1">
-                                      ⏰ 자동 종료일시 설정
-                                    </label>
-                                  </div>
-                                  {useEditExpires && (
+                                  <label className="font-bold text-slate-600 flex items-center gap-1">⏰ 자동 종료일시</label>
+                                  <select
+                                    value={editExpiresMode}
+                                    onChange={(e) => {
+                                      const m = e.target.value as 'none'|'24h'|'7d'|'custom';
+                                      setEditExpiresMode(m);
+                                      if (m === 'custom') setEditExpiresAt(editExpiresAt || getKSTDateTimeString(24*60*60*1000));
+                                    }}
+                                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                  >
+                                    <option value="none">없음</option>
+                                    <option value="24h">24시간 이후</option>
+                                    <option value="7d">7일 이후</option>
+                                    <option value="custom">직접 입력</option>
+                                  </select>
+                                  {editExpiresMode === 'custom' && (
                                     <>
                                       <Input
                                         size="sm"
@@ -1374,7 +1391,7 @@ export default function Dashboard() {
                                     <>
                                       <Input
                                         size="sm"
-                                        type="password"
+                                        type="text"
                                         placeholder="숫자 6자리 입력 (예: 123456)"
                                         maxLength={6}
                                         pattern="[0-9]*"
@@ -1538,22 +1555,22 @@ export default function Dashboard() {
 
                               {/* 자동 종료일시 */}
                               <div className="space-y-2 pt-2 border-t border-slate-100">
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    id="useNewExpires"
-                                    checked={useNewExpires}
-                                    onChange={(e) => {
-                                      setUseNewExpires(e.target.checked);
-                                      if (e.target.checked) setNewExpiresAt(newExpiresAt || getCurrentDateTimeString());
-                                    }}
-                                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                  />
-                                  <label htmlFor="useNewExpires" className="font-bold text-slate-600 select-none flex items-center gap-1">
-                                    ⏰ 자동 종료일시 설정
-                                  </label>
-                                </div>
-                                {useNewExpires && (
+                                <label className="font-bold text-slate-600 flex items-center gap-1">⏰ 자동 종료일시</label>
+                                <select
+                                  value={newExpiresMode}
+                                  onChange={(e) => {
+                                    const m = e.target.value as 'none'|'24h'|'7d'|'custom';
+                                    setNewExpiresMode(m);
+                                    if (m === 'custom') setNewExpiresAt(newExpiresAt || getKSTDateTimeString(24*60*60*1000));
+                                  }}
+                                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                >
+                                  <option value="none">없음</option>
+                                  <option value="24h">24시간 이후</option>
+                                  <option value="7d">7일 이후</option>
+                                  <option value="custom">직접 입력</option>
+                                </select>
+                                {newExpiresMode === 'custom' && (
                                   <>
                                     <Input
                                       size="sm"
@@ -1562,7 +1579,7 @@ export default function Dashboard() {
                                       onChange={(e) => setNewExpiresAt(e.target.value)}
                                       className="w-full"
                                     />
-                                    <p className="text-[9px] text-slate-400">설정된 일시 이후 자동 비활성화됩니다. 체크 해제 시 만료 없음.</p>
+                                    <p className="text-[9px] text-slate-400">설정된 일시 이후 자동 비활성화됩니다.</p>
                                   </>
                                 )}
                               </div>
@@ -1588,7 +1605,7 @@ export default function Dashboard() {
                                   <>
                                     <Input
                                       size="sm"
-                                      type="password"
+                                      type="text"
                                       placeholder="숫자 6자리 입력 (예: 123456)"
                                       maxLength={6}
                                       pattern="[0-9]*"
