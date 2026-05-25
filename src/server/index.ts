@@ -523,7 +523,7 @@ const api = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 
 // /v1/* 경로는 자체 API Key 인증을 사용하므로 제외
 api.use('*', async (c, next) => {
-    if (c.req.path.startsWith('/v1/')) return next();
+    if (c.req.path.startsWith('/api/v1/')) return next();
     return authMiddleware()(c, next);
 });
 
