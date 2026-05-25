@@ -1126,8 +1126,17 @@ export default function Dashboard() {
                                   </div>
 
                                   <p className="text-[11px] font-mono text-slate-400 truncate break-all max-w-lg" title={link.original_url}>
-                                    목적지: {link.original_url}
+                                    {link.original_url}
                                   </p>
+
+                                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-medium pt-0.5">
+                                    <span className="flex items-center gap-1">
+                                      <BarChart3 className="w-3 h-3" />
+                                      <span className="font-bold text-slate-600">{link.click_count ?? 0}</span>회
+                                    </span>
+                                    <span className="text-slate-200">·</span>
+                                    <span>생성 {formatDate(link.created_at)}</span>
+                                  </div>
                                 </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">

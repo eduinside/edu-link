@@ -1183,133 +1183,43 @@ app.route('/api/v1', v1);
 // [?쇰툝由?由щ뵒?됱뀡 諛?SPA ?쒕튃]
 // ----------------------------------------------------
 
-// QR 슬러그 DB 조회 + 응답 생성
-async function buildQrResponse(slug: string, requestUrl: string, env: Env): Promise<Response | null> {
-    const record = await env.DB.prepare(
-        "SELECT is_active FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
-    ).bind(slug, slug, slug).first<{ is_active: number }>();
-    if (!record || record.is_active !== 1) return null;
+// /qr/:slug 및 /:slug.qr — DB 확인 후 외부 QR 이미지로 302 리다이렉트
+async function handleQrRequest(slug: string, requestUrl: string, env: Env): Promise<Response> {
+    try {
+        const record = await env.DB.prepare(
+            "SELECT is_active FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+        ).bind(slug, slug, slug).first<{ is_active: number }>();
 
-    const host = new URL(requestUrl).host;
-    const proto = requestUrl.startsWith('https') ? 'https' : 'http';
-    const shortUrl = `${proto}://${host}/${slug}`;
+        if (record && record.is_active === 1) {
+            const host = new URL(requestUrl).host;
+            const shortUrl = `https://${host}/${slug}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&data=${encodeURIComponent(shortUrl)}`;
+            return Response.redirect(qrUrl, 302);
+        }
+    } catch (e) {
+        console.error('[qr] DB error:', e);
+    }
 
-    const html = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR 코드 · /${slug}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; font-family: 'Noto Sans KR', sans-serif;
-            background: #0f1117; color: #fff; overflow: hidden; }
-        .page { width: 100vw; height: 100vh; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; position: relative;
-            background: radial-gradient(ellipse at center, #1a1f2e 0%, #0a0d14 100%); }
-        .bg-glow { position: absolute; width: 520px; height: 520px; border-radius: 50%;
-            background: rgba(79,70,229,0.12); filter: blur(80px); pointer-events: none; }
-        .qr-wrapper { position: relative; z-index: 1; display: flex; flex-direction: column;
-            align-items: center; }
-        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-        .brand-dot { width: 10px; height: 10px; border-radius: 50%;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            box-shadow: 0 0 12px rgba(99,102,241,0.7); }
-        .brand-name { font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
-            color: rgba(255,255,255,0.6); text-transform: uppercase; }
-        .qr-frame { background: #fff; border-radius: 28px; padding: 22px;
-            box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.5),
-                        0 0 80px rgba(99,102,241,0.15);
-            display: flex; align-items: center; justify-content: center; }
-        canvas { display: block; width: min(72vw, 360px) !important; height: min(72vw, 360px) !important; }
-        .url-label { margin-top: 22px; display: flex; align-items: center; gap: 8px; }
-        .url-label span { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.45); }
-        .url-label code { font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.9); }
-        .actions { margin-top: 28px; display: flex; gap: 12px; }
-        .btn { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border: none;
-            border-radius: 100px; font-size: 13px; font-weight: 700; cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; }
-        .btn:hover { transform: translateY(-2px) scale(1.03); }
-        .btn-copy { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9);
-            border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(12px); }
-        .btn-download { background: linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff;
-            box-shadow: 0 4px 20px rgba(79,70,229,0.4); }
-        .toast { position: fixed; top: 28px; left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            background: rgba(30,41,59,0.95); border: 1px solid rgba(255,255,255,0.1);
-            color: #fff; padding: 10px 22px; border-radius: 100px;
-            font-size: 12px; font-weight: 600; opacity: 0; transition: all 0.3s ease;
-            pointer-events: none; backdrop-filter: blur(10px); white-space: nowrap; z-index: 100; }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        @media (max-width: 480px) { .qr-frame { padding: 14px; border-radius: 20px; } }
-    </style>
-</head>
-<body>
-<div class="page">
-    <div class="bg-glow"></div>
-    <div class="qr-wrapper">
-        <div class="brand"><div class="brand-dot"></div><span class="brand-name">edulink</span></div>
-        <div class="qr-frame">
-            <img id="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&data=${encodeURIComponent(shortUrl)}" alt="QR Code" style="display:block;width:min(72vw,360px);height:min(72vw,360px);">
-        </div>
-        <div class="url-label"><span>단축주소</span><code id="url-text">${shortUrl}</code></div>
-        <div class="actions">
-            <button class="btn btn-copy" onclick="copyUrl()">🔗 주소 복사</button>
-            <button class="btn btn-download" onclick="downloadPng()">⬇ PNG 저장</button>
-        </div>
-    </div>
-</div>
-<div class="toast" id="toast"></div>
-<script>
-    const url = '${shortUrl}';
-    function copyUrl() {
-        navigator.clipboard.writeText(url).then(() => showToast('주소가 복사됐습니다!'));
-    }
-    function downloadPng() {
-        const a = document.createElement('a');
-        a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&ecc=H&margin=10&format=png&data=' + encodeURIComponent(url);
-        a.download = '${slug}-qr.png';
-        a.target = '_blank';
-        a.click();
-    }
-    function showToast(m) {
-        const t = document.getElementById('toast');
-        t.textContent = m;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2200);
-    }
-</script>
-</body>
-</html>`;
-    return new Response(html, { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
+    return new Response(
+        '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>QR 오류</title></head>' +
+        '<body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;background:#0f1117;color:#fff">' +
+        '<div style="text-align:center"><h2 style="color:#f87171;margin:0 0 12px">존재하지 않는 단축주소입니다</h2>' +
+        '<p style="color:#94a3b8;font-size:13px;margin:0">/' + slug + ' 슬러그를 찾을 수 없습니다.</p></div></body></html>',
+        { status: 404, headers: { 'Content-Type': 'text/html; charset=UTF-8' } }
+    );
 }
 
-// 8.9 /qr/:slug  및  /:slug.qr  — QR 코드 전체화면
 app.get('/qr/:slug', async (c) => {
     let slug = c.req.param('slug');
     try { slug = decodeURIComponent(slug).normalize('NFC'); } catch { slug = slug.normalize('NFC'); }
-    try {
-        const res = await buildQrResponse(slug, c.req.url, c.env);
-        if (res) return res;
-    } catch (err) {
-        console.error('QR route error:', err);
-    }
-    return c.html('<p style="text-align:center;margin-top:50px;font-family:sans-serif">존재하지 않는 단축주소입니다.</p>', 404);
+    return handleQrRequest(slug, c.req.url, c.env);
 });
 
-// /:slug.qr 패턴 (예: /Q9FPip.qr)
 app.get('/:slug{[^/]+\\.qr}', async (c) => {
     let raw = c.req.param('slug');
     try { raw = decodeURIComponent(raw).normalize('NFC'); } catch { raw = raw.normalize('NFC'); }
     const slug = raw.replace(/\.qr$/i, '');
-    try {
-        const res = await buildQrResponse(slug, c.req.url, c.env);
-        if (res) return res;
-    } catch (err) {
-        console.error('QR .qr route error:', err);
-    }
-    return c.html('<p style="text-align:center;margin-top:50px;font-family:sans-serif">존재하지 않는 단축주소입니다.</p>', 404);
+    return handleQrRequest(slug, c.req.url, c.env);
 });
 
 // 9. /{slug} 리다이렉트 怨좎냽 由щ뵒?됱뀡
