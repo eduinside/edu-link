@@ -2,4 +2,5 @@
 interface Env {
     JWT_SECRET?: string;
     RESEND_API_KEY?: string;
+    KAKAO_CLIENT_ID?: string;
 }

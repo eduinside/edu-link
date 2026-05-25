@@ -46,10 +46,10 @@ app.get('/api/notices', async (c) => {
 app.get('/api/links/public', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
-            `SELECT slug, original_url, click_count, created_at 
-             FROM urls 
+            `SELECT slug, custom_slug, title, original_url, created_at
+             FROM urls
              WHERE is_active = 1 AND is_public = 1
-             ORDER BY created_at DESC 
+             ORDER BY created_at DESC
              LIMIT 10`
         ).all();
         return c.json({ success: true, links: results });
@@ -162,17 +162,28 @@ app.post('/api/verify-password', async (c) => {
 app.post('/api/auth/otp/send', async (c) => {
     try {
         const { email, name } = await c.req.json();
-        if (!email || !name || !email.trim() || !name.trim()) {
-            return c.json({ success: false, error: '\uc774\uba54\uc77c\uacfc \uc774\ub984\uc744 \ubaa8\ub450 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
+        if (!email || !email.trim()) {
+            return c.json({ success: false, error: '\uc774\uba54\uc77c\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
+        }
+
+        const cleanEmail = email.trim().toLowerCase();
+
+        // \uae30\uc874 \uc0ac\uc6a9\uc790 \uc5ec\ubd80 \ud655\uc778 (\uc2e0\uaddc\ub294 \uc774\ub984 \ud544\uc218)
+        const existingUser = await c.env.DB.prepare("SELECT name FROM users WHERE email = ?")
+            .bind(cleanEmail)
+            .first<{ name: string }>();
+
+        const displayName = existingUser?.name || (name ? name.trim() : null);
+        if (!existingUser && !displayName) {
+            return c.json({ success: false, error: '\uc2e0\uaddc \uc0ac\uc6a9\uc790\ub294 \uc774\ub984\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
         }
 
         // 6\uc790\ub9ac OTP \ucf54\ub4dc \uc0dd\uc131
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
         // KV \uce90\uc2dc\uc5d0 5\ubd84\uac04 \uc800\uc7a5
-        const cleanEmail = email.trim().toLowerCase();
         const cacheKey = `otp:${cleanEmail}`;
-        const cacheValue = JSON.stringify({ code: otpCode, name: name.trim() });
+        const cacheValue = JSON.stringify({ code: otpCode, name: displayName });
 
         await c.env.URL_CACHE.put(cacheKey, cacheValue, { expirationTtl: 300 });
 
@@ -193,7 +204,7 @@ app.post('/api/auth/otp/send', async (c) => {
       <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">\uad50\uc721\uae30\uad00 \ub2e8\ucd95\uc8fc\uc18c \ud50c\ub7ab\ud3fc</p>
     </div>
     <div style="padding:36px 40px;">
-      <p style="color:#1e293b;font-size:16px;font-weight:700;margin:0 0 8px;">${name.trim()}\ub2d8, \uc548\ub155\ud558\uc138\uc694!</p>
+      <p style="color:#1e293b;font-size:16px;font-weight:700;margin:0 0 8px;">${displayName}\ub2d8, \uc548\ub155\ud558\uc138\uc694!</p>
       <p style="color:#64748b;font-size:14px;line-height:1.7;margin:0 0 28px;">\uc5d0\ub4c0\ub9c1\ud06c \ub85c\uadf8\uc778 \uc778\uc99d\ucf54\ub4dc\uc785\ub2c8\ub2e4.<br>\uc544\ub798 6\uc790\ub9ac \ucf54\ub4dc\ub97c 5\ubd84 \uc774\ub0b4\uc5d0 \uc785\ub825\ud574 \uc8fc\uc138\uc694.</p>
       <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:16px;padding:28px;text-align:center;margin-bottom:28px;">
         <p style="color:#94a3b8;font-size:12px;font-weight:600;margin:0 0 10px;letter-spacing:0.05em;text-transform:uppercase;">\uc778\uc99d\ucf54\ub4dc</p>
@@ -386,6 +397,103 @@ app.post('/api/auth/logout', async (c) => {
 // ----------------------------------------------------
 // [?몄쬆 ?곸뿭] Cloudflare Access ?몄쬆???꾩슂???대? API 洹몃９
 // ----------------------------------------------------
+// 이메일 존재 여부 확인 (공개 API - 로그인 모달 UX)
+app.get('/api/auth/check-email', async (c) => {
+    const email = c.req.query('email');
+    if (!email || !email.trim()) return c.json({ exists: false });
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await c.env.DB.prepare("SELECT name FROM users WHERE email = ?")
+        .bind(cleanEmail)
+        .first<{ name: string }>();
+    return c.json({ exists: !!user, name: user?.name ?? null });
+});
+
+// 카카오 OAuth 로그인 시작
+app.get('/api/auth/kakao', (c) => {
+    const clientId = c.env.KAKAO_CLIENT_ID;
+    if (!clientId) return c.redirect('/?kakao_error=not_configured', 302);
+    const redirectUri = 'https://dgedu.link/api/auth/kakao/callback';
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=profile_nickname,account_email`;
+    return c.redirect(kakaoAuthUrl, 302);
+});
+
+// 카카오 OAuth 콜백
+app.get('/api/auth/kakao/callback', async (c) => {
+    const code = c.req.query('code');
+    const error = c.req.query('error');
+    if (error || !code) return c.redirect('/?kakao_error=1', 302);
+
+    const clientId = c.env.KAKAO_CLIENT_ID!;
+    const redirectUri = 'https://dgedu.link/api/auth/kakao/callback';
+
+    try {
+        // 1. 인가 코드 → 액세스 토큰
+        const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                code,
+            }).toString(),
+        });
+        if (!tokenRes.ok) {
+            console.error('Kakao token error:', await tokenRes.text());
+            return c.redirect('/?kakao_error=2', 302);
+        }
+        const tokenData: any = await tokenRes.json();
+
+        // 2. 사용자 정보 조회
+        const userRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        if (!userRes.ok) {
+            console.error('Kakao user info error:', await userRes.text());
+            return c.redirect('/?kakao_error=3', 302);
+        }
+        const userData: any = await userRes.json();
+
+        const kakaoId: string = String(userData.id);
+        const kakaoEmail: string = userData.kakao_account?.email || `kakao_${kakaoId}@kakao.local`;
+        const kakaoName: string = userData.kakao_account?.profile?.nickname
+            || userData.properties?.nickname || '커카오사용자';
+
+        // 3. 기존 사용자 조회 또는 신규 생성
+        let userRecord = await c.env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+            .bind(kakaoEmail)
+            .first<{ id: number; email: string; name: string; level: number }>();
+
+        if (!userRecord) {
+            const domain = kakaoEmail.split('@')[1];
+            const isAllowed = await c.env.DB.prepare("SELECT id FROM allowed_domains WHERE domain = ?")
+                .bind(domain).first();
+            const level = isAllowed ? 2 : 1;
+            const insert = await c.env.DB.prepare("INSERT INTO users (email, name, level) VALUES (?, ?, ?)")
+                .bind(kakaoEmail, kakaoName, level).run();
+            userRecord = { id: Number(insert.meta.last_row_id), email: kakaoEmail, name: kakaoName, level };
+        }
+
+        // 4. JWT 세션 쿠키 발급
+        const secret = new TextEncoder().encode(c.env.JWT_SECRET || 'edulink_jwt_secret_key_2026_xyz');
+        const sessionToken = await new SignJWT({
+            id: userRecord.id, email: userRecord.email, name: userRecord.name, level: userRecord.level,
+        })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setExpirationTime('7d')
+            .sign(secret);
+
+        setCookie(c, 'edulink_token', sessionToken, {
+            path: '/', secure: true, httpOnly: true, maxAge: 7 * 24 * 60 * 60, sameSite: 'Lax',
+        });
+
+        return c.redirect('/dashboard', 302);
+    } catch (err: any) {
+        console.error('Kakao login error:', err);
+        return c.redirect('/?kakao_error=4', 302);
+    }
+});
+
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 const api = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 

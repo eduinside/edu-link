@@ -68,39 +68,70 @@ export default function Landing() {
   // 모달 상태
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authTab, setAuthTab] = useState<'email' | 'google'>('email');
-  
+
   // 이메일 OTP 로그인 상태
   const [loginEmail, setLoginEmail] = useState('');
   const [loginName, setLoginName] = useState('');
+  const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
+  const [existingUserName, setExistingUserName] = useState('');
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [debugOtp, setDebugOtp] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // 구글 커스텀 계정 입력 상태
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
+  // 이메일 존재 여부 확인 (blur 또는 submit 시)
+  const checkEmailExists = async (email: string) => {
+    if (!email || !email.includes('@')) return;
+    setIsCheckingEmail(true);
+    try {
+      const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      const data = await res.json();
+      setIsExistingUser(data.exists);
+      if (data.exists && data.name) setExistingUserName(data.name);
+    } catch {}
+    setIsCheckingEmail(false);
+  };
 
   // 이메일 OTP 전송
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginName) return;
+    if (!loginEmail) return;
     setAuthLoading(true);
     setAuthError('');
+
+    // 이메일 체크가 아직 안 된 경우 먼저 체크
+    let existingCheck = isExistingUser;
+    if (existingCheck === null) {
+      try {
+        const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(loginEmail.trim().toLowerCase())}`);
+        const data = await res.json();
+        existingCheck = data.exists;
+        setIsExistingUser(data.exists);
+        if (data.exists && data.name) setExistingUserName(data.name);
+      } catch {
+        setAuthError('서버 통신 실패');
+        setAuthLoading(false);
+        return;
+      }
+    }
+    if (!existingCheck && !loginName.trim()) {
+      setAuthError('신규 가입 사용자는 이름을 입력해주세요.');
+      setAuthLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, name: loginName })
+        body: JSON.stringify({ email: loginEmail, name: loginName || undefined })
       });
       const data = await res.json();
       if (data.success) {
         setOtpSent(true);
-        if (data.debug_otp) {
-          setDebugOtp(data.debug_otp);
-        }
+        if (data.debug_otp) setDebugOtp(data.debug_otp);
       } else {
         setAuthError(data.error || 'OTP 전송에 실패했습니다.');
       }
@@ -129,6 +160,8 @@ export default function Landing() {
         setOtpSent(false);
         setLoginEmail('');
         setLoginName('');
+        setIsExistingUser(null);
+        setExistingUserName('');
         setOtpCode('');
         setDebugOtp('');
         
@@ -137,36 +170,6 @@ export default function Landing() {
         navigate('/dashboard');
       } else {
         setAuthError(data.error || '인증번호가 올바르지 않습니다.');
-      }
-    } catch {
-      setAuthError('서버 통신 실패');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // 구글 로그인 시뮬레이션
-  const handleGoogleMockLogin = async (email: string, name: string) => {
-    if (!email || !name) return;
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const res = await fetch('/api/auth/google/mock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setShowAuthModal(false);
-        setGoogleEmail('');
-        setGoogleName('');
-        
-        setUser(data.user);
-        setIsLoggedIn(true);
-        navigate('/dashboard');
-      } else {
-        setAuthError(data.error || '로그인 중 오류가 발생했습니다.');
       }
     } catch {
       setAuthError('서버 통신 실패');
@@ -733,7 +736,7 @@ export default function Landing() {
         </div>
       )}
 
-      {/* 🔐 통합 로그인 모달 (이메일 OTP & 구글 로그인) */}
+      {/* 🔐 통합 로그인 모달 (카카오 + 이메일 OTP) */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-3xl overflow-hidden bg-white animate-fade-in">
@@ -741,25 +744,27 @@ export default function Landing() {
               <LogIn className="w-5 h-5" />
               <div>
                 <h3 className="font-bold text-sm">에듀링크 로그인</h3>
-                <p className="text-[10px] text-indigo-200">OTP 및 구글 연동 로그인을 지원합니다.</p>
+                <p className="text-[10px] text-indigo-200">교육기관 임직원 전용 서비스입니다.</p>
               </div>
             </div>
 
-            <CardContent className="p-6 space-y-5">
-              {/* 탭 헤더 */}
-              <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                <button
-                  onClick={() => { setAuthTab('email'); setAuthError(''); }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${authTab === 'email' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  📧 이메일 OTP 인증
-                </button>
-                <button
-                  onClick={() => { setAuthTab('google'); setAuthError(''); }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${authTab === 'google' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  🌐 구글 로그인 처리
-                </button>
+            <CardContent className="p-6 space-y-4">
+              {/* 카카오 로그인 버튼 */}
+              <button
+                type="button"
+                onClick={() => { window.location.href = '/api/auth/kakao'; }}
+                className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-2xl font-bold text-sm transition-all shadow-sm"
+                style={{ backgroundColor: '#FEE500', color: '#3C1E1E' }}
+              >
+                <span className="text-base leading-none font-black">K</span>
+                카카오 계정으로 로그인
+              </button>
+
+              {/* 구분선 */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-slate-100" />
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">또는 이메일 OTP</span>
+                <div className="flex-1 h-px bg-slate-100" />
               </div>
 
               {authError && (
@@ -768,199 +773,118 @@ export default function Landing() {
                 </div>
               )}
 
-              {/* 1. 이메일 OTP 폼 */}
-              {authTab === 'email' && (
-                <div className="space-y-4">
-                  {!otpSent ? (
-                    <form onSubmit={handleSendOtp} className="space-y-3.5">
-                      <div className="space-y-1.5 text-xs">
-                        <label className="font-bold text-slate-600">사용자명 (성함)</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="성함을 입력하세요 (예: 홍길동)"
-                          value={loginName}
-                          onChange={(e) => setLoginName(e.target.value)}
-                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
-                        />
+              {!otpSent ? (
+                <form onSubmit={handleSendOtp} className="space-y-3.5">
+                  {/* 이메일 입력 */}
+                  <div className="space-y-1.5 text-xs">
+                    <label className="font-bold text-slate-600">이메일 주소</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="email@example.com"
+                      value={loginEmail}
+                      onChange={(e) => {
+                        setLoginEmail(e.target.value);
+                        setIsExistingUser(null);
+                        setExistingUserName('');
+                      }}
+                      onBlur={() => checkEmailExists(loginEmail)}
+                      className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                    />
+                    {isCheckingEmail && (
+                      <p className="text-[9px] text-slate-400">이메일 확인 중...</p>
+                    )}
+                    {isExistingUser === true && !isCheckingEmail && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold">
+                        <Check className="w-3 h-3" />
+                        기존 사용자 — {existingUserName}님으로 로그인합니다
                       </div>
-
-                      <div className="space-y-1.5 text-xs">
-                        <label className="font-bold text-slate-600">이메일 주소</label>
-                        <input
-                          type="email"
-                          required
-                          placeholder="email@example.com"
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
-                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
-                        />
-                        <span className="text-[9px] text-slate-400 font-medium leading-normal">
-                          💡 화이트리스트 도메인(korea.kr, dge.go.kr 등) 메일은 <strong>2단계 인증사용자</strong>로 자동 승급 가입됩니다.
-                        </span>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        color="primary"
-                        className="w-full rounded-xl font-bold py-5 text-xs shadow-md shadow-primary/20"
-                        isLoading={authLoading}
-                      >
-                        OTP 코드 전송
-                      </Button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleVerifyOtp} className="space-y-3.5">
-                      <div className="space-y-2 text-center bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
-                        <p className="text-[11px] text-indigo-700 font-bold">
-                          {loginEmail} 주소로 인증코드가 발송되었습니다.
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          인증용 6자리 OTP 코드를 입력해 주세요. (5분 내 유효)
-                        </p>
-                        {debugOtp && (
-                          <div className="mt-2 bg-amber-100 border border-amber-200 p-2 rounded-xl">
-                            <span className="text-[10px] text-amber-800 font-bold">
-                              🧪 모의 테스트 인증코드: <code className="bg-white px-1.5 py-0.5 rounded font-mono font-black">{debugOtp}</code>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5 text-xs">
-                        <label className="font-bold text-slate-600">인증코드 (6자리)</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={6}
-                          placeholder="000000"
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                          className="w-full text-center tracking-widest font-mono font-bold text-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-slate-800 transition-all"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="flat"
-                          color="default"
-                          className="rounded-xl font-bold text-xs"
-                          onClick={() => { setOtpSent(false); setOtpCode(''); }}
-                        >
-                          이메일 변경
-                        </Button>
-                        <Button
-                          type="submit"
-                          color="primary"
-                          className="flex-1 rounded-xl font-bold text-xs shadow-md shadow-primary/20"
-                          isLoading={authLoading}
-                        >
-                          인증 완료 및 로그인
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              )}
-
-              {/* 2. 구글 로그인 시뮬레이션 */}
-              {authTab === 'google' && (
-                <div className="space-y-4">
-                  <div className="text-center space-y-1.5">
-                    <p className="text-[11px] text-slate-400">
-                      테스트를 원하시는 Google 계정을 아래에서 선택하거나,<br />하단 입력창을 통해 원하는 이메일로 접속하실 수 있습니다.
-                    </p>
+                    )}
+                    {isExistingUser === false && !isCheckingEmail && (
+                      <p className="text-[10px] text-indigo-600 font-semibold">✨ 신규 가입 — 아래에 성함을 입력해주세요</p>
+                    )}
+                    <span className="text-[9px] text-slate-400 font-medium leading-normal">
+                      💡 화이트리스트 도메인(korea.kr, dge.go.kr 등) 메일은 <strong>2단계 인증사용자</strong>로 자동 승급됩니다.
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => handleGoogleMockLogin('teacher@dge.go.kr', '김교사')}
-                      className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-100 hover:border-slate-200 p-3 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs font-sans">G</div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">김교사</p>
-                          <p className="text-[10px] text-slate-400">teacher@dge.go.kr</p>
-                        </div>
-                      </div>
-                      <Chip size="sm" color="success" variant="flat" className="h-5 text-[9px] font-bold">
-                        2레벨(자동승급)
-                      </Chip>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleGoogleMockLogin('admin@korea.kr', '이관리')}
-                      className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-100 hover:border-slate-200 p-3 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs font-sans">G</div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">이관리</p>
-                          <p className="text-[10px] text-slate-400">admin@korea.kr</p>
-                        </div>
-                      </div>
-                      <Chip size="sm" color="danger" variant="flat" className="h-5 text-[9px] font-bold">
-                        4레벨(최고관리자)
-                      </Chip>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleGoogleMockLogin('student@gmail.com', '박학생')}
-                      className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-100 hover:border-slate-200 p-3 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs font-sans">G</div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">박학생</p>
-                          <p className="text-[10px] text-slate-400">student@gmail.com</p>
-                        </div>
-                      </div>
-                      <Chip size="sm" color="default" variant="flat" className="h-5 text-[9px] font-bold">
-                        1레벨(일반로그인)
-                      </Chip>
-                    </button>
-                  </div>
-
-                  <div className="relative flex py-2 items-center">
-                    <div className="flex-grow border-t border-slate-100"></div>
-                    <span className="flex-shrink mx-3 text-[9px] text-slate-300 font-bold uppercase">또는 직접 입력</span>
-                    <div className="flex-grow border-t border-slate-100"></div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs bg-slate-50/50 p-4 border border-slate-100 rounded-2xl">
-                    <div className="flex gap-2">
+                  {/* 신규 사용자만 이름 입력 */}
+                  {isExistingUser === false && (
+                    <div className="space-y-1.5 text-xs">
+                      <label className="font-bold text-slate-600">성함 (이름)</label>
                       <input
                         type="text"
-                        placeholder="이름"
-                        value={googleName}
-                        onChange={(e) => setGoogleName(e.target.value)}
-                        className="w-1/3 border border-slate-200 bg-white focus:border-indigo-400 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-800 transition-all"
-                      />
-                      <input
-                        type="email"
-                        placeholder="google_email@domain.com"
-                        value={googleEmail}
-                        onChange={(e) => setGoogleEmail(e.target.value)}
-                        className="flex-1 border border-slate-200 bg-white focus:border-indigo-400 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-800 transition-all"
+                        required
+                        placeholder="홍길동"
+                        value={loginName}
+                        onChange={(e) => setLoginName(e.target.value)}
+                        className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                        autoFocus
                       />
                     </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    color="primary"
+                    className="w-full rounded-xl font-bold py-5 text-xs shadow-md shadow-primary/20"
+                    isLoading={authLoading}
+                  >
+                    OTP 코드 전송
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-3.5">
+                  <div className="space-y-2 text-center bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
+                    <p className="text-[11px] text-indigo-700 font-bold">
+                      {loginEmail} 주소로 인증코드가 발송되었습니다.
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      인증용 6자리 OTP 코드를 입력해 주세요. (5분 내 유효)
+                    </p>
+                    {debugOtp && (
+                      <div className="mt-2 bg-amber-100 border border-amber-200 p-2 rounded-xl">
+                        <span className="text-[10px] text-amber-800 font-bold">
+                          🧪 모의 테스트 인증코드: <code className="bg-white px-1.5 py-0.5 rounded font-mono font-black">{debugOtp}</code>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    <label className="font-bold text-slate-600">인증코드 (6자리)</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      placeholder="000000"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full text-center tracking-widest font-mono font-bold text-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-slate-800 transition-all"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
                     <Button
-                      size="sm"
-                      color="secondary"
-                      className="w-full rounded-xl font-bold py-4 text-xs shadow-sm"
-                      onClick={() => handleGoogleMockLogin(googleEmail, googleName)}
-                      disabled={!googleEmail || !googleName}
+                      type="button"
+                      variant="flat"
+                      color="default"
+                      className="rounded-xl font-bold text-xs"
+                      onClick={() => { setOtpSent(false); setOtpCode(''); setAuthError(''); }}
+                    >
+                      이메일 변경
+                    </Button>
+                    <Button
+                      type="submit"
+                      color="primary"
+                      className="flex-1 rounded-xl font-bold text-xs shadow-md shadow-primary/20"
                       isLoading={authLoading}
                     >
-                      구글 가상 로그인
+                      인증 완료 및 로그인
                     </Button>
                   </div>
-                </div>
+                </form>
               )}
             </CardContent>
 
@@ -975,6 +899,8 @@ export default function Landing() {
                   setOtpSent(false);
                   setLoginEmail('');
                   setLoginName('');
+                  setIsExistingUser(null);
+                  setExistingUserName('');
                   setOtpCode('');
                   setDebugOtp('');
                   setAuthError('');
