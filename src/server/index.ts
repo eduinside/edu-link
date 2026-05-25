@@ -971,9 +971,7 @@ api.delete('/keys/:id', async (c) => {
     }
 });
 
-// v1 외부 API — /api보다 먼저 등록해야 authMiddleware를 우회함
 const v1 = new Hono<{ Bindings: Env }>();
-app.route('/api/v1', v1);
 app.route("/api", api);
 
 // ----------------------------------------------------
@@ -1256,7 +1254,8 @@ v1.post('/shorten', async (c) => {
     }
 });
 
-// v1 외부 API — /api보다 먼저 등록해야 authMiddleware를 우회함
+// v1을 api 내부에 마운트 — authMiddleware가 /api/v1/ 경로는 건너뜀
+api.route('/v1', v1);
 
 
 // ----------------------------------------------------
