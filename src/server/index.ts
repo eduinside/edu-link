@@ -100,32 +100,87 @@ app.post('/api/verify-password', async (c) => {
     }
 });
 
-// 3.2 [怨듦났 ?몄쬆 諛??먯껜 ?몄뀡 愿由?API]
+// 3.2 [OTP Email send & login API]
 app.post('/api/auth/otp/send', async (c) => {
     try {
         const { email, name } = await c.req.json();
         if (!email || !name || !email.trim() || !name.trim()) {
-            return c.json({ success: false, error: '?대찓?쇨낵 ?ъ슜?먮챸??紐⑤몢 ?낅젰??二쇱꽭??' }, 400);
+            return c.json({ success: false, error: '\uc774\uba54\uc77c\uacfc \uc774\ub984\uc744 \ubaa8\ub450 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
         }
-        
-        // 6?먮━ OTP 肄붾뱶 ?앹꽦
+
+        // 6\uc790\ub9ac OTP \ucf54\ub4dc \uc0dd\uc131
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // KV 罹먯떆??5遺꾧컙 ???(email, name, code)
+
+        // KV \uce90\uc2dc\uc5d0 5\ubd84\uac04 \uc800\uc7a5
         const cleanEmail = email.trim().toLowerCase();
         const cacheKey = `otp:${cleanEmail}`;
         const cacheValue = JSON.stringify({ code: otpCode, name: name.trim() });
-        
+
         await c.env.URL_CACHE.put(cacheKey, cacheValue, { expirationTtl: 300 });
-        
-        console.log(`[OTP 諛쒖넚 ?꾨즺] ??? ${cleanEmail}, ?대쫫: ${name}, 肄붾뱶: ${otpCode}`);
-        
-        const isLocal = !c.req.url.includes('dgedu.link');
-        
-        return c.json({ 
-            success: true, 
-            message: 'OTP 肄붾뱶媛 ?앹꽦?섏뿀?듬땲?? (?대찓???꾩넚 ?쒕??덉씠??',
-            ...(isLocal ? { debug_otp: otpCode } : {})
+
+        console.log(`[OTP \ubc1c\uc1a1] \uc774\uba54\uc77c: ${cleanEmail}, \ucf54\ub4dc: ${otpCode}`);
+
+        const isProd = c.req.url.includes('dgedu.link');
+
+        // \ud504\ub85c\ub355\uc158: Resend API\ub85c \uc2e4\uc81c \uc774\uba54\uc77c \ubc1c\uc1a1
+        if (isProd && c.env.RESEND_API_KEY) {
+            const emailHtml = `
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:'Apple SD Gothic Neo',sans-serif;background:#f5f7fa;margin:0;padding:40px 0;">
+  <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#2563eb,#4f46e5);padding:32px 40px;">
+      <h1 style="color:#fff;margin:0;font-size:22px;font-weight:900;letter-spacing:-0.5px;">\uc5d0\ub4c0\ub9c1\ud06c</h1>
+      <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">\uad50\uc721\uae30\uad00 \ub2e8\ucd95\uc8fc\uc18c \ud50c\ub7ab\ud3fc</p>
+    </div>
+    <div style="padding:36px 40px;">
+      <p style="color:#1e293b;font-size:16px;font-weight:700;margin:0 0 8px;">${name.trim()}\ub2d8, \uc548\ub155\ud558\uc138\uc694!</p>
+      <p style="color:#64748b;font-size:14px;line-height:1.7;margin:0 0 28px;">\uc5d0\ub4c0\ub9c1\ud06c \ub85c\uadf8\uc778 \uc778\uc99d\ucf54\ub4dc\uc785\ub2c8\ub2e4.<br>\uc544\ub798 6\uc790\ub9ac \ucf54\ub4dc\ub97c 5\ubd84 \uc774\ub0b4\uc5d0 \uc785\ub825\ud574 \uc8fc\uc138\uc694.</p>
+      <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:16px;padding:28px;text-align:center;margin-bottom:28px;">
+        <p style="color:#94a3b8;font-size:12px;font-weight:600;margin:0 0 10px;letter-spacing:0.05em;text-transform:uppercase;">\uc778\uc99d\ucf54\ub4dc</p>
+        <p style="color:#1e293b;font-size:40px;font-weight:900;margin:0;letter-spacing:12px;font-family:'Courier New',monospace;">${otpCode}</p>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0;">
+        \uc774 \ucf54\ub4dc\ub294 <strong>5\ubd84 \ud6c4 \ub9cc\ub8cc</strong>\ub429\ub2c8\ub2e4.<br>
+        \ubcf8\uc778\uc774 \uc694\uccad\ud558\uc9c0 \uc54a\uc558\ub2e4\uba74 \uc774 \uba54\uc77c\uc744 \ubb34\uc2dc\ud558\uc138\uc694.
+      </p>
+    </div>
+    <div style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+      <p style="color:#cbd5e1;font-size:11px;margin:0;text-align:center;">&copy; 2026 \uc5d0\ub4c0\ub9c1\ud06c &middot; dgedu.link</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+            const resendRes = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    from: '\uc5d0\ub4c0\ub9c1\ud06c <noreply@dgedu.link>',
+                    to: [cleanEmail],
+                    subject: `[\uc5d0\ub4c0\ub9c1\ud06c] \ub85c\uadf8\uc778 \uc778\uc99d\ucf54\ub4dc: ${otpCode}`,
+                    html: emailHtml,
+                }),
+            });
+
+            if (!resendRes.ok) {
+                const errText = await resendRes.text();
+                console.error(`[Resend \uc624\ub958] ${resendRes.status}: ${errText}`);
+                return c.json({ success: false, error: '\uc774\uba54\uc77c \ubc1c\uc1a1\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.' }, 500);
+            }
+
+            return c.json({ success: true, message: `${cleanEmail}\ub85c \uc778\uc99d\ucf54\ub4dc\ub97c \ubc1c\uc1a1\ud588\uc2b5\ub2c8\ub2e4.` });
+        }
+
+        // \ub85c\uce7c/\uac1c\ubc1c \ud658\uacbd: debug_otp \ubc18\ud658
+        return c.json({
+            success: true,
+            message: 'OTP \ucf54\ub4dc\uac00 \uc0dd\uc131\ub428\ub2c8\ub2e4. (\uc774\uba54\uc77c \ubc1c\uc1a1 \uc2dc\ubbac\ub808\uc774\uc158)',
+            debug_otp: otpCode,
         });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
