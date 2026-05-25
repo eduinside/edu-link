@@ -521,11 +521,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 const api = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 
-// /v1/* 경로는 자체 API Key 인증을 사용하므로 제외
-api.use('*', async (c, next) => {
-    if (c.req.path.startsWith('/api/v1/')) return next();
-    return authMiddleware()(c, next);
-});
+api.use('*', authMiddleware());
 
 // 4. ???꾨줈???뺣낫 議고쉶
 api.get('/auth/me', (c) => {
@@ -971,7 +967,6 @@ api.delete('/keys/:id', async (c) => {
     }
 });
 
-const v1 = new Hono<{ Bindings: Env }>();
 app.route("/api", api);
 
 // ----------------------------------------------------
@@ -1119,10 +1114,9 @@ app.route("/api/admin", adminApi);
 
 
 // CORS & Rate Limit 寃고빀 (API Key???뱀? IP??遺꾨떦 理쒕? 15???덉슜)
-v1.use('*', rateLimitMiddleware({ limit: 15, windowSec: 60 }));
 
 // 8.5 ?몃????⑥텞 URL ?앹꽦 API
-v1.post('/shorten', async (c) => {
+app.post('/api/v1/shorten', async (c) => {
     try {
         // ?몄쬆 ?섎떒 ?뺤씤 (?ㅻ뜑 Authorization ?먮뒗 x-api-key)
         let token = c.req.header('x-api-key') || '';
@@ -1254,8 +1248,6 @@ v1.post('/shorten', async (c) => {
     }
 });
 
-// v1을 api 내부에 마운트 — authMiddleware가 /api/v1/ 경로는 건너뜀
-api.route('/v1', v1);
 
 
 // ----------------------------------------------------
