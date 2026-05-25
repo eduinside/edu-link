@@ -1,5 +1,5 @@
 // src/client/pages/Dashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Button, 
   Card, 
@@ -99,6 +99,7 @@ export default function Dashboard() {
   // 새 단축 링크 상태
   const [newUrl, setNewUrl] = useState('');
   const [newTitle, setNewTitle] = useState('');
+  const [isFetchingNewTitle, setIsFetchingNewTitle] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [useCustomSlug, setUseCustomSlug] = useState(false);
@@ -120,6 +121,7 @@ export default function Dashboard() {
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
   const [editUrl, setEditUrl] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [isFetchingEditTitle, setIsFetchingEditTitle] = useState(false);
   const [editDesc, setEditDesc] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editPublic, setEditPublic] = useState(false);
@@ -160,6 +162,47 @@ export default function Dashboard() {
 
   // 모의 테스트용 권한 상태
   const [mockRole, setMockRole] = useState<string | null>(localStorage.getItem('mock_role'));
+
+  // URL → 제목 자동완성용 타이머 ref
+  const newTitleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editTitleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // URL 입력 시 og:title / <title> 자동 완성
+  const handleNewUrlChange = (url: string) => {
+    setNewUrl(url);
+    if (newTitleTimerRef.current) clearTimeout(newTitleTimerRef.current);
+    if (!url) return;
+    newTitleTimerRef.current = setTimeout(async () => {
+      try { new URL(url); } catch { return; }
+      setIsFetchingNewTitle(true);
+      try {
+        const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (data.success && data.title) {
+          setNewTitle(prev => prev ? prev : data.title);
+        }
+      } catch { /* 무시 */ }
+      setIsFetchingNewTitle(false);
+    }, 800);
+  };
+
+  const handleEditUrlChange = (url: string) => {
+    setEditUrl(url);
+    if (editTitleTimerRef.current) clearTimeout(editTitleTimerRef.current);
+    if (!url) return;
+    editTitleTimerRef.current = setTimeout(async () => {
+      try { new URL(url); } catch { return; }
+      setIsFetchingEditTitle(true);
+      try {
+        const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (data.success && data.title) {
+          setEditTitle(prev => prev ? prev : data.title);
+        }
+      } catch { /* 무시 */ }
+      setIsFetchingEditTitle(false);
+    }, 800);
+  };
 
   // fetch 시 mock 헤더 주입용 헬퍼
   const getHeaders = (extra = {}) => {
@@ -989,7 +1032,7 @@ export default function Dashboard() {
                             required
                             placeholder="단축할 원본 주소(URL)를 입력하세요 (https://...)"
                             value={newUrl}
-                            onChange={(e) => setNewUrl(e.target.value)}
+                            onChange={(e) => handleNewUrlChange(e.target.value)}
                             className="w-full font-medium"
                             disabled={user && user.level < 2}
                           />
@@ -1249,17 +1292,23 @@ export default function Dashboard() {
                                     type="url"
                                     required
                                     value={editUrl}
-                                    onChange={(e) => setEditUrl(e.target.value)}
+                                    onChange={(e) => handleEditUrlChange(e.target.value)}
                                     className="w-full"
                                   />
                                 </div>
 
                                 <div className="space-y-1.5">
-                                  <label className="font-bold text-slate-600">링크 제목</label>
+                                  <label className="font-bold text-slate-600 flex items-center gap-1.5">
+                                    링크 제목
+                                    {isFetchingEditTitle && (
+                                      <span className="text-[10px] text-primary font-normal animate-pulse">제목 불러오는 중…</span>
+                                    )}
+                                  </label>
                                   <Input
                                     size="sm"
                                     value={editTitle}
                                     onChange={(e) => setEditTitle(e.target.value)}
+                                    placeholder={isFetchingEditTitle ? '페이지 제목 가져오는 중...' : ''}
                                     className="w-full"
                                   />
                                 </div>
@@ -1427,17 +1476,22 @@ export default function Dashboard() {
                                   required
                                   placeholder="https://..."
                                   value={newUrl}
-                                  onChange={(e) => setNewUrl(e.target.value)}
+                                  onChange={(e) => handleNewUrlChange(e.target.value)}
                                   className="w-full"
                                 />
                               </div>
 
                               {/* 링크 제목 */}
                               <div className="space-y-1.5">
-                                <label className="font-bold text-slate-600">링크 제목 (선택)</label>
+                                <label className="font-bold text-slate-600 flex items-center gap-1.5">
+                                  링크 제목 (선택)
+                                  {isFetchingNewTitle && (
+                                    <span className="text-[10px] text-primary font-normal animate-pulse">제목 불러오는 중…</span>
+                                  )}
+                                </label>
                                 <Input
                                   size="sm"
-                                  placeholder="예: 학교 홈페이지"
+                                  placeholder={isFetchingNewTitle ? '페이지 제목 가져오는 중...' : '예: 학교 홈페이지'}
                                   value={newTitle}
                                   onChange={(e) => setNewTitle(e.target.value)}
                                   className="w-full"

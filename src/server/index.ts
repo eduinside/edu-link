@@ -58,7 +58,65 @@ app.get('/api/links/public', async (c) => {
     }
 });
 
-// 3.1 鍮꾨?踰덊샇 ?뺤씤 API (?쇰툝由?
+// 3.1 페이지 제목 자동 추출 API (og:title / <title> 파싱)
+app.get('/api/fetch-title', async (c) => {
+    const rawUrl = c.req.query('url');
+    if (!rawUrl) return c.json({ success: false, error: 'URL이 필요합니다.' }, 400);
+    try { new URL(rawUrl); } catch {
+        return c.json({ success: false, error: '유효하지 않은 URL입니다.' }, 400);
+    }
+    try {
+        const res = await fetch(rawUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; EduLink/1.0; +https://dgedu.link)',
+                'Accept': 'text/html,application/xhtml+xml',
+            },
+            signal: AbortSignal.timeout(5000),
+            redirect: 'follow',
+        });
+        if (!res.ok) return c.json({ success: false }, 200);
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('text/html')) return c.json({ success: false }, 200);
+
+        // <title>이 항상 <head> 안에 있으므로 처음 15KB만 읽음
+        const reader = res.body?.getReader();
+        let html = '';
+        if (reader) {
+            let bytes = 0;
+            while (bytes < 15000) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                html += new TextDecoder('utf-8', { fatal: false }).decode(value);
+                bytes += value.byteLength;
+                if (html.includes('</title>')) break;
+            }
+            await reader.cancel();
+        }
+
+        let title = '';
+        // og:title 우선
+        const ogMatch =
+            html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"'<>]+)["']/i) ||
+            html.match(/<meta[^>]*content=["']([^"'<>]+)["'][^>]*property=["']og:title["']/i);
+        if (ogMatch) title = ogMatch[1];
+        // fallback: <title>
+        if (!title) {
+            const t = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            if (t) title = t[1];
+        }
+        // HTML 엔티티 디코딩 & 정리
+        title = title
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ').trim().slice(0, 100);
+
+        return c.json({ success: true, title });
+    } catch {
+        return c.json({ success: false }, 200);
+    }
+});
+
+// 3.1b 비밀번호 확인 API (공개용)
 app.post('/api/verify-password', async (c) => {
     try {
         const body = await c.req.json();
