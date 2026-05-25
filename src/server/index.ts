@@ -1244,7 +1244,7 @@ async function buildQrResponse(slug: string, requestUrl: string, env: Env): Prom
     <div class="qr-wrapper">
         <div class="brand"><div class="brand-dot"></div><span class="brand-name">edulink</span></div>
         <div class="qr-frame">
-            <canvas id="qr"></canvas>
+            <img id="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&data=${encodeURIComponent(shortUrl)}" alt="QR Code" style="display:block;width:min(72vw,360px);height:min(72vw,360px);">
         </div>
         <div class="url-label"><span>단축주소</span><code id="url-text">${shortUrl}</code></div>
         <div class="actions">
@@ -1254,27 +1254,16 @@ async function buildQrResponse(slug: string, requestUrl: string, env: Env): Prom
     </div>
 </div>
 <div class="toast" id="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script>
     const url = '${shortUrl}';
-    const canvas = document.getElementById('qr');
-    QRCode.toCanvas(canvas, url, {
-        errorCorrectionLevel: 'H',
-        margin: 2,
-        width: 800,
-        color: { dark: '#000000', light: '#ffffff' }
-    }, function(err) {
-        if (err) {
-            canvas.parentElement.innerHTML = '<p style="color:#f87171;font-size:12px">QR 생성 실패: ' + err.message + '</p>';
-        }
-    });
     function copyUrl() {
         navigator.clipboard.writeText(url).then(() => showToast('주소가 복사됐습니다!'));
     }
     function downloadPng() {
         const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
+        a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&ecc=H&margin=10&format=png&data=' + encodeURIComponent(url);
         a.download = '${slug}-qr.png';
+        a.target = '_blank';
         a.click();
     }
     function showToast(m) {
