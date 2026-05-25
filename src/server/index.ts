@@ -517,16 +517,17 @@ api.get('/auth/me', (c) => {
 api.patch('/auth/profile', async (c) => {
     const user = c.get('user');
     try {
-        const { name } = await c.req.json();
+        const { name, affiliation } = await c.req.json();
         if (!name || !name.trim()) {
-            return c.json({ success: false, error: '?ъ슜?먮챸???낅젰??二쇱꽭??' }, 400);
+            return c.json({ success: false, error: '이름을 입력해주세요.' }, 400);
         }
-        
-        await c.env.DB.prepare("UPDATE users SET name = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(name.trim(), user.id)
+        const aff = typeof affiliation === 'string' ? affiliation.trim() : '';
+
+        await c.env.DB.prepare("UPDATE users SET name = ?, affiliation = ?, updated_at = datetime('now') WHERE id = ?")
+            .bind(name.trim(), aff, user.id)
             .run();
-            
-        return c.json({ success: true, message: '?꾨줈???뺣낫媛 ?낅뜲?댄듃?섏뿀?듬땲??', name: name.trim() });
+
+        return c.json({ success: true, message: '프로필이 업데이트되었습니다.', name: name.trim(), affiliation: aff });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
@@ -992,7 +993,7 @@ adminApi.delete('/notices/:id', async (c) => {
 adminApi.get('/users', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
-            "SELECT id, email, name, level, created_at FROM users ORDER BY created_at DESC"
+            "SELECT id, email, name, affiliation, level, created_at FROM users ORDER BY created_at DESC"
         ).all();
         return c.json({ success: true, users: results });
     } catch (err: any) {
@@ -1010,6 +1011,12 @@ adminApi.patch('/users/:id', async (c) => {
             return c.json({ success: false, error: '?щ컮瑜댁? ?딆? 沅뚰븳 ?깃툒?낅땲?? (1~4)' }, 400);
         }
         
+        // 본인 등급 변경 차단 (최고관리자 권한 해제 방지)
+        const self = c.get('user');
+        if (self && String(self.id) === String(id)) {
+            return c.json({ success: false, error: '본인의 권한 등급은 변경할 수 없습니다.' }, 400);
+        }
+
         const result = await c.env.DB.prepare("UPDATE users SET level = ?, updated_at = datetime('now') WHERE id = ?")
             .bind(numericLevel, id)
             .run();

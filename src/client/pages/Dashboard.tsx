@@ -69,7 +69,9 @@ interface User {
   id: number;
   email: string;
   name: string;
+  affiliation?: string;
   level: number;
+  created_at?: string;
 }
 
 interface Notice {
@@ -166,6 +168,7 @@ export default function Dashboard() {
 
   // 개인정보수정 상태
   const [newProfileName, setNewProfileName] = useState('');
+  const [newProfileAffiliation, setNewProfileAffiliation] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // 활용방법 / 공지사항 상태
@@ -256,6 +259,7 @@ export default function Dashboard() {
       if (data.success) {
         setUser(data.user);
         setNewProfileName(data.user.name);
+        setNewProfileAffiliation(data.user.affiliation || '');
         
         // 모의권한 및 등급 수준에 맞추어 활성 탭 자동 조율
         if (data.user.level < 2) {
@@ -344,13 +348,13 @@ export default function Dashboard() {
       const res = await fetch('/api/auth/profile', {
         method: 'PATCH',
         headers: getHeaders(),
-        body: JSON.stringify({ name: newProfileName })
+        body: JSON.stringify({ name: newProfileName, affiliation: newProfileAffiliation })
       });
       const data = await res.json();
       if (data.success) {
-        setSuccessMsg('성함이 성공적으로 변경되었습니다.');
+        setSuccessMsg('개인정보가 성공적으로 변경되었습니다.');
         if (user) {
-          setUser({ ...user, name: data.name });
+          setUser({ ...user, name: data.name, affiliation: data.affiliation });
         }
       } else {
         setError(data.error || '프로필 수정 실패');
@@ -794,7 +798,10 @@ export default function Dashboard() {
               className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
               onClick={() => {
                 setActiveTab('profile');
-                if (user) setNewProfileName(user.name);
+                if (user) {
+                  setNewProfileName(user.name);
+                  setNewProfileAffiliation(user.affiliation || '');
+                }
               }}
               startContent={<User className="w-4 h-4 flex-shrink-0" />}
             >
@@ -1853,6 +1860,17 @@ export default function Dashboard() {
                       />
                     </div>
 
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-600">소속 (학교/기관명)</label>
+                      <Input
+                        size="sm"
+                        placeholder="대구광역시교육청 / 대구○○초등학교"
+                        value={newProfileAffiliation}
+                        onChange={(e) => setNewProfileAffiliation(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+
                     <Button
                       type="submit"
                       color="primary"
@@ -2219,6 +2237,7 @@ export default function Dashboard() {
                         <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
                           <th className="p-4">ID</th>
                           <th className="p-4">사용자명</th>
+                          <th className="p-4">소속</th>
                           <th className="p-4">이메일</th>
                           <th className="p-4">가입일시</th>
                           <th className="p-4">현재 등급</th>
@@ -2226,10 +2245,13 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {adminUsers.map((u) => (
+                        {adminUsers.map((u) => {
+                          const isSelf = user && u.id === user.id;
+                          return (
                           <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="p-4 font-mono font-bold">{u.id}</td>
-                            <td className="p-4 font-bold">{u.name}</td>
+                            <td className="p-4 font-bold">{u.name}{isSelf && <span className="ml-1 text-[9px] text-indigo-600 font-bold">(본인)</span>}</td>
+                            <td className="p-4 text-slate-600">{u.affiliation || <span className="text-slate-300">—</span>}</td>
                             <td className="p-4 font-mono">{u.email}</td>
                             <td className="p-4 text-slate-400">{formatDate(u.created_at || null)}</td>
                             <td className="p-4">
@@ -2251,19 +2273,24 @@ export default function Dashboard() {
                               </Chip>
                             </td>
                             <td className="p-4 text-center">
-                              <select
-                                value={u.level}
-                                onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))}
-                                className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400"
-                              >
-                                <option value={1}>1-일반회원 (연결만)</option>
-                                <option value={2}>2-인증사용자 (링크생성)</option>
-                                <option value={3}>3-개발자 (+API키)</option>
-                                <option value={4}>4-최고관리자 (모든권한)</option>
-                              </select>
+                              {isSelf ? (
+                                <span className="text-[10px] text-slate-400 font-bold">본인 등급 조정 불가</span>
+                              ) : (
+                                <select
+                                  value={u.level}
+                                  onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))}
+                                  className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400"
+                                >
+                                  <option value={1}>1-일반회원 (연결만)</option>
+                                  <option value={2}>2-인증사용자 (링크생성)</option>
+                                  <option value={3}>3-개발자 (+API키)</option>
+                                  <option value={4}>4-최고관리자 (모든권한)</option>
+                                </select>
+                              )}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

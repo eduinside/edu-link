@@ -15,7 +15,7 @@ function getJWKSet(teamDomain: string) {
     return jwksCache;
 }
 
-export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: { user: { id: number; email: string; name: string; level: number } } }> => {
+export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: { user: { id: number; email: string; name: string; affiliation: string; level: number } } }> => {
     return async (c, next) => {
         const env = c.env;
         const isLocal = !c.req.url.includes('dgedu.link');
@@ -45,18 +45,19 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
                 mockLevel = 2;
             }
 
-            let userRecord = await env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+            let userRecord = await env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
                 .bind(mockEmail)
-                .first<{ id: number; email: string; name: string; level: number }>();
+                .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
 
             if (!userRecord) {
                 const insert = await env.DB.prepare(
-                    "INSERT INTO users (email, name, level) VALUES (?, ?, ?)"
-                ).bind(mockEmail, mockName, mockLevel).run();
+                    "INSERT INTO users (email, name, affiliation, level) VALUES (?, ?, ?, ?)"
+                ).bind(mockEmail, mockName, '', mockLevel).run();
                 userRecord = {
                     id: Number(insert.meta.last_row_id),
                     email: mockEmail,
                     name: mockName,
+                    affiliation: '',
                     level: mockLevel
                 };
             } else {
@@ -92,9 +93,9 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
                 
                 const email = payload.email as string;
                 if (email) {
-                    let userRecord = await env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+                    let userRecord = await env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
                         .bind(email)
-                        .first<{ id: number; email: string; name: string; level: number }>();
+                        .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
 
                     if (userRecord) {
                         c.set('user', userRecord);
@@ -116,14 +117,14 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
                 let mockName = '홍길동';
                 let mockLevel = 2;
 
-                let userRecord = await env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+                let userRecord = await env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
                     .bind(mockEmail)
-                    .first<{ id: number; email: string; name: string; level: number }>();
+                    .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
 
                 if (!userRecord) {
                     const insert = await env.DB.prepare(
-                        "INSERT INTO users (email, name, level) VALUES (?, ?, ?)"
-                    ).bind(mockEmail, mockName, mockLevel).run();
+                        "INSERT INTO users (email, name, affiliation, level) VALUES (?, ?, ?, ?)"
+                    ).bind(mockEmail, mockName, '', mockLevel).run();
                     userRecord = {
                         id: Number(insert.meta.last_row_id),
                         email: mockEmail,
@@ -162,9 +163,9 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
             }
 
             // D1 users 테이블 조회
-            let userRecord = await env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+            let userRecord = await env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
                 .bind(email)
-                .first<{ id: number; email: string; name: string; level: number }>();
+                .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
 
             if (!userRecord) {
                 // 화이트리스트 도메인 여부 검증 후 자동 등급 승급 처리
@@ -176,13 +177,14 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
                 const initialLevel = isAllowed ? 2 : 1;
 
                 const insert = await env.DB.prepare(
-                    "INSERT INTO users (email, name, level) VALUES (?, ?, ?)"
-                ).bind(email, name, initialLevel).run();
+                    "INSERT INTO users (email, name, affiliation, level) VALUES (?, ?, ?, ?)"
+                ).bind(email, name, '', initialLevel).run();
 
                 userRecord = {
                     id: Number(insert.meta.last_row_id),
                     email,
                     name,
+                    affiliation: '',
                     level: initialLevel
                 };
             }
@@ -196,7 +198,7 @@ export const authMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: 
     };
 };
 
-export const adminMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: { user: { id: number; email: string; name: string; level: number } } }> => {
+export const adminMiddleware = (): MiddlewareHandler<{ Bindings: Env; Variables: { user: { id: number; email: string; name: string; affiliation: string; level: number } } }> => {
     return async (c, next) => {
         const user = c.get('user');
         if (!user || user.level !== 4) {
