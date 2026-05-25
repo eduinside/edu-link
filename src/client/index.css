@@ -1,0 +1,57 @@
+/* src/client/index.css */
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --font-sans: 'Noto Sans KR', 'Inter', sans-serif;
+  --font-display: 'Noto Sans KR', 'Outfit', sans-serif;
+}
+
+/* Custom styles & animations */
+@keyframes gradient-bg {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.gemini-gradient-bg {
+  background: linear-gradient(-45deg, #e0f2fe, #e0e7ff, #faf5ff, #ffffff);
+  background-size: 400% 400%;
+  animation: gradient-bg 15s ease infinite;
+}
+
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glassmorphism-dark {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}

@@ -1,0 +1,32 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "edu-link",
+	"main": "src/server/index.ts",
+	"compatibility_date": "2026-05-25",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": "./dist/client",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "URL_CACHE",
+			"id": "8acabbbf2c7c43eaaf876f0c27cc2bd1"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "edu-link-db",
+			"database_id": "e5fa6f54-6063-48f9-9cf3-0517381dd005"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+}
