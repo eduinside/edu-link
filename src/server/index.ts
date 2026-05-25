@@ -968,6 +968,8 @@ api.delete('/keys/:id', async (c) => {
     }
 });
 
+// v1 외부 API — /api보다 먼저 등록해야 authMiddleware를 우회함
+const v1 = new Hono<{ Bindings: Env }>();
 app.route('/api/v1', v1);
 app.route("/api", api);
 
@@ -1114,7 +1116,6 @@ app.route("/api/admin", adminApi);
 // ----------------------------------------------------
 // [媛쒕컻?먯슜 OpenAPI ?곸뿭] API Key 諛?Rate Limiting 諛붿씤??// ----------------------------------------------------
 
-const v1 = new Hono<{ Bindings: Env }>();
 
 // CORS & Rate Limit 寃고빀 (API Key???뱀? IP??遺꾨떦 理쒕? 15???덉슜)
 v1.use('*', rateLimitMiddleware({ limit: 15, windowSec: 60 }));
@@ -1252,7 +1253,7 @@ v1.post('/shorten', async (c) => {
     }
 });
 
-// v1 외부 API (app.route('/api', api) 앞에 이미 등록됨)
+// v1 외부 API — /api보다 먼저 등록해야 authMiddleware를 우회함
 
 
 // ----------------------------------------------------
