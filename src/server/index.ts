@@ -161,21 +161,28 @@ app.post('/api/verify-password', async (c) => {
 // 3.2 [OTP Email send & login API]
 app.post('/api/auth/otp/send', async (c) => {
     try {
-        const { email, name } = await c.req.json();
+        const { email, name, affiliation } = await c.req.json();
         if (!email || !email.trim()) {
             return c.json({ success: false, error: '\uc774\uba54\uc77c\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
         }
 
         const cleanEmail = email.trim().toLowerCase();
 
-        // \uae30\uc874 \uc0ac\uc6a9\uc790 \uc5ec\ubd80 \ud655\uc778 (\uc2e0\uaddc\ub294 \uc774\ub984 \ud544\uc218)
-        const existingUser = await c.env.DB.prepare("SELECT name FROM users WHERE email = ?")
+        // \uae30\uc874 \uc0ac\uc6a9\uc790 \uc5ec\ubd80 \ud655\uc778 (\uc2e0\uaddc\ub294 \uc774\ub984+\uc18c\uc18d \ud544\uc218)
+        const existingUser = await c.env.DB.prepare("SELECT name, affiliation FROM users WHERE email = ?")
             .bind(cleanEmail)
-            .first<{ name: string }>();
+            .first<{ name: string; affiliation: string }>();
 
         const displayName = existingUser?.name || (name ? name.trim() : null);
-        if (!existingUser && !displayName) {
-            return c.json({ success: false, error: '\uc2e0\uaddc \uc0ac\uc6a9\uc790\ub294 \uc774\ub984\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
+        const displayAffiliation = existingUser?.affiliation || (affiliation ? affiliation.trim() : null);
+
+        if (!existingUser) {
+            if (!displayName) {
+                return c.json({ success: false, error: '\uc2e0\uaddc \uc0ac\uc6a9\uc790\ub294 \uc774\ub984\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
+            }
+            if (!displayAffiliation) {
+                return c.json({ success: false, error: '\uc2e0\uaddc \uc0ac\uc6a9\uc790\ub294 \uc18c\uc18d\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694.' }, 400);
+            }
         }
 
         // 6\uc790\ub9ac OTP \ucf54\ub4dc \uc0dd\uc131
@@ -183,7 +190,7 @@ app.post('/api/auth/otp/send', async (c) => {
 
         // KV \uce90\uc2dc\uc5d0 5\ubd84\uac04 \uc800\uc7a5
         const cacheKey = `otp:${cleanEmail}`;
-        const cacheValue = JSON.stringify({ code: otpCode, name: displayName });
+        const cacheValue = JSON.stringify({ code: otpCode, name: displayName, affiliation: displayAffiliation || '' });
 
         await c.env.URL_CACHE.put(cacheKey, cacheValue, { expirationTtl: 300 });
 
@@ -278,9 +285,9 @@ app.post('/api/auth/otp/verify', async (c) => {
         
         // ?몄쬆 ?깃났: D1 ?ъ슜???앹꽦 ?먮뒗 議고쉶
         const domain = cleanEmail.split('@')[1];
-        let userRecord = await c.env.DB.prepare("SELECT id, email, name, level FROM users WHERE email = ?")
+        let userRecord = await c.env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
             .bind(cleanEmail)
-            .first<{ id: number; email: string; name: string; level: number }>();
+            .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
             
         if (!userRecord) {
             // ?붿씠?몃━?ㅽ듃 ?꾨찓??泥댄겕
@@ -292,20 +299,21 @@ app.post('/api/auth/otp/verify', async (c) => {
             const level = isAllowed ? 2 : 1;
             
             const insert = await c.env.DB.prepare(
-                "INSERT INTO users (email, name, level) VALUES (?, ?, ?)"
-            ).bind(cleanEmail, cached.name, level).run();
-            
+                "INSERT INTO users (email, name, affiliation, level) VALUES (?, ?, ?, ?)"
+            ).bind(cleanEmail, cached.name, cached.affiliation || '', level).run();
+
             userRecord = {
                 id: Number(insert.meta.last_row_id),
                 email: cleanEmail,
                 name: cached.name,
+                affiliation: cached.affiliation || '',
                 level
             };
         }
         
         // 濡쒓렇???몄뀡 荑좏궎 諛쒗뻾???꾪븳 JWT ?앹꽦
         const secret = new TextEncoder().encode(c.env.JWT_SECRET || 'edulink_jwt_secret_key_2026_xyz');
-        const sessionToken = await new SignJWT({ id: userRecord.id, email: userRecord.email, name: userRecord.name, level: userRecord.level })
+        const sessionToken = await new SignJWT({ id: userRecord.id, email: userRecord.email, name: userRecord.name, affiliation: userRecord.affiliation, level: userRecord.level })
             .setProtectedHeader({ alg: 'HS256' })
             .setExpirationTime('7d')
             .sign(secret);
@@ -402,10 +410,10 @@ app.get('/api/auth/check-email', async (c) => {
     const email = c.req.query('email');
     if (!email || !email.trim()) return c.json({ exists: false });
     const cleanEmail = email.trim().toLowerCase();
-    const user = await c.env.DB.prepare("SELECT name FROM users WHERE email = ?")
+    const user = await c.env.DB.prepare("SELECT name, affiliation FROM users WHERE email = ?")
         .bind(cleanEmail)
-        .first<{ name: string }>();
-    return c.json({ exists: !!user, name: user?.name ?? null });
+        .first<{ name: string; affiliation: string }>();
+    return c.json({ exists: !!user, name: user?.name ?? null, affiliation: user?.affiliation ?? null });
 });
 
 // 카카오 OAuth 로그인 시작
@@ -1321,20 +1329,26 @@ app.get('/:slug', async (c) => {
     const country = c.req.header('cf-ipcountry') || 'unknown';
     const cfConnectingIp = c.req.header('cf-connecting-ip') || 'unknown';
 
-    const reservedSlugs = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
-    const reservedSet = new Set(reservedSlugs.results.map(r => r.slug.toLowerCase()));
-    
-    if (reservedSet.has(slug.toLowerCase())) {
-        return c.env.ASSETS.fetch(c.req.raw);
-    }
-
     try {
-        // 1. KV 罹먯떆 ?뺤씤 (留뚮즺?쒓컙/鍮꾨?踰덊샇媛 ?녿뒗 ?쇰컲 ?⑥텞留??ㅼ뼱?덉쓬)
+        // 예약 슬러그 체크 (SPA 라우트 보호)
+        let reservedSet = new Set<string>();
+        try {
+            const { results } = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
+            reservedSet = new Set(results.map(r => r.slug.toLowerCase()));
+        } catch (e) {
+            console.error('[redirect] reserved_slugs load failed:', e);
+        }
+
+        if (reservedSet.has(slug.toLowerCase())) {
+            return c.env.ASSETS.fetch(c.req.raw);
+        }
+
+        // 1. KV 캐시 확인 (만료/비밀번호 없는 활성 링크만 캐싱됨)
         let destination = await c.env.URL_CACHE.get(slug);
         let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null } | null = null;
 
         if (!destination) {
-            // 2. D1 DB 議고쉶
+            // 2. D1 DB 조회 (base_slug, custom_slug, slug 모두 검색)
             urlRecord = await c.env.DB.prepare(
                 "SELECT id, original_url, is_active, expires_at, password FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
             )
@@ -1342,32 +1356,34 @@ app.get('/:slug', async (c) => {
             .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null }>();
 
             if (urlRecord) {
-                // 鍮꾪솢??留곹겕 泥댄겕
+                // 비활성 링크 처리
                 if (urlRecord.is_active === 0) {
                     return c.redirect('/');
                 }
 
-                // 留뚮즺?쇱떆 泥댄겕
+                // 만료일시 처리 (비밀번호/만료일 기능 유지)
                 if (urlRecord.expires_at) {
                     const expireDate = new Date(urlRecord.expires_at);
                     const now = new Date();
                     if (now > expireDate) {
-                        // 諛깃렇?쇱슫??鍮꾪솢?깊솕 諛?罹먯떆 臾댄슚??
-                        c.executionCtx.waitUntil((async () => {
-                            await c.env.DB.prepare("UPDATE urls SET is_active = 0 WHERE id = ?").bind(urlRecord!.id).run();
-                            await c.env.URL_CACHE.delete(slug);
-                        })());
+                        try {
+                            c.executionCtx.waitUntil((async () => {
+                                await c.env.DB.prepare("UPDATE urls SET is_active = 0 WHERE id = ?").bind(urlRecord!.id).run();
+                                await c.env.URL_CACHE.delete(slug);
+                            })());
+                        } catch {}
                         return c.redirect('/');
                     }
                 }
 
+                // 비밀번호 보호 처리 (비밀번호 기능 유지)
                 if (urlRecord.password) {
                     return c.html(getPasswordPageHtml(slug));
                 }
 
                 destination = urlRecord.original_url;
-                
-                // 留뚮즺?쒓컙???녾퀬 鍮꾨?踰덊샇???놁쑝誘濡?罹먯떛 ?깅줉
+
+                // 만료/비밀번호 없는 활성 링크만 KV에 캐싱
                 if (!urlRecord.expires_at && !urlRecord.password) {
                     await c.env.URL_CACHE.put(slug, destination);
                 }
@@ -1375,47 +1391,53 @@ app.get('/:slug', async (c) => {
         }
 
         if (destination) {
-            c.executionCtx.waitUntil((async () => {
-                try {
-                    if (!urlRecord) {
-                        urlRecord = await c.env.DB.prepare("SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?")
+            // 클릭 분석 기록 (비동기 — 실패해도 리다이렉트는 진행)
+            try {
+                c.executionCtx.waitUntil((async () => {
+                    try {
+                        if (!urlRecord) {
+                            urlRecord = await c.env.DB.prepare(
+                                "SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+                            )
                             .bind(slug, slug, slug)
                             .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null }>();
+                        }
+                        if (urlRecord) {
+                            await c.env.DB.prepare("UPDATE urls SET click_count = click_count + 1 WHERE id = ?")
+                                .bind(urlRecord.id).run();
+
+                            let deviceType = 'desktop';
+                            if (/mobile/i.test(userAgent)) deviceType = 'mobile';
+                            else if (/tablet/i.test(userAgent)) deviceType = 'tablet';
+
+                            const encoder = new TextEncoder();
+                            const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(cfConnectingIp));
+                            const ipHash = Array.from(new Uint8Array(hashBuffer))
+                                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+                            await c.env.DB.prepare(
+                                `INSERT INTO click_logs (url_id, ip_hash, country, referer, user_agent, device_type) VALUES (?, ?, ?, ?, ?, ?)`
+                            ).bind(urlRecord.id, ipHash, country, referer, userAgent, deviceType).run();
+                        }
+                    } catch (e) {
+                        console.error('[redirect] click analytics failed:', e);
                     }
+                })());
+            } catch (e) {
+                console.error('[redirect] waitUntil failed:', e);
+            }
 
-                    if (urlRecord) {
-                        await c.env.DB.prepare("UPDATE urls SET click_count = click_count + 1 WHERE id = ?")
-                            .bind(urlRecord.id)
-                            .run();
-
-                        let deviceType = 'desktop';
-                        if (/mobile/i.test(userAgent)) deviceType = 'mobile';
-                        else if (/tablet/i.test(userAgent)) deviceType = 'tablet';
-
-                        const encoder = new TextEncoder();
-                        const ipData = encoder.encode(cfConnectingIp);
-                        const hashBuffer = await crypto.subtle.digest('SHA-256', ipData);
-                        const ipHash = Array.from(new Uint8Array(hashBuffer))
-                            .map(b => b.toString(16).padStart(2, '0'))
-                            .join('');
-
-                        await c.env.DB.prepare(
-                            `INSERT INTO click_logs (url_id, ip_hash, country, referer, user_agent, device_type) 
-                             VALUES (?, ?, ?, ?, ?, ?)`
-                        )
-                        .bind(urlRecord.id, ipHash, country, referer, userAgent, deviceType)
-                        .run();
-                    }
-                } catch (e) {
-                    console.error('Failed to log click analytics:', e);
-                }
-            })());
-
-            c.header('Cache-Control', 'no-store');
-            return c.redirect(destination, 307);
+            // 307 리다이렉트 (캐시 방지)
+            return new Response(null, {
+                status: 307,
+                headers: {
+                    'Location': destination,
+                    'Cache-Control': 'no-store',
+                },
+            });
         }
     } catch (err) {
-        console.error('Redirect handler error:', err);
+        console.error('[redirect] handler error:', err);
     }
 
     return c.env.ASSETS.fetch(c.req.raw);

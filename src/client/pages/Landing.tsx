@@ -72,6 +72,7 @@ export default function Landing() {
   // 이메일 OTP 로그인 상태
   const [loginEmail, setLoginEmail] = useState('');
   const [loginName, setLoginName] = useState('');
+  const [loginAffiliation, setLoginAffiliation] = useState('');
   const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
   const [existingUserName, setExistingUserName] = useState('');
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -116,17 +117,28 @@ export default function Landing() {
         return;
       }
     }
-    if (!existingCheck && !loginName.trim()) {
-      setAuthError('신규 가입 사용자는 이름을 입력해주세요.');
-      setAuthLoading(false);
-      return;
+    if (!existingCheck) {
+      if (!loginName.trim()) {
+        setAuthError('신규 가입 사용자는 이름을 입력해주세요.');
+        setAuthLoading(false);
+        return;
+      }
+      if (!loginAffiliation.trim()) {
+        setAuthError('신규 가입 사용자는 소속을 입력해주세요.');
+        setAuthLoading(false);
+        return;
+      }
     }
 
     try {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, name: loginName || undefined })
+        body: JSON.stringify({
+          email: loginEmail,
+          name: loginName || undefined,
+          affiliation: loginAffiliation || undefined,
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -167,6 +179,7 @@ export default function Landing() {
         
         setUser(data.user);
         setIsLoggedIn(true);
+        setLoginAffiliation('');
         navigate('/dashboard');
       } else {
         setAuthError(data.error || '인증번호가 올바르지 않습니다.');
@@ -778,26 +791,39 @@ export default function Landing() {
                       </div>
                     )}
                     {isExistingUser === false && !isCheckingEmail && (
-                      <p className="text-[10px] text-indigo-600 font-semibold">✨ 신규 가입 — 아래에 성함을 입력해주세요</p>
+                      <p className="text-[10px] text-indigo-600 font-semibold">✨ 신규 가입 — 아래에 성함과 소속을 입력해주세요</p>
                     )}
                     <span className="text-[9px] text-slate-400 font-medium leading-normal">
                       💡 화이트리스트 도메인(korea.kr, dge.go.kr 등) 메일은 <strong>2단계 인증사용자</strong>로 자동 승급됩니다.
                     </span>
                   </div>
 
-                  {/* 신규 사용자만 이름 입력 */}
+                  {/* 신규 사용자만 이름 + 소속 입력 */}
                   {isExistingUser === false && (
-                    <div className="space-y-1.5 text-xs">
-                      <label className="font-bold text-slate-600">성함 (이름)</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="홍길동"
-                        value={loginName}
-                        onChange={(e) => setLoginName(e.target.value)}
-                        className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
-                        autoFocus
-                      />
+                    <div className="space-y-3 text-xs">
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-slate-600">성함 (이름) <span className="text-red-400">*</span></label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="홍길동"
+                          value={loginName}
+                          onChange={(e) => setLoginName(e.target.value)}
+                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-slate-600">소속 (학교/기관명) <span className="text-red-400">*</span></label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="대구광역시교육청 / 대구○○초등학교"
+                          value={loginAffiliation}
+                          onChange={(e) => setLoginAffiliation(e.target.value)}
+                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -876,6 +902,7 @@ export default function Landing() {
                   setOtpSent(false);
                   setLoginEmail('');
                   setLoginName('');
+                  setLoginAffiliation('');
                   setIsExistingUser(null);
                   setExistingUserName('');
                   setOtpCode('');
