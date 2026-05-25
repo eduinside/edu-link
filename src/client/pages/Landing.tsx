@@ -1,21 +1,20 @@
 // src/client/pages/Landing.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Button, 
-  Card, 
-  CardContent, 
+import {
+  Button,
+  Card,
+  CardContent,
   Chip
 } from '@heroui/react';
-import { 
-  Link2, 
-  Send, 
-  Copy, 
-  ExternalLink, 
-  Check, 
-  Sparkles, 
+import {
+  Link2,
+  Send,
+  Copy,
+  ExternalLink,
+  Check,
+  Sparkles,
   Info,
   ShieldCheck,
-  Zap,
   Globe,
   Pin,
   Megaphone,
@@ -32,6 +31,7 @@ interface PublicLink {
   custom_slug: string | null;
   title: string | null;
   original_url: string;
+  click_count: number;
   created_at: string;
 }
 
@@ -203,6 +203,9 @@ export default function Landing() {
   };
 
   const [publicLinks, setPublicLinks] = useState<PublicLink[]>([]);
+  const [popularLinks, setPopularLinks] = useState<PublicLink[]>([]);
+  const [activeLinksTab, setActiveLinksTab] = useState<'recent' | 'popular'>('recent');
+  const [visibleCount, setVisibleCount] = useState(5);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
@@ -228,11 +231,13 @@ export default function Landing() {
   // 최근 공개 링크 목록 불러오기
   const fetchPublicLinks = async () => {
     try {
-      const res = await fetch('/api/links/public');
-      const data = await res.json();
-      if (data.success) {
-        setPublicLinks(data.links);
-      }
+      const [resRecent, resPopular] = await Promise.all([
+        fetch('/api/links/public'),
+        fetch('/api/links/popular'),
+      ]);
+      const [dataR, dataP] = await Promise.all([resRecent.json(), resPopular.json()]);
+      if (dataR.success) setPublicLinks(dataR.links);
+      if (dataP.success) setPopularLinks(dataP.links);
     } catch (e) {
       console.error('공개 링크 조회 실패:', e);
     }
@@ -353,40 +358,38 @@ export default function Landing() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Chip size="sm" variant="flat" color="secondary" className="px-2 font-medium">
-            korea.kr / dge.go.kr 전용
-          </Chip>
-          
+        <div className="flex items-center gap-2">
           {isLoggedIn ? (
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant="light" 
+            <>
+              <Button
+                size="sm"
+                variant="light"
                 color="danger"
-                className="font-medium rounded-full"
+                className="font-medium rounded-full text-xs"
                 onClick={handleLogout}
               >
                 로그아웃
               </Button>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 color="primary"
-                className="font-bold rounded-full shadow-sm"
+                className="font-bold rounded-full shadow-sm text-xs"
                 onClick={() => navigate('/dashboard')}
               >
-                대시보드 바로가기
+                대시보드
               </Button>
-            </div>
+            </>
           ) : (
-            <Button 
-              size="sm" 
-              variant="ghost" 
+            <Button
+              size="sm"
+              variant="flat"
               color="primary"
-              className="font-medium rounded-full"
+              isIconOnly
+              className="rounded-full w-9 h-9 min-w-0"
               onClick={() => setShowAuthModal(true)}
+              title="로그인"
             >
-              대시보드 로그인
+              <LogIn className="w-4 h-4" />
             </Button>
           )}
         </div>
@@ -403,10 +406,10 @@ export default function Landing() {
               <span>스마트 단축주소 플랫폼</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-800 font-display">
-              에듀링크에서 어떤 링크를 단축할까요?
+              링크를 쉽고 간편하게<br className="hidden md:block" /> 전달해 보세요.
             </h1>
             <p className="text-sm md:text-base text-slate-500 max-w-lg mx-auto">
-              긴 주소를 입력하면 가독성이 좋고 안전한 짧은 도메인(<span className="font-semibold text-indigo-600 font-display">dgedu.link</span>)으로 변환해 드립니다.
+              긴 주소를 선생님이 원하시는 대로 짧고 간단하게 줄여서 전달해 보세요.
             </p>
           </div>
 
@@ -546,83 +549,124 @@ export default function Landing() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
           
           {/* 좌측 2개 컬럼: 사용자들이 공유한 페이지 목록 */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="bg-indigo-50 p-2 rounded-xl text-indigo-600">
-                  <Share2 className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-bold text-slate-800">공유된 페이지 목록</h3>
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            {/* 헤더 + 탭 */}
+            <div className="flex items-center gap-2">
+              <div className="bg-indigo-50 p-2 rounded-xl text-indigo-600">
+                <Share2 className="w-4 h-4" />
               </div>
-              <Chip size="sm" variant="flat" color="default" className="text-slate-500 font-semibold">
-                최근 {publicLinks.length}개 링크
-              </Chip>
+              <h3 className="text-base font-bold text-slate-800">공유된 페이지 목록</h3>
             </div>
 
-            {publicLinks.length === 0 ? (
-              <Card className="bg-white/40 border border-slate-200/30 shadow-none rounded-3xl py-12">
-                <CardContent className="text-center flex flex-col items-center gap-2">
-                  <Globe className="w-10 h-10 text-slate-300" />
-                  <span className="text-xs text-slate-400 font-medium">아직 공개로 공유된 단축주소가 없습니다.</span>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {publicLinks.map((link) => {
-                  const effectiveSlug = link.custom_slug || link.slug;
-                  const shortUrl = `${window.location.protocol}//${window.location.host}/${effectiveSlug}`;
-                  const isLinkCopied = copiedSlug === effectiveSlug;
-                  return (
-                    <Card key={link.slug} className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-300 rounded-2xl group overflow-hidden">
-                      <CardContent className="p-4 flex flex-col justify-between h-full gap-3">
-                        <div className="space-y-1">
-                          {link.title && (
-                            <p className="text-xs font-bold text-slate-700 truncate w-full" title={link.title}>
-                              {link.title}
-                            </p>
-                          )}
-                          <span className="font-display font-extrabold text-lg text-indigo-600 break-all">
-                            /{effectiveSlug}
-                          </span>
-                          <p className="text-[10px] font-mono text-slate-400 truncate w-full" title={link.original_url}>
-                            {getDomain(link.original_url)}
-                          </p>
-                        </div>
+            {/* 탭 스위처 */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100/70 rounded-xl w-fit">
+              {(['recent', 'popular'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => { setActiveLinksTab(tab); setVisibleCount(5); }}
+                  className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer select-none
+                    ${activeLinksTab === tab
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                    }`}
+                >
+                  {tab === 'recent' ? '🕐 최근 공유된 링크' : '🔥 인기 링크'}
+                </button>
+              ))}
+            </div>
 
-                        <div className="flex items-center justify-between border-t border-slate-50 pt-2.5 mt-1">
-                          <span className="text-[9px] text-slate-400 font-medium">
-                            {formatDate(link.created_at)}
-                          </span>
+            {/* 링크 목록 */}
+            {(() => {
+              const list = activeLinksTab === 'recent' ? publicLinks : popularLinks;
+              const visible = list.slice(0, visibleCount);
 
-                          <div className="flex gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              size="sm"
-                              variant="light"
-                              color={isLinkCopied ? 'success' : 'default'}
-                              isIconOnly
-                              className="w-7 h-7 min-w-0 p-0 rounded-lg"
-                              onClick={() => handleCopyPublicLink(effectiveSlug, shortUrl)}
-                            >
-                              {isLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="light"
-                              color="primary"
-                              isIconOnly
-                              className="w-7 h-7 min-w-0 p-0 rounded-lg"
-                              onClick={() => window.open(`/${effectiveSlug}`, '_blank')}
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </Button>
+              if (list.length === 0) {
+                return (
+                  <Card className="bg-white/40 border border-slate-200/30 shadow-none rounded-3xl py-12">
+                    <CardContent className="text-center flex flex-col items-center gap-2">
+                      <Globe className="w-10 h-10 text-slate-300" />
+                      <span className="text-xs text-slate-400 font-medium">아직 공개로 공유된 단축주소가 없습니다.</span>
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              return (
+                <div className="flex flex-col gap-3">
+                  {visible.map((link) => {
+                    const effectiveSlug = link.custom_slug || link.slug;
+                    const shortUrl = `${window.location.protocol}//${window.location.host}/${effectiveSlug}`;
+                    const isLinkCopied = copiedSlug === effectiveSlug;
+
+                    return (
+                      <Card
+                        key={`${link.slug}-${activeLinksTab}`}
+                        className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-200 rounded-2xl group overflow-hidden cursor-pointer"
+                        onClick={() => window.open(shortUrl, '_blank')}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            {/* 좌: 슬러그 + 제목 + 도메인 */}
+                            <div className="flex-1 min-w-0 space-y-0.5">
+                              {link.title ? (
+                                <p className="text-[11px] text-slate-500 font-medium truncate" title={link.title}>
+                                  {link.title}
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-slate-300 italic">제목 없음</p>
+                              )}
+                              <div className="font-display font-extrabold text-base text-indigo-600 truncate">
+                                /{effectiveSlug}
+                              </div>
+                              <p className="text-[10px] font-mono text-slate-400 truncate" title={link.original_url}>
+                                {getDomain(link.original_url)}
+                              </p>
+                            </div>
+
+                            {/* 우: 날짜 + 클릭수 + 복사 버튼 */}
+                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                              <div className="text-right space-y-0.5">
+                                <p className="text-[9px] text-slate-400 whitespace-nowrap">{formatDate(link.created_at)}</p>
+                                {link.click_count > 0 && (
+                                  <p className="text-[9px] text-indigo-400 font-bold whitespace-nowrap">
+                                    {link.click_count}회 접속
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant={isLinkCopied ? 'flat' : 'light'}
+                                color={isLinkCopied ? 'success' : 'default'}
+                                isIconOnly
+                                className="w-7 h-7 min-w-0 p-0 rounded-lg flex-shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyPublicLink(effectiveSlug, shortUrl);
+                                }}
+                              >
+                                {isLinkCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* 더보기 버튼 */}
+                  {visibleCount < list.length && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((v) => v + 10)}
+                      className="w-full py-2.5 text-xs font-bold text-indigo-600 bg-white/60 hover:bg-white border border-slate-100 hover:border-indigo-100 rounded-2xl transition-all duration-200"
+                    >
+                      더보기 ({list.length - visibleCount}개 남음)
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 우측 1개 컬럼: 공지사항 공간 */}
@@ -920,7 +964,7 @@ export default function Landing() {
 
       {/* 푸터 */}
       <footer className="w-full py-6 text-center text-xs text-slate-400 border-t border-slate-200/20 z-10">
-        <p>© 2026 에듀링크 (edu-link). All rights reserved.</p>
+        <p>© 2026 에듀링크. All rights reserved.</p>
       </footer>
 
     </div>

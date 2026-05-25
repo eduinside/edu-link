@@ -17,8 +17,9 @@ import {
   Edit3, 
   Check, 
   LogOut, 
-  BarChart3, 
-  LayoutDashboard, 
+  BarChart3,
+  TrendingUp,
+  LayoutDashboard,
   KeyRound, 
   Settings,
   ChevronLeft,
@@ -127,6 +128,11 @@ export default function Dashboard() {
 
   // QR 모달
   const [qrModalLink, setQrModalLink] = useState<LinkItem | null>(null);
+
+  // 통계 드로어
+  const [statsDrawerLink, setStatsDrawerLink] = useState<LinkItem | null>(null);
+  const [statsData, setStatsData] = useState<{ daily_clicks: { date: string; clicks: number }[] } | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   
   // API Key 발급 상태
   const [newKeyName, setNewKeyName] = useState('');
@@ -701,6 +707,20 @@ export default function Dashboard() {
     }
   };
 
+  const openStats = async (link: LinkItem) => {
+    setStatsDrawerLink(link);
+    setStatsData(null);
+    setIsLoadingStats(true);
+    try {
+      const res = await fetch(`/api/links/${link.id}/stats`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setStatsData({ daily_clicks: data.daily_clicks });
+      }
+    } catch { /* ignore */ }
+    setIsLoadingStats(false);
+  };
+
   const copyToClipboard = (id: number, slug: string) => {
     const shortUrl = `${window.location.protocol}//${window.location.host}/${slug}`;
     navigator.clipboard.writeText(shortUrl);
@@ -1069,8 +1089,8 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
 
-                  {/* 단축 링크 목록 */}
-                  <div className="space-y-4">
+                  {/* 단축 링크 목록 — 테이블 */}
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-sm text-slate-800">단축 링크 목록</h4>
                       <span className="text-xs text-slate-400">총 {links.length}개 발행됨</span>
@@ -1084,137 +1104,177 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                     ) : (
-                      <div className="space-y-3">
-                        {links.map((link) => {
-                          const shortUrl = `${window.location.protocol}//${window.location.host}/${link.slug}`;
-                          const isCopied = copiedId === link.id;
-                          return (
-                            // isCopied used for copy button color feedback below
-                            <Card key={link.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-slate-200 transition-colors">
-                              <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                
-                                <div className="space-y-1.5 flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-display font-extrabold text-base text-slate-800 break-all">
-                                      /{link.base_slug || link.slug}
-                                    </span>
-                                    {link.custom_slug && (
-                                      <span className="font-mono text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">
-                                        /{link.custom_slug}
-                                      </span>
-                                    )}
-                                    {link.title && (
-                                      <span className="text-xs font-bold text-slate-600 truncate max-w-[200px]" title={link.title}>
-                                        ({link.title})
-                                      </span>
-                                    )}
-                                    
-                                    <Chip 
-                                      size="sm" 
-                                      color={link.is_active === 1 ? 'success' : 'default'} 
-                                      variant="flat" 
-                                      className="px-1 h-5 text-[9px] font-bold"
-                                    >
-                                      {link.is_active === 1 ? '활성' : '비활성'}
-                                    </Chip>
+                      <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
+                                <th className="text-left p-3 pl-5 whitespace-nowrap">슬러그</th>
+                                <th className="text-left p-3 whitespace-nowrap">제목 / 원본 주소</th>
+                                <th className="text-left p-3 whitespace-nowrap">클릭</th>
+                                <th className="text-left p-3 whitespace-nowrap">생성일</th>
+                                <th className="text-left p-3 whitespace-nowrap">상태</th>
+                                <th className="text-right p-3 pr-4 whitespace-nowrap">작업</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {links.map((link) => {
+                                const openUrl = `${window.location.protocol}//${window.location.host}/${link.custom_slug || link.base_slug || link.slug}`;
+                                const isCopied = copiedId === link.id;
+                                return (
+                                  <tr
+                                    key={link.id}
+                                    className="hover:bg-slate-50/60 transition-colors group"
+                                  >
+                                    {/* 슬러그 */}
+                                    <td className="p-3 pl-5 align-middle">
+                                      <div className="font-mono font-bold text-slate-800 text-[11px]">
+                                        /{link.base_slug || link.slug}
+                                      </div>
+                                      {link.custom_slug && (
+                                        <div className="font-mono text-[10px] text-indigo-500 mt-0.5">
+                                          /{link.custom_slug}
+                                        </div>
+                                      )}
+                                    </td>
 
-                                    <Chip
-                                      size="sm"
-                                      color={link.is_public === 1 ? 'secondary' : 'default'}
-                                      variant="flat"
-                                      startContent={link.is_public === 1 ? <Eye className="w-3 h-3 flex-shrink-0" /> : <EyeOff className="w-3 h-3 flex-shrink-0" />}
-                                      className="px-1 h-5 text-[9px] font-bold"
-                                    >
-                                      {link.is_public === 1 ? '전체공개' : '비공개'}
-                                    </Chip>
-                                  </div>
+                                    {/* 제목 / 원본 주소 */}
+                                    <td className="p-3 align-middle max-w-xs">
+                                      {link.title ? (
+                                        <div className="font-semibold text-slate-700 truncate max-w-[240px]" title={link.title}>
+                                          {link.title}
+                                        </div>
+                                      ) : (
+                                        <div className="text-slate-300 italic text-[10px]">제목 없음</div>
+                                      )}
+                                      <div className="font-mono text-[10px] text-slate-400 truncate max-w-[240px] mt-0.5" title={link.original_url}>
+                                        {link.original_url}
+                                      </div>
+                                    </td>
 
-                                  <p className="text-[11px] font-mono text-slate-400 truncate break-all max-w-lg" title={link.original_url}>
-                                    {link.original_url}
-                                  </p>
+                                    {/* 클릭 수 */}
+                                    <td className="p-3 align-middle whitespace-nowrap">
+                                      <span className="font-extrabold text-slate-800">{link.click_count ?? 0}</span>
+                                      <span className="text-slate-400 ml-0.5">회</span>
+                                    </td>
 
-                                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-medium pt-0.5">
-                                    <span className="flex items-center gap-1">
-                                      <BarChart3 className="w-3 h-3" />
-                                      <span className="font-bold text-slate-600">{link.click_count ?? 0}</span>회
-                                    </span>
-                                    <span className="text-slate-200">·</span>
-                                    <span>생성 {formatDate(link.created_at)}</span>
-                                  </div>
-                                </div>
+                                    {/* 생성일 */}
+                                    <td className="p-3 align-middle whitespace-nowrap text-slate-400">
+                                      {formatDate(link.created_at)}
+                                    </td>
 
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <Tooltip content={isCopied ? '복사됨!' : '주소 복사'}>
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      color={isCopied ? 'success' : 'default'}
-                                      isIconOnly
-                                      onClick={() => copyToClipboard(link.id, link.custom_slug || link.base_slug || link.slug)}
-                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                    >
-                                      {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                    </Button>
-                                  </Tooltip>
+                                    {/* 상태 */}
+                                    <td className="p-3 align-middle">
+                                      <div className="flex flex-col gap-1">
+                                        <Chip
+                                          size="sm"
+                                          color={link.is_active === 1 ? 'success' : 'default'}
+                                          variant="flat"
+                                          className="px-1.5 h-4 text-[9px] font-bold"
+                                        >
+                                          {link.is_active === 1 ? '활성' : '비활성'}
+                                        </Chip>
+                                        <Chip
+                                          size="sm"
+                                          color={link.is_public === 1 ? 'secondary' : 'default'}
+                                          variant="flat"
+                                          className="px-1.5 h-4 text-[9px] font-bold"
+                                        >
+                                          {link.is_public === 1 ? '공개' : '비공개'}
+                                        </Chip>
+                                      </div>
+                                    </td>
 
-                                  <Tooltip content="QR 코드">
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      color="secondary"
-                                      isIconOnly
-                                      onClick={() => setQrModalLink(link)}
-                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                    >
-                                      <QrCode className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </Tooltip>
+                                    {/* 작업 버튼 */}
+                                    <td className="p-3 pr-4 align-middle">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <Tooltip content={isCopied ? '복사됨!' : '주소 복사'}>
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color={isCopied ? 'success' : 'default'}
+                                            isIconOnly
+                                            onClick={() => copyToClipboard(link.id, link.custom_slug || link.base_slug || link.slug)}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                          >
+                                            {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                          </Button>
+                                        </Tooltip>
 
-                                  <Tooltip content="편집">
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      color="primary"
-                                      isIconOnly
-                                      onClick={() => startEdit(link)}
-                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                      disabled={user && user.level < 2}
-                                    >
-                                      <Edit3 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </Tooltip>
- 
-                                  <Tooltip content="이동">
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      color="default"
-                                      isIconOnly
-                                      onClick={() => window.open(shortUrl, '_blank')}
-                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                    >
-                                      <ExternalLink className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </Tooltip>
- 
-                                  <Tooltip content="삭제">
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      color="danger"
-                                      isIconOnly
-                                      onClick={() => handleDeleteLink(link.id)}
-                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                      disabled={user && user.level < 2}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </Tooltip>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                                        <Tooltip content="QR 코드">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="secondary"
+                                            isIconOnly
+                                            onClick={() => setQrModalLink(link)}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                          >
+                                            <QrCode className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+
+                                        <Tooltip content="통계">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="primary"
+                                            isIconOnly
+                                            onClick={() => openStats(link)}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                          >
+                                            <TrendingUp className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+
+                                        <Tooltip content="편집">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="default"
+                                            isIconOnly
+                                            onClick={() => startEdit(link)}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                            disabled={user && user.level < 2}
+                                          >
+                                            <Edit3 className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+
+                                        <Tooltip content="원본 이동">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="default"
+                                            isIconOnly
+                                            onClick={() => window.open(openUrl, '_blank')}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                          >
+                                            <ExternalLink className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+
+                                        <Tooltip content="삭제">
+                                          <Button
+                                            size="sm"
+                                            variant="flat"
+                                            color="danger"
+                                            isIconOnly
+                                            onClick={() => handleDeleteLink(link.id)}
+                                            className="rounded-lg w-7 h-7 min-w-0 p-0"
+                                            disabled={user && user.level < 2}
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </Tooltip>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1673,7 +1733,88 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
- 
+
+                  {/* 통계 드로어 */}
+                  <div className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${statsDrawerLink ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+                    <div
+                      className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${statsDrawerLink ? 'opacity-100' : 'opacity-0'}`}
+                      onClick={() => setStatsDrawerLink(null)}
+                    />
+                    <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+                      <div className={`w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 transform ${statsDrawerLink ? 'translate-x-0' : 'translate-x-full'}`}>
+                        {statsDrawerLink && (
+                          <div className="h-full flex flex-col">
+                            {/* 헤더 */}
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                              <div className="space-y-0.5 min-w-0">
+                                <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                                  <TrendingUp className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                                  접속 통계
+                                </h3>
+                                <p className="text-[10px] text-indigo-600 font-bold font-mono truncate">
+                                  dgedu.link/{statsDrawerLink.base_slug || statsDrawerLink.slug}
+                                  {statsDrawerLink.custom_slug && <span className="text-slate-400 font-normal"> · /{statsDrawerLink.custom_slug}</span>}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm" variant="light" isIconOnly
+                                onClick={() => setStatsDrawerLink(null)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                              >✕</Button>
+                            </div>
+
+                            {/* 컨텐츠 */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                              {/* 기본 정보 */}
+                              <div className="bg-slate-50 rounded-2xl p-4 space-y-3 text-xs">
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="text-slate-400 font-bold flex-shrink-0">제목</span>
+                                  <span className="text-slate-800 font-semibold text-right break-words max-w-[240px]">
+                                    {statsDrawerLink.title || <span className="text-slate-300 italic font-normal">없음</span>}
+                                  </span>
+                                </div>
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="text-slate-400 font-bold flex-shrink-0">원본 주소</span>
+                                  <a
+                                    href={statsDrawerLink.original_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                                  >
+                                    {statsDrawerLink.original_url}
+                                  </a>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-slate-400 font-bold">생성일시</span>
+                                  <span className="text-slate-600 font-semibold">{formatDate(statsDrawerLink.created_at)}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                                  <span className="text-slate-500 font-bold flex items-center gap-1.5">
+                                    <BarChart3 className="w-3.5 h-3.5 text-indigo-500" />
+                                    누적 클릭
+                                  </span>
+                                  <span className="text-slate-800 font-extrabold text-lg">{statsDrawerLink.click_count ?? 0}<span className="text-xs font-normal text-slate-400 ml-1">회</span></span>
+                                </div>
+                              </div>
+
+                              {/* 일별 접속 그래프 */}
+                              <div className="space-y-3">
+                                <h4 className="font-bold text-sm text-slate-800">최근 30일 일별 접속 현황</h4>
+                                {isLoadingStats ? (
+                                  <div className="flex items-center justify-center py-14">
+                                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                  </div>
+                                ) : (
+                                  <StatsBarChart dailyClicks={statsData?.daily_clicks || []} />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
             </>
           )}
@@ -2367,6 +2508,92 @@ export default function Dashboard() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// 일별 클릭 통계 바 차트 (SVG 기반, 외부 라이브러리 없음)
+function StatsBarChart({ dailyClicks }: { dailyClicks: { date: string; clicks: number }[] }) {
+  const DAYS = 30;
+  const today = new Date();
+
+  const dates = Array.from({ length: DAYS }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (DAYS - 1 - i));
+    return d.toISOString().split('T')[0];
+  });
+
+  const clickMap: Record<string, number> = {};
+  dailyClicks.forEach(({ date, clicks }) => { clickMap[date] = clicks; });
+
+  const data = dates.map(date => ({ date, clicks: clickMap[date] || 0 }));
+  const maxClicks = Math.max(...data.map(d => d.clicks), 1);
+  const totalClicks = data.reduce((s, d) => s + d.clicks, 0);
+
+  if (totalClicks === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-300">
+        <BarChart3 className="w-10 h-10" />
+        <p className="text-xs text-slate-400">최근 30일 간 접속 기록이 없습니다.</p>
+      </div>
+    );
+  }
+
+  // SVG 크기 계산
+  const W = 340;
+  const BAR_AREA_H = 90;
+  const LABEL_OFFSET = 14;
+  const H = BAR_AREA_H + LABEL_OFFSET + 6;
+  const barW = Math.floor((W - 8) / DAYS) - 1;
+  const step = (W - 8) / DAYS;
+
+  return (
+    <div className="space-y-3">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+        {/* 최대값 기준선 */}
+        <line x1={0} y1={4} x2={W} y2={4} stroke="#e2e8f0" strokeWidth={0.5} strokeDasharray="2 2" />
+        <text x={2} y={3} fontSize={6.5} fill="#94a3b8" dominantBaseline="auto">{maxClicks}회</text>
+
+        {data.map((d, i) => {
+          const barH = Math.max((d.clicks / maxClicks) * BAR_AREA_H, d.clicks > 0 ? 3 : 0.5);
+          const x = 4 + i * step;
+          const y = BAR_AREA_H - barH + 4;
+          const showLabel = i === 0 || i === DAYS - 1 || (i + 1) % 6 === 0;
+          const dateObj = new Date(d.date + 'T00:00:00');
+          const label = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+
+          return (
+            <g key={d.date}>
+              <rect
+                x={x}
+                y={y}
+                width={Math.max(barW, 2)}
+                height={barH}
+                rx={1.5}
+                fill={d.clicks > 0 ? '#6366f1' : '#e2e8f0'}
+                opacity={d.clicks > 0 ? 0.82 : 0.6}
+              />
+              {showLabel && (
+                <text
+                  x={x + barW / 2}
+                  y={BAR_AREA_H + LABEL_OFFSET + 2}
+                  textAnchor="middle"
+                  fontSize={6.5}
+                  fill="#94a3b8"
+                >
+                  {label}
+                </text>
+              )}
+              {d.clicks > 0 && (
+                <title>{d.date}: {d.clicks}회</title>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <p className="text-[10px] text-slate-400 text-center">
+        기간 내 총 <strong className="text-slate-700 font-extrabold">{totalClicks}회</strong> 접속
+      </p>
     </div>
   );
 }

@@ -46,11 +46,27 @@ app.get('/api/notices', async (c) => {
 app.get('/api/links/public', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
-            `SELECT slug, custom_slug, title, original_url, created_at
+            `SELECT slug, custom_slug, title, original_url, click_count, created_at
              FROM urls
              WHERE is_active = 1 AND is_public = 1
              ORDER BY created_at DESC
-             LIMIT 10`
+             LIMIT 20`
+        ).all();
+        return c.json({ success: true, links: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 3.0b 인기 공개 링크 (클릭수 기준)
+app.get('/api/links/popular', async (c) => {
+    try {
+        const { results } = await c.env.DB.prepare(
+            `SELECT slug, custom_slug, title, original_url, click_count, created_at
+             FROM urls
+             WHERE is_active = 1 AND is_public = 1
+             ORDER BY click_count DESC, created_at DESC
+             LIMIT 20`
         ).all();
         return c.json({ success: true, links: results });
     } catch (err: any) {
@@ -804,7 +820,35 @@ api.get('/links/check-slug', async (c) => {
     return c.json({ success: true, available: true });
 });
 
-// 8. ?⑥텞 留곹겕 ??젣
+// 8.1 링크 일별 클릭 통계 API (최근 30일)
+api.get('/links/:id/stats', async (c) => {
+    const user = c.get('user');
+    const id = c.req.param('id');
+    try {
+        const link = await c.env.DB.prepare(
+            "SELECT id, slug, base_slug, custom_slug, original_url, title, click_count, created_at FROM urls WHERE id = ? AND user_id = ?"
+        ).bind(id, user.id).first<{ id: number; slug: string; base_slug: string | null; custom_slug: string | null; original_url: string; title: string; click_count: number; created_at: string }>();
+
+        if (!link) {
+            return c.json({ success: false, error: '링크를 찾을 수 없거나 권한이 없습니다.' }, 404);
+        }
+
+        const { results } = await c.env.DB.prepare(
+            `SELECT DATE(created_at) as date, COUNT(*) as clicks
+             FROM click_logs
+             WHERE url_id = ?
+             AND created_at >= datetime('now', '-30 days')
+             GROUP BY DATE(created_at)
+             ORDER BY date ASC`
+        ).bind(id).all<{ date: string; clicks: number }>();
+
+        return c.json({ success: true, link, daily_clicks: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 8.?⑥텞 留곹겕 ??젣
 api.delete('/links/:id', async (c) => {
     const user = c.get('user');
     const id = c.req.param('id');
