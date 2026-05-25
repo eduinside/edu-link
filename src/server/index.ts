@@ -521,8 +521,11 @@ app.get('/api/auth/kakao/callback', async (c) => {
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 const api = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 
-//api 寃쎈줈 蹂댄샇
-api.use('*', authMiddleware());
+// /v1/* 경로는 자체 API Key 인증을 사용하므로 제외
+api.use('*', async (c, next) => {
+    if (c.req.path.startsWith('/v1/')) return next();
+    return authMiddleware()(c, next);
+});
 
 // 4. ???꾨줈???뺣낫 議고쉶
 api.get('/auth/me', (c) => {
