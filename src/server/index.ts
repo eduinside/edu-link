@@ -554,99 +554,131 @@ api.get('/links', async (c) => {
 // 6. ?⑥텞 留곹겕 ?앹꽦
 api.post('/links', async (c) => {
     const user = c.get('user');
-    
+
     if (user.level < 2) {
-        return c.json({ success: false, error: '?몄쬆?ъ슜???덈꺼 2) 沅뚰븳 ?댁긽留??⑥텞 留곹겕瑜?諛쒗뻾?????덉뒿?덈떎.' }, 403);
+        return c.json({ success: false, error: '인증사용자(레벨 2) 권한 이상만 단축 링크를 발행할 수 있습니다.' }, 403);
     }
 
     try {
         const body = await c.req.json();
         const { original_url, title, description, is_public, expires_at, password } = body;
-        let { slug } = body;
+        // 사용자가 입력한 슬러그는 custom_slug로 처리 (이름 호환: slug 또는 custom_slug)
+        const inputCustomSlug = body.custom_slug ?? body.slug ?? null;
 
         if (!original_url) {
-            return c.json({ success: false, error: 'original_url???꾩슂?⑸땲??' }, 400);
+            return c.json({ success: false, error: 'original_url이 필요합니다.' }, 400);
         }
-        try {
-            new URL(original_url);
-        } catch {
-            return c.json({ success: false, error: '?좏슚?섏? ?딆? URL ?뺤떇?낅땲??' }, 400);
+        try { new URL(original_url); } catch {
+            return c.json({ success: false, error: '유효하지 않은 URL 형식입니다.' }, 400);
         }
 
         if (password && !/^\d{6}$/.test(password)) {
-            return c.json({ success: false, error: '鍮꾨?踰덊샇???レ옄 6?먮━?ъ빞 ?⑸땲??' }, 400);
+            return c.json({ success: false, error: '비밀번호는 숫자 6자리여야 합니다.' }, 400);
         }
 
         const reservedSlugs = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
         const reservedSet = new Set(reservedSlugs.results.map(r => r.slug.toLowerCase()));
 
-        if (slug) {
-            slug = slug.trim();
+        // custom_slug 검증 (사용자가 입력한 경우만)
+        let customSlug: string | null = null;
+        if (inputCustomSlug && String(inputCustomSlug).trim()) {
+            let cs = String(inputCustomSlug).trim();
+            try { cs = decodeURIComponent(cs).normalize('NFC'); } catch { cs = cs.normalize('NFC'); }
+            if (!isValidCustomSlug(cs)) {
+                return c.json({ success: false, error: '슬러그는 4~20자의 영숫자, 한글, 하이픈만 사용할 수 있습니다.' }, 400);
+            }
+            if (reservedSet.has(cs.toLowerCase())) {
+                return c.json({ success: false, error: '사용할 수 없는 예약 슬러그입니다.' }, 400);
+            }
+            const dup = await c.env.DB.prepare(
+                "SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+            ).bind(cs, cs, cs).first();
+            if (dup) {
+                return c.json({ success: false, error: '이미 사용 중인 슬러그입니다.' }, 400);
+            }
+            customSlug = cs;
+        }
+
+        // base_slug는 항상 자동 생성 (6자리 무작위, 중복 회피)
+        let baseSlug = '';
+        let attempts = 0;
+        while (attempts < 10) {
+            const candidate = generateRandomSlug(6);
+            attempts++;
+            if (reservedSet.has(candidate.toLowerCase())) continue;
+            const exists = await c.env.DB.prepare(
+                "SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+            ).bind(candidate, candidate, candidate).first();
+            if (!exists) { baseSlug = candidate; break; }
+        }
+        if (!baseSlug) {
+            return c.json({ success: false, error: '슬러그 생성에 실패했습니다. 다시 시도해주세요.' }, 500);
+        }
+
+        // title이 비어있으면 og:title 자동 추출 (실패해도 무시)
+        let finalTitle = (title && title.trim()) ? title.trim() : '';
+        if (!finalTitle) {
             try {
-                slug = decodeURIComponent(slug).normalize('NFC');
-            } catch {
-                slug = slug.normalize('NFC');
-            }
-            if (!isValidCustomSlug(slug)) {
-                return c.json({ success: false, error: '?щ윭洹몃뒗 4~20?먯쓽 ?곸닽?? ?쒓? 諛??섏씠?덈쭔 ?ъ슜?????덉뒿?덈떎.' }, 400);
-            }
-            if (reservedSet.has(slug.toLowerCase())) {
-                return c.json({ success: false, error: '?ъ슜?????녿뒗 ?덉빟???щ윭洹몄엯?덈떎.' }, 400);
-            }
-
-            const exists = await c.env.DB.prepare("SELECT id FROM urls WHERE slug = ?")
-                .bind(slug)
-                .first();
-            if (exists) {
-                return c.json({ success: false, error: '?대? ?ъ슜 以묒씤 ?щ윭洹몄엯?덈떎.' }, 400);
-            }
-        } else {
-            let attempts = 0;
-            let generated = '';
-            let isUnique = false;
-
-            while (attempts < 5 && !isUnique) {
-                generated = generateRandomSlug(6);
-                attempts++;
-
-                if (reservedSet.has(generated.toLowerCase())) continue;
-
-                const exists = await c.env.DB.prepare("SELECT id FROM urls WHERE slug = ?")
-                    .bind(generated)
-                    .first();
-                if (!exists) {
-                    isUnique = true;
+                const res = await fetch(original_url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; EduLink/1.0; +https://dgedu.link)',
+                        'Accept': 'text/html,application/xhtml+xml',
+                    },
+                    signal: AbortSignal.timeout(4000),
+                    redirect: 'follow',
+                });
+                if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
+                    const reader = res.body?.getReader();
+                    let html = '';
+                    if (reader) {
+                        let bytes = 0;
+                        while (bytes < 15000) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            html += new TextDecoder('utf-8', { fatal: false }).decode(value);
+                            bytes += value.byteLength;
+                            if (html.includes('</title>')) break;
+                        }
+                        await reader.cancel();
+                    }
+                    const og = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"'<>]+)["']/i)
+                        || html.match(/<meta[^>]*content=["']([^"'<>]+)["'][^>]*property=["']og:title["']/i);
+                    let t = og ? og[1] : '';
+                    if (!t) {
+                        const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+                        if (m) t = m[1];
+                    }
+                    finalTitle = t
+                        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+                        .replace(/\s+/g, ' ').trim().slice(0, 100);
                 }
-            }
-
-            if (!isUnique) {
-                return c.json({ success: false, error: '?щ윭洹??앹꽦???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??' }, 500);
-            }
-            slug = generated;
+            } catch { /* ignore — title fetch is best-effort */ }
         }
 
         const publicFlag = is_public ? 1 : 0;
         const expiration = expires_at ? expires_at : null;
         const pass = password ? password : null;
 
-        // D1 DB ???(expires_at, password 異붽?)
         await c.env.DB.prepare(
-            `INSERT INTO urls (slug, base_slug, original_url, title, description, is_public, expires_at, password, user_id) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(slug, slug, original_url, title || '', description || '', publicFlag, expiration, pass, user.id).run();
+            `INSERT INTO urls (slug, base_slug, custom_slug, original_url, title, description, is_public, expires_at, password, user_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(baseSlug, baseSlug, customSlug, original_url, finalTitle, description || '', publicFlag, expiration, pass, user.id).run();
 
-        // 蹂댁븞/鍮꾨?踰덊샇/留뚮즺 泥섎━ 嫄댁? 罹먯떛 諛곗젣
+        // KV 캐싱: 만료/비밀번호 없는 활성 링크만, base_slug + custom_slug 모두
         if (!pass && !expiration) {
-            await c.env.URL_CACHE.put(slug, original_url);
-        } else {
-            await c.env.URL_CACHE.delete(slug);
+            await c.env.URL_CACHE.put(baseSlug, original_url);
+            if (customSlug) await c.env.URL_CACHE.put(customSlug, original_url);
         }
 
         return c.json({
             success: true,
-            slug,
-            short_url: `https://${new URL(c.req.url).host}/${slug}`,
-            original_url
+            slug: baseSlug,
+            base_slug: baseSlug,
+            custom_slug: customSlug,
+            title: finalTitle,
+            short_url: `https://${new URL(c.req.url).host}/${customSlug || baseSlug}`,
+            original_url,
         });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);

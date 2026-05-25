@@ -276,7 +276,8 @@ export default function Landing() {
     try {
       const payload: any = { original_url: url };
       if (slugType === 'custom' && customSlug) {
-        payload.slug = customSlug;
+        // 사용자 입력은 custom_slug로 전송. base_slug는 서버가 자동 생성.
+        payload.custom_slug = customSlug;
       }
 
       const res = await fetch('/api/links', {

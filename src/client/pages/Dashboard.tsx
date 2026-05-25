@@ -404,7 +404,8 @@ export default function Dashboard() {
         password: useNewPassword ? (newPassword || null) : null
       };
       if (useCustomSlug && newSlug) {
-        payload.slug = newSlug;
+        // 사용자 입력은 custom_slug로 전송. base_slug는 서버가 자동 생성.
+        payload.custom_slug = newSlug;
       }
 
       const res = await fetch('/api/links', {
