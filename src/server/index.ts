@@ -521,7 +521,10 @@ app.get('/api/auth/kakao/callback', async (c) => {
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 const api = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 
-api.use('*', authMiddleware());
+api.use('*', async (c, next) => {
+    if (c.req.path.startsWith('/api/v1/')) return next();
+    return authMiddleware()(c, next);
+});
 
 // 4. ???꾨줈???뺣낫 議고쉶
 api.get('/auth/me', (c) => {
