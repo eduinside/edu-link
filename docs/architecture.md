@@ -96,7 +96,29 @@ edu-link/
     └─ ASSETS.fetch() → dist/client/index.html → React Router가 /dashboard 렌더
 ```
 
-### 3. API 요청 (`POST /api/links`)
+### 3. 외부 API 요청 (`POST /api/v1/shorten`)
+
+```
+외부 앱 POST /api/v1/shorten
+  + Header: x-api-key: edulink_<key>
+    │
+    ▼ Worker → Hono 라우터
+    │
+    ├─ app.post('/api/v1/shorten', handler)  ← app에 직접 등록 (서브라우터 우회)
+    │   └─ api.use('*', ...) 에서 /api/v1/ 경로는 authMiddleware 건너뜀
+    │
+    ├─ x-api-key SHA-256 해시 → D1 api_keys 조회 → level ≥ 3 확인
+    ├─ 슬러그 생성/검증
+    ├─ D1 INSERT (urls 테이블)
+    └─ KV 캐싱 (만료/비밀번호 없는 경우)
+        └─ { success: true, slug, short_url, original_url } 반환
+```
+
+> **구현 노트**: Hono에서 `api.use('*', authMiddleware())`가 `/api/*` 전체에 적용되므로,
+> v1 엔드포인트를 `app.post('/api/v1/shorten', ...)` 으로 app에 직접 등록하고
+> `api.use` 미들웨어에서 `/api/v1/` 경로를 명시적으로 skip 처리.
+
+### 4. API 요청 (`POST /api/links`)
 
 ```
 브라우저 POST /api/links

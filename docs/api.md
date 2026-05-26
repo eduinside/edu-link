@@ -191,11 +191,36 @@
 ```json
 {
   "original_url": "https://school.go.kr/notice/123",
-  "slug": "notice-123",     // 선택
-  "is_public": true,         // 선택
-  "title": "공지 링크",      // 선택
-  "description": "메모"      // 선택
+  "slug": "notice-123",       // 선택 (4~20자, 한글/영숫자/하이픈)
+  "is_public": false,          // 선택, 기본 false
+  "title": "공지 링크",        // 선택
+  "description": "메모",       // 선택
+  "expires_at": "2026-12-31 00:00:00",  // 선택
+  "password": "123456"         // 선택, 숫자 6자리
 }
+```
+
+**POST /api/v1/shorten 응답 (성공)**
+```json
+{
+  "success": true,
+  "slug": "aB3kR9",
+  "short_url": "https://dgedu.link/aB3kR9",
+  "original_url": "https://school.go.kr/notice/123"
+}
+```
+
+**연동 예시 — ssac-app (`functions/api/shorten.ts`)**
+```typescript
+const res = await fetch("https://dgedu.link/api/v1/shorten", {
+  method: "POST",
+  headers: {
+    "x-api-key": env.EDULINK_API_KEY,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ original_url: url, is_public: false }),
+});
+const data = await res.json(); // { success, short_url, slug, original_url }
 ```
 
 ---
