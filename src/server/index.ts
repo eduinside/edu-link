@@ -1141,10 +1141,10 @@ app.post('/api/v1/shorten', async (c) => {
             .join('');
 
         // D1?먯꽌 ?쒖꽦?붾맂 ??諛??뚯쑀 ?ъ슜??李얘린
-        const keyRecord = await c.env.DB.prepare(`SELECT k.id, k.user_id, u.level FROM api_keys k JOIN users u ON k.user_id = u.id WHERE k.key_hash = ? AND k.is_active = 1`
+        const keyRecord = await c.env.DB.prepare(`SELECT k.id, k.user_id, k.name, u.level FROM api_keys k JOIN users u ON k.user_id = u.id WHERE k.key_hash = ? AND k.is_active = 1`
         )
         .bind(keyHash)
-        .first<{ user_id: number; level: number }>();
+        .first<{ id: number; user_id: number; name: string; level: number }>();
 
         if (!keyRecord) {
             return c.json({ success: false, error: '?좏슚?섏? ?딄굅??鍮꾪솢?깊솕??API Key?낅땲??' }, 401);
@@ -1224,7 +1224,7 @@ app.post('/api/v1/shorten', async (c) => {
         await c.env.DB.prepare(
             `INSERT INTO urls (slug, base_slug, original_url, title, description, is_public, expires_at, password, user_id, created_by) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api')`
-        ).bind(slug, slug, original_url, title || 'API Created Link', description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
+        ).bind(slug, slug, original_url, title || keyRecord.name, description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
 
         // KV 罹먯떆 ?낅뜲?댄듃
         if (!pass && !expiration) {
