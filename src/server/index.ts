@@ -1541,11 +1541,11 @@ function getPasswordPageHtml(slug: string): string {
 <body>
     <div class="card">
         <div class="logo">
-            <img src="/edulink_logo.png" alt="濡쒓퀬">
-            <span>?먮?留곹겕</span>
+            <img src="/edulink_logo.png" alt="로고">
+            <span>에듀링크</span>
         </div>
-        <h2>鍮꾨?踰덊샇瑜??낅젰?섏꽭??/h2>
-        <p>??留곹겕??鍮꾨?踰덊샇濡?蹂댄샇?섏뼱 ?덉뒿?덈떎.<br>?몄쬆??6?먮━ ?レ옄 肄붾뱶瑜??낅젰??二쇱꽭??</p>
+        <h2>비밀번호를 입력하세요</h2>
+        <p>이 링크는 비밀번호로 보호되어 있습니다.<br>인증용 6자리 숫자 코드를 입력해 주세요.</p>
         <div class="input-group" id="inputGroup">
             <input type="password" maxlength="1" class="digit-input" pattern="[0-9]*" inputmode="numeric">
             <input type="password" maxlength="1" class="digit-input" pattern="[0-9]*" inputmode="numeric">
@@ -1554,8 +1554,8 @@ function getPasswordPageHtml(slug: string): string {
             <input type="password" maxlength="1" class="digit-input" pattern="[0-9]*" inputmode="numeric">
             <input type="password" maxlength="1" class="digit-input" pattern="[0-9]*" inputmode="numeric">
         </div>
-        <button class="btn" id="submitBtn">?뺤씤 諛??대룞</button>
-        <div class="error-msg" id="errorMsg">鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆뒿?덈떎.</div>
+        <button class="btn" id="submitBtn">확인 및 이동</button>
+        <div class="error-msg" id="errorMsg">비밀번호가 일치하지 않습니다.</div>
     </div>
 
     <script>
@@ -1580,7 +1580,7 @@ function getPasswordPageHtml(slug: string): string {
         submitBtn.addEventListener('click', async () => {
             const password = Array.from(inputs).map(input => input.value).join('');
             if (password.length !== 6) {
-                showError('鍮꾨?踰덊샇 6?먮━瑜?紐⑤몢 ?낅젰??二쇱꽭??');
+                showError('비밀번호 6자리를 모두 입력해 주세요.');
                 return;
             }
 
@@ -1594,10 +1594,10 @@ function getPasswordPageHtml(slug: string): string {
                 if (data.success && data.original_url) {
                     window.location.replace(data.original_url);
                 } else {
-                    showError(data.error || '鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.');
+                    showError(data.error || '비밀번호가 올바르지 않습니다.');
                 }
             } catch (e) {
-                showError('?쒕쾭 ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+                showError('서버 오류가 발생했습니다. 다시 시도해 주세요.');
             }
         });
 
@@ -1623,7 +1623,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR 肄붾뱶 쨌 /${slug} 쨌 ?먮?留곹겕</title>
+    <title>QR 코드 · /${slug} · 에듀링크</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1635,7 +1635,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             overflow: hidden;
         }
 
-        /* ?꾩껜 ?덉씠?꾩썐 */
+        /* 전체 레이아웃 */
         .page {
             width: 100vw;
             height: 100vh;
@@ -1647,7 +1647,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             background: radial-gradient(ellipse at center, #1a1f2e 0%, #0a0d14 100%);
         }
 
-        /* 諛곌꼍 釉붾윭 ?④낵??QR 洹몃┝??*/
+        /* 배경 블러 효과 */
         .bg-glow {
             position: absolute;
             width: 520px;
@@ -1659,7 +1659,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             z-index: 0;
         }
 
-        /* 硫붿씤 QR ?섑띁 */
+        /* 메인 QR 래퍼 */
         .qr-wrapper {
             position: relative;
             z-index: 1;
@@ -1669,7 +1669,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             gap: 0;
         }
 
-        /* ?곷떒 濡쒓퀬 */
+        /* 상단 로고 */
         .brand {
             display: flex;
             align-items: center;
@@ -1691,7 +1691,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             text-transform: uppercase;
         }
 
-        /* QR ?대?吏 ?꾨젅??*/
+        /* QR 이미지 프레임 */
         .qr-frame {
             background: #ffffff;
             border-radius: 28px;
@@ -1710,7 +1710,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             border-radius: 8px;
         }
 
-        /* URL ?쒖떆 */
+        /* URL 표시 */
         .url-label {
             margin-top: 28px;
             display: flex;
@@ -1739,7 +1739,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             max-width: 50vw;
         }
 
-        /* ?섎떒 踰꾪듉 洹몃９ */
+        /* 하단 버튼 그룹 */
         .actions {
             position: fixed;
             bottom: 32px;
@@ -1779,7 +1779,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
         }
         .btn-download:hover { box-shadow: 0 8px 28px rgba(79, 70, 229, 0.55); }
 
-        /* ?좎뒪??*/
+        /* 토스트 */
         .toast {
             position: fixed;
             top: 28px;
@@ -1804,7 +1804,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             transform: translateX(-50%) translateY(0);
         }
 
-        /* 紐⑤컮??理쒖쟻??*/
+        /* 모바일 최적화 */
         @media (max-width: 480px) {
             .qr-frame { padding: 16px; border-radius: 20px; }
             .qr-frame img { width: 78vw; height: 78vw; }
@@ -1824,7 +1824,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             <div class="qr-frame">
                 <img id="qrImg"
                     src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=${encodeURIComponent(shortUrl)}"
-                    alt="QR 肄붾뱶 쨌 ${shortUrl}"
+                    alt="QR 코드 · ${shortUrl}"
                     loading="eager"
                 >
             </div>
@@ -1845,7 +1845,8 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            QR ???        </button>
+            QR 저장
+        </button>
     </div>
 
     <div class="toast" id="toast"></div>
@@ -1863,8 +1864,8 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
 
         document.getElementById('copyBtn').addEventListener('click', () => {
             navigator.clipboard.writeText(shortUrl)
-                .then(() => showToast('?? 二쇱냼媛 蹂듭궗?섏뿀?듬땲??))
-                .catch(() => showToast('蹂듭궗 ?ㅽ뙣 ??二쇱냼李쎌뿉??吏곸젒 蹂듭궗?댁＜?몄슂'));
+                .then(() => showToast('단축 주소가 복사되었습니다.'))
+                .catch(() => showToast('복사 실패. 주소창에서 직접 복사해 주세요.'));
         });
 
         document.getElementById('downloadBtn').addEventListener('click', async () => {
@@ -1879,7 +1880,7 @@ function getQrPageHtml(slug: string, shortUrl: string): string {
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(a.href);
-                showToast('?? QR 肄붾뱶媛 ??λ릺?덉뒿?덈떎');
+                showToast('QR 코드가 저장되었습니다.');
             } catch {
                 window.open(document.getElementById('qrImg').src, '_blank');
             }
