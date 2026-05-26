@@ -15,13 +15,18 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS urls (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     slug          TEXT NOT NULL UNIQUE,
+    base_slug     TEXT,
+    custom_slug   TEXT,
     original_url  TEXT NOT NULL,
     title         TEXT DEFAULT '',
     description   TEXT DEFAULT '',
     user_id       INTEGER NOT NULL,
     is_active     INTEGER NOT NULL DEFAULT 1,
+    is_public     INTEGER NOT NULL DEFAULT 0,
     click_count   INTEGER NOT NULL DEFAULT 0,
     expires_at    TEXT,
+    password      TEXT,
+    created_by    TEXT NOT NULL DEFAULT 'web',
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

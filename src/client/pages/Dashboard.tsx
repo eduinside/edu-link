@@ -55,6 +55,7 @@ interface LinkItem {
   expires_at: string | null;
   password: string | null;
   created_at: string;
+  created_by?: 'web' | 'api';
 }
 
 interface ApiKeyItem {
@@ -110,6 +111,7 @@ export default function Dashboard() {
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'links' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
+  const [linkSourceFilter, setLinkSourceFilter] = useState<'web' | 'api'>('web');
   
   // 새 단축 링크 상태
   const [newUrl, setNewUrl] = useState('');
@@ -748,6 +750,13 @@ export default function Dashboard() {
 
   const totalClicks = links.reduce((sum, item) => sum + item.click_count, 0);
 
+  const filteredLinks = links.filter(link => {
+    if (linkSourceFilter === 'api') {
+      return link.created_by === 'api';
+    }
+    return link.created_by !== 'api';
+  });
+
   return (
     <div className="h-screen bg-slate-50 flex overflow-hidden">
       
@@ -1091,16 +1100,60 @@ export default function Dashboard() {
 
                   {/* 단축 링크 목록 — 테이블 */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <h4 className="font-bold text-sm text-slate-800">단축 링크 목록</h4>
-                      <span className="text-xs text-slate-400">총 {links.length}개 발행됨</span>
+                      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/40">
+                        <button
+                          type="button"
+                          onClick={() => setLinkSourceFilter('web')}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            linkSourceFilter === 'web'
+                              ? 'bg-white text-indigo-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          <Link2 className="w-3 h-3" />
+                          일반 링크
+                          <span className={`ml-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                            linkSourceFilter === 'web'
+                              ? 'bg-indigo-50 text-indigo-600'
+                              : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {links.filter(l => l.created_by !== 'api').length}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLinkSourceFilter('api')}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            linkSourceFilter === 'api'
+                              ? 'bg-white text-indigo-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          <Terminal className="w-3 h-3" />
+                          API 생성 링크
+                          <span className={`ml-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                            linkSourceFilter === 'api'
+                              ? 'bg-indigo-50 text-indigo-600'
+                              : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {links.filter(l => l.created_by === 'api').length}
+                          </span>
+                        </button>
+                      </div>
                     </div>
 
-                    {links.length === 0 ? (
+                    {filteredLinks.length === 0 ? (
                       <Card className="bg-white border border-slate-100 rounded-3xl py-16 shadow-sm">
                         <CardContent className="text-center flex flex-col items-center gap-2">
                           <Link2 className="w-12 h-12 text-slate-200" />
-                          <p className="text-xs text-slate-400 font-medium">아직 발행하신 단축 링크가 존재하지 않습니다.</p>
+                          <p className="text-xs text-slate-400 font-medium">
+                            {linkSourceFilter === 'api' 
+                              ? '아직 API로 생성된 단축 링크가 존재하지 않습니다.'
+                              : '아직 대시보드에서 직접 생성한 단축 링크가 존재하지 않습니다.'
+                            }
+                          </p>
                         </CardContent>
                       </Card>
                     ) : (
@@ -1118,7 +1171,7 @@ export default function Dashboard() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                              {links.map((link) => {
+                              {filteredLinks.map((link) => {
                                 const openUrl = `${window.location.protocol}//${window.location.host}/${link.custom_slug || link.base_slug || link.slug}`;
                                 const isCopied = copiedId === link.id;
                                 return (

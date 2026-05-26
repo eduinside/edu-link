@@ -551,12 +551,12 @@ api.patch('/auth/profile', async (c) => {
     }
 });
 
-// 5. ???⑥텞 留곹겕 紐⑸줉 議고쉶 (is_public 而щ읆 異붽? 諛섑솚)
+// 5. 내 단축 링크 목록 조회 (is_public 컬럼 추가 반환)
 api.get('/links', async (c) => {
     const user = c.get('user');
     try {
         const { results } = await c.env.DB.prepare(
-            `SELECT id, slug, base_slug, custom_slug, original_url, title, description, click_count, is_active, is_public, expires_at, password, created_at 
+            `SELECT id, slug, base_slug, custom_slug, original_url, title, description, click_count, is_active, is_public, expires_at, password, created_at, created_by 
              FROM urls 
              WHERE user_id = ? 
              ORDER BY created_at DESC`
@@ -1220,11 +1220,11 @@ app.post('/api/v1/shorten', async (c) => {
         const expiration = expires_at ? expires_at : null;
         const pass = password ? password : null;
 
-        // D1 DB 湲곕줉 (is_public, expires_at, password 異붽?)
+        // D1 DB 기록 (is_public, expires_at, password, base_slug, created_by 추가)
         await c.env.DB.prepare(
-            `INSERT INTO urls (slug, original_url, title, description, is_public, expires_at, password, user_id) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(slug, original_url, title || 'API Created Link', description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
+            `INSERT INTO urls (slug, base_slug, original_url, title, description, is_public, expires_at, password, user_id, created_by) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api')`
+        ).bind(slug, slug, original_url, title || 'API Created Link', description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
 
         // KV 罹먯떆 ?낅뜲?댄듃
         if (!pass && !expiration) {
