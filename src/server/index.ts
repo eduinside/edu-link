@@ -551,6 +551,50 @@ api.patch('/auth/profile', async (c) => {
     }
 });
 
+// 4.2 등급 승급 요청 제출 (level 1, 2 사용자)
+api.post('/auth/upgrade-request', async (c) => {
+    const user = c.get('user');
+    if (user.level >= 3) {
+        return c.json({ success: false, error: '3단계 이상 사용자는 승급 요청을 제출할 수 없습니다.' }, 400);
+    }
+    try {
+        const { requested_level, reason } = await c.req.json();
+        const numericLevel = Number(requested_level);
+        if (isNaN(numericLevel) || numericLevel <= user.level || numericLevel > 3) {
+            return c.json({ success: false, error: '유효하지 않은 요청 등급입니다.' }, 400);
+        }
+        if (!reason || !reason.trim()) {
+            return c.json({ success: false, error: '요청 사유를 입력해주세요.' }, 400);
+        }
+        // 이미 대기 중인 요청이 있으면 차단
+        const existing = await c.env.DB.prepare(
+            "SELECT id FROM upgrade_requests WHERE user_id = ? AND status = 'pending'"
+        ).bind(user.id).first();
+        if (existing) {
+            return c.json({ success: false, error: '이미 처리 대기 중인 승급 요청이 있습니다.' }, 400);
+        }
+        await c.env.DB.prepare(
+            "INSERT INTO upgrade_requests (user_id, current_level, requested_level, reason) VALUES (?, ?, ?, ?)"
+        ).bind(user.id, user.level, numericLevel, reason.trim()).run();
+        return c.json({ success: true, message: '승급 요청이 제출되었습니다. 최고관리자 검토 후 처리됩니다.' });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 4.3 내 등급 승급 요청 현황 조회
+api.get('/auth/upgrade-request', async (c) => {
+    const user = c.get('user');
+    try {
+        const { results } = await c.env.DB.prepare(
+            "SELECT * FROM upgrade_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 5"
+        ).bind(user.id).all();
+        return c.json({ success: true, requests: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
 // 5. 내 단축 링크 목록 조회 (is_public 컬럼 추가 반환)
 api.get('/links', async (c) => {
     const user = c.get('user');
@@ -1108,6 +1152,57 @@ adminApi.patch('/users/:id', async (c) => {
         return c.json({ success: false, error: err.message }, 500);
     }
 });
+// 10.8 승급 요청 목록 조회 (최고관리자)
+adminApi.get('/upgrade-requests', async (c) => {
+    try {
+        const { results } = await c.env.DB.prepare(
+            `SELECT r.*, u.email, u.name, u.affiliation
+             FROM upgrade_requests r
+             JOIN users u ON r.user_id = u.id
+             ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC`
+        ).all();
+        return c.json({ success: true, requests: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 10.9 승급 요청 승인 / 거절 (최고관리자)
+adminApi.patch('/upgrade-requests/:id', async (c) => {
+    const id = c.req.param('id');
+    const admin = c.get('user');
+    try {
+        const { action } = await c.req.json(); // 'approve' | 'reject'
+        if (action !== 'approve' && action !== 'reject') {
+            return c.json({ success: false, error: '유효하지 않은 액션입니다.' }, 400);
+        }
+        const req = await c.env.DB.prepare(
+            "SELECT * FROM upgrade_requests WHERE id = ?"
+        ).bind(id).first() as any;
+        if (!req) {
+            return c.json({ success: false, error: '요청을 찾을 수 없습니다.' }, 404);
+        }
+        if (req.status !== 'pending') {
+            return c.json({ success: false, error: '이미 처리된 요청입니다.' }, 400);
+        }
+        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        await c.env.DB.prepare(
+            "UPDATE upgrade_requests SET status = ?, reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?"
+        ).bind(newStatus, admin.id, id).run();
+        if (action === 'approve') {
+            await c.env.DB.prepare(
+                "UPDATE users SET level = ?, updated_at = datetime('now') WHERE id = ?"
+            ).bind(req.requested_level, req.user_id).run();
+        }
+        const msg = action === 'approve'
+            ? `승급 요청이 승인되었습니다. (${req.requested_level}단계로 변경)`
+            : '승급 요청이 거절되었습니다.';
+        return c.json({ success: true, message: msg });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
 app.route("/api/admin", adminApi);
 
 

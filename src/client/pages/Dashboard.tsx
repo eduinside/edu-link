@@ -84,6 +84,22 @@ interface Notice {
   created_at: string;
 }
 
+interface UpgradeRequest {
+  id: number;
+  user_id: number;
+  current_level: number;
+  requested_level: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  created_at: string;
+  // admin view extras
+  email?: string;
+  name?: string;
+  affiliation?: string;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -181,6 +197,16 @@ export default function Dashboard() {
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileAffiliation, setNewProfileAffiliation] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  // 승급 요청 상태 (사용자용)
+  const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [upgradeReqLevel, setUpgradeReqLevel] = useState(0);
+  const [upgradeReqReason, setUpgradeReqReason] = useState('');
+  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
+
+  // 승급 요청 관리 (최고관리자용)
+  const [adminUpgradeRequests, setAdminUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [isProcessingRequest, setIsProcessingRequest] = useState<number | null>(null);
 
   // 활용방법 / 공지사항 상태
   const [dashboardNotices, setDashboardNotices] = useState<Notice[]>([]);
@@ -377,6 +403,79 @@ export default function Dashboard() {
     }
   };
 
+  // 내 승급 요청 현황 조회
+  const fetchUpgradeRequests = async () => {
+    try {
+      const res = await fetch('/api/auth/upgrade-request', { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) setUpgradeRequests(data.requests);
+    } catch { /* 무시 */ }
+  };
+
+  // 승급 요청 제출
+  const handleSubmitUpgradeRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!upgradeReqLevel || !upgradeReqReason.trim()) return;
+    setIsSubmittingUpgrade(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch('/api/auth/upgrade-request', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ requested_level: upgradeReqLevel, reason: upgradeReqReason })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(data.message);
+        setUpgradeReqReason('');
+        setUpgradeReqLevel(0);
+        fetchUpgradeRequests();
+      } else {
+        setError(data.error || '승급 요청 실패');
+      }
+    } catch {
+      setError('서버 연결 실패');
+    } finally {
+      setIsSubmittingUpgrade(false);
+    }
+  };
+
+  // 관리자: 승급 요청 목록 조회
+  const fetchAdminUpgradeRequests = async () => {
+    try {
+      const res = await fetch('/api/admin/upgrade-requests', { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) setAdminUpgradeRequests(data.requests);
+    } catch { /* 무시 */ }
+  };
+
+  // 관리자: 승급 요청 처리
+  const handleProcessUpgradeRequest = async (reqId: number, action: 'approve' | 'reject') => {
+    setIsProcessingRequest(reqId);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`/api/admin/upgrade-requests/${reqId}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(data.message);
+        fetchAdminUpgradeRequests();
+        fetchAdminData();
+      } else {
+        setError(data.error || '처리 실패');
+      }
+    } catch {
+      setError('서버 연결 실패');
+    } finally {
+      setIsProcessingRequest(null);
+    }
+  };
+
   useEffect(() => {
     fetchUser();
     fetchLinks();
@@ -386,6 +485,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeTab === 'admin' && user?.level === 4) {
       fetchAdminData();
+      fetchAdminUpgradeRequests();
+    }
+    if (activeTab === 'profile' && user && user.level <= 2) {
+      fetchUpgradeRequests();
     }
   }, [activeTab, user]);
 
@@ -2153,6 +2256,93 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
+              {/* 승급 요청 카드 (1단계, 2단계 사용자만 표시) */}
+              {user.level <= 2 && (
+                <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* 요청 제출 폼 */}
+                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                    <CardContent className="p-6 space-y-5 text-xs">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <ShieldAlert className="w-4 h-4 text-amber-500" />
+                        <h4 className="font-bold text-sm text-slate-800">상위 등급 승급 요청</h4>
+                      </div>
+                      <p className="text-slate-500 leading-relaxed">
+                        현재 등급보다 높은 권한이 필요한 경우, 아래 양식을 작성하여 최고관리자에게 승급 요청을 제출하세요.
+                      </p>
+                      <form onSubmit={handleSubmitUpgradeRequest} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-600">요청 등급</label>
+                          <select
+                            required
+                            value={upgradeReqLevel}
+                            onChange={(e) => setUpgradeReqLevel(Number(e.target.value))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-indigo-400 transition-colors"
+                          >
+                            <option value={0} disabled>— 요청할 등급 선택 —</option>
+                            {user.level < 2 && <option value={2}>2단계: 인증사용자 (링크 생성·관리)</option>}
+                            {user.level < 3 && <option value={3}>3단계: 개발자 (API Key 발급)</option>}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-600">요청 사유</label>
+                          <textarea
+                            required
+                            rows={4}
+                            placeholder="승급이 필요한 이유, 소속 기관, 활용 목적 등을 구체적으로 작성해 주세요."
+                            value={upgradeReqReason}
+                            onChange={(e) => setUpgradeReqReason(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-indigo-400 transition-colors resize-none leading-relaxed"
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          color="warning"
+                          variant="flat"
+                          className="w-full rounded-xl font-bold mt-1"
+                          isLoading={isSubmittingUpgrade}
+                          isDisabled={!upgradeReqLevel || !upgradeReqReason.trim()}
+                        >
+                          승급 요청 제출
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* 내 요청 현황 */}
+                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                    <CardContent className="p-6 space-y-4 text-xs">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <Info className="w-4 h-4 text-slate-400" />
+                        <h4 className="font-bold text-sm text-slate-800">내 승급 요청 현황</h4>
+                      </div>
+                      {upgradeRequests.length === 0 ? (
+                        <p className="text-slate-400 text-center py-6">제출된 요청이 없습니다.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {upgradeRequests.map((r) => (
+                            <div key={r.id} className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-700">{r.requested_level}단계 승급 요청</span>
+                                <Chip
+                                  size="sm"
+                                  variant="flat"
+                                  color={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'}
+                                  className="font-bold text-[9px] h-5"
+                                >
+                                  {r.status === 'approved' ? '승인됨' : r.status === 'rejected' ? '거절됨' : '대기 중'}
+                                </Chip>
+                              </div>
+                              <p className="text-slate-500 leading-relaxed line-clamp-2">{r.reason}</p>
+                              <p className="text-[10px] text-slate-400">{formatDate(r.created_at)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -2428,6 +2618,115 @@ export default function Dashboard() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* 승급 요청 관리 섹션 */}
+              <div className="lg:col-span-3 space-y-3 pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-slate-800">등급 승급 요청 관리</h4>
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" color="warning" variant="flat" className="font-bold text-[10px]">
+                      대기 중 {adminUpgradeRequests.filter(r => r.status === 'pending').length}건
+                    </Chip>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      className="text-[10px] font-bold text-slate-400 h-6 px-2"
+                      onClick={fetchAdminUpgradeRequests}
+                    >
+                      새로고침
+                    </Button>
+                  </div>
+                </div>
+
+                {adminUpgradeRequests.length === 0 ? (
+                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                    <CardContent className="p-8 text-center text-xs text-slate-400">
+                      제출된 승급 요청이 없습니다.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                            <th className="p-4">신청자</th>
+                            <th className="p-4">소속</th>
+                            <th className="p-4">이메일</th>
+                            <th className="p-4">현재→요청</th>
+                            <th className="p-4">요청 사유</th>
+                            <th className="p-4">신청일시</th>
+                            <th className="p-4">상태</th>
+                            <th className="p-4 text-center">처리</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {adminUpgradeRequests.map((r) => (
+                            <tr key={r.id} className={`hover:bg-slate-50/50 transition-colors ${r.status !== 'pending' ? 'opacity-50' : ''}`}>
+                              <td className="p-4 font-bold">{r.name}</td>
+                              <td className="p-4 text-slate-500">{r.affiliation || <span className="text-slate-300">—</span>}</td>
+                              <td className="p-4 font-mono text-[10px]">{r.email}</td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-1.5">
+                                  <Chip size="sm" variant="flat" color={r.current_level === 2 ? 'primary' : 'default'} className="font-bold text-[9px] h-5 px-1.5">
+                                    {r.current_level}단계
+                                  </Chip>
+                                  <span className="text-slate-300">→</span>
+                                  <Chip size="sm" variant="flat" color={r.requested_level === 3 ? 'secondary' : 'primary'} className="font-bold text-[9px] h-5 px-1.5">
+                                    {r.requested_level}단계
+                                  </Chip>
+                                </div>
+                              </td>
+                              <td className="p-4 max-w-[200px]">
+                                <p className="text-slate-500 line-clamp-2 leading-relaxed">{r.reason}</p>
+                              </td>
+                              <td className="p-4 text-slate-400 text-[10px]">{formatDate(r.created_at)}</td>
+                              <td className="p-4">
+                                <Chip
+                                  size="sm"
+                                  variant="flat"
+                                  color={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'}
+                                  className="font-bold text-[9px] h-5"
+                                >
+                                  {r.status === 'approved' ? '승인됨' : r.status === 'rejected' ? '거절됨' : '대기 중'}
+                                </Chip>
+                              </td>
+                              <td className="p-4 text-center">
+                                {r.status === 'pending' ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      color="success"
+                                      variant="flat"
+                                      className="h-7 px-2.5 text-[10px] font-bold rounded-lg"
+                                      isLoading={isProcessingRequest === r.id}
+                                      onClick={() => handleProcessUpgradeRequest(r.id, 'approve')}
+                                    >
+                                      승인
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      color="danger"
+                                      variant="flat"
+                                      className="h-7 px-2.5 text-[10px] font-bold rounded-lg"
+                                      isLoading={isProcessingRequest === r.id}
+                                      onClick={() => handleProcessUpgradeRequest(r.id, 'reject')}
+                                    >
+                                      거절
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-slate-300 font-bold">처리 완료</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )}
               </div>
 
               {/* 어드민 사용자 등급 관리 섹션 */}
