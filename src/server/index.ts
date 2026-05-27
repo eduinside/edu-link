@@ -1096,6 +1096,25 @@ adminApi.post('/notices', async (c) => {
 });
 
 // 10.5 怨듭??ы빆 ??젣
+adminApi.patch('/notices/:id', async (c) => {
+    const id = c.req.param('id');
+    try {
+        const { title, content, is_pinned } = await c.req.json();
+        if (!title?.trim() || !content?.trim()) {
+            return c.json({ success: false, error: '제목과 내용을 입력해주세요.' }, 400);
+        }
+        const result = await c.env.DB.prepare(
+            "UPDATE notices SET title = ?, content = ?, is_pinned = ?, updated_at = datetime('now') WHERE id = ?"
+        ).bind(title.trim(), content.trim(), is_pinned ? 1 : 0, id).run();
+        if (result.meta.changes === 0) {
+            return c.json({ success: false, error: '해당 공지사항을 찾을 수 없습니다.' }, 404);
+        }
+        return c.json({ success: true, message: '공지사항이 수정되었습니다.' });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
 adminApi.delete('/notices/:id', async (c) => {
     const id = c.req.param('id');
     try {

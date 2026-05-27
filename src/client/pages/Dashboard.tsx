@@ -208,6 +208,16 @@ export default function Dashboard() {
   const [adminUpgradeRequests, setAdminUpgradeRequests] = useState<UpgradeRequest[]>([]);
   const [isProcessingRequest, setIsProcessingRequest] = useState<number | null>(null);
 
+  // 최고관리자 서브탭
+  const [adminSubTab, setAdminSubTab] = useState<'overview' | 'notices' | 'settings'>('overview');
+
+  // 공지사항 수정 상태
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [editNoticeTitle, setEditNoticeTitle] = useState('');
+  const [editNoticeContent, setEditNoticeContent] = useState('');
+  const [editNoticePinned, setEditNoticePinned] = useState(false);
+  const [isSavingNotice, setIsSavingNotice] = useState(false);
+
   // 활용방법 / 공지사항 상태
   const [dashboardNotices, setDashboardNotices] = useState<Notice[]>([]);
   const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(null);
@@ -768,6 +778,34 @@ export default function Dashboard() {
       }
     } catch {
       setError('서버 연결 실패');
+    }
+  };
+
+  // 공지 수정 핸들러
+  const handleEditNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNotice) return;
+    setIsSavingNotice(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`/api/admin/notices/${editingNotice.id}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ title: editNoticeTitle, content: editNoticeContent, is_pinned: editNoticePinned })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg('공지사항이 수정되었습니다.');
+        setEditingNotice(null);
+        fetchAdminData();
+      } else {
+        setError(data.error || '공지 수정 실패');
+      }
+    } catch {
+      setError('서버 연결 실패');
+    } finally {
+      setIsSavingNotice(false);
     }
   };
 
@@ -2470,338 +2508,384 @@ export default function Dashboard() {
 
           {/* 최고관리자 탭 */}
           {activeTab === 'admin' && user?.level === 4 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-fade-in">
-              
-              {/* 좌측: 도메인 설정 관리 */}
-              <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm lg:sticky lg:top-8">
-                <CardContent className="p-6 space-y-4 text-xs">
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <Globe className="w-4 h-4 text-red-500" />
-                    <h4 className="font-bold text-sm text-slate-800">Zero Trust 허용 도메인 추가</h4>
-                  </div>
+            <div className="space-y-6 animate-fade-in">
 
-                  <form onSubmit={handleAddDomain} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-600">이메일 도메인 명</label>
-                      <Input
-                        size="sm"
-                        required
-                        placeholder="예: dge.go.kr"
-                        value={newDomain}
-                        onChange={(e) => setNewDomain(e.target.value)}
-                        className="w-full"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      color="danger"
-                      className="w-full rounded-xl font-bold mt-2 shadow-md shadow-danger/10 text-white"
-                    >
-                      도메인 등록
-                    </Button>
-                  </form>
+              {/* 관리자 서브탭 헤더 */}
+              <div className="flex items-center gap-1 bg-slate-100/70 p-1 rounded-2xl w-fit">
+                {([
+                  { key: 'overview', label: '통계 및 회원', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+                  { key: 'notices',  label: '공지사항',     icon: <Megaphone  className="w-3.5 h-3.5" /> },
+                  { key: 'settings', label: '시스템 설정',  icon: <Settings   className="w-3.5 h-3.5" /> },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setAdminSubTab(t.key)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200
+                      ${adminSubTab === t.key
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {t.icon}
+                    {t.label}
+                    {t.key === 'overview' && adminUpgradeRequests.filter(r => r.status === 'pending').length > 0 && (
+                      <span className="bg-red-500 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                        {adminUpgradeRequests.filter(r => r.status === 'pending').length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
 
-                  <div className="pt-4 border-t border-slate-100 space-y-2">
-                    <label className="font-bold text-slate-500">현재 허용 도메인 목록</label>
-                    <div className="space-y-1.5">
-                      {adminDomains.map((d) => (
-                        <div key={d.id} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl text-[11px]">
-                          <span className="font-mono font-bold text-slate-700">{d.domain}</span>
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="danger"
-                            isIconOnly
-                            className="w-5 h-5 min-w-0 p-0 rounded-md"
-                            onClick={() => handleDeleteDomain(d.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* ───────── 1탭: 통계 및 회원 ───────── */}
+              {adminSubTab === 'overview' && (
+                <div className="space-y-8">
 
-              {/* 우측: 공지사항 관리 */}
-              <div className="lg:col-span-2 space-y-6">
-                
-                {/* 1. 공지 등록 */}
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
-                  <CardContent className="p-6 space-y-4 text-xs">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <Settings className="w-4 h-4 text-red-500" />
-                      <h4 className="font-bold text-sm text-slate-800">에듀링크 공지사항 작성</h4>
-                    </div>
-
-                    <form onSubmit={handleAddNotice} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-slate-600">공지 제목</label>
-                        <Input
-                          size="sm"
-                          required
-                          placeholder="공지사항 제목을 입력하세요"
-                          value={newNoticeTitle}
-                          onChange={(e) => setNewNoticeTitle(e.target.value)}
-                          className="w-full"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-slate-600">공지 내용</label>
-                        <textarea
-                          required
-                          rows={4}
-                          placeholder="내용을 자세히 입력하세요..."
-                          value={newNoticeContent}
-                          onChange={(e) => setNewNoticeContent(e.target.value)}
-                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl p-3 text-xs text-slate-800 transition-all"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 py-1">
-                        <input
-                          type="checkbox"
-                          id="noticePin"
-                          checked={newNoticePinned}
-                          onChange={(e) => setNewNoticePinned(e.target.checked)}
-                          className="rounded text-red-600 focus:ring-red-500 w-3.5 h-3.5"
-                        />
-                        <label htmlFor="noticePin" className="font-bold text-slate-600 select-none">
-                          이 공지를 목록 최상단에 고정하기 (중요 공지)
-                        </label>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        color="danger"
-                        className="w-full rounded-xl font-bold mt-2 shadow-md shadow-danger/10 text-white"
-                      >
-                        공지사항 등록
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-
-                {/* 2. 공지 리스트 */}
-                <div className="space-y-3">
-                  <h4 className="font-bold text-sm text-slate-800">등록된 공지 목록</h4>
-                  <div className="space-y-2">
-                    {adminNotices.map((n) => (
-                      <Card key={n.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm">
-                        <CardContent className="p-4 flex items-start justify-between gap-4 text-xs">
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {n.is_pinned === 1 && (
-                                <Chip size="sm" color="warning" variant="flat" className="h-5 text-[9px] font-bold px-1.5">
-                                  📌 고정됨
-                                </Chip>
-                              )}
-                              <span className="text-[10px] text-slate-400">{formatDate(n.created_at)}</span>
-                            </div>
-                            <h5 className="font-bold text-slate-800 truncate">{n.title}</h5>
-                            <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{n.content}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            color="danger"
-                            isIconOnly
-                            className="rounded-lg w-8 h-8 min-w-0 p-0 flex-shrink-0"
-                            onClick={() => handleDeleteNotice(n.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                  {/* 통계 카드 4종 */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: '전체 회원', value: adminUsers.length, sub: '명', color: 'bg-indigo-50 border-indigo-100', textColor: 'text-indigo-600' },
+                      { label: '인증사용자 이상', value: adminUsers.filter(u => u.level >= 2).length, sub: '명', color: 'bg-blue-50 border-blue-100', textColor: 'text-blue-600' },
+                      { label: '승급 대기', value: adminUpgradeRequests.filter(r => r.status === 'pending').length, sub: '건', color: 'bg-amber-50 border-amber-100', textColor: 'text-amber-600' },
+                      { label: '공지사항', value: adminNotices.length, sub: '건', color: 'bg-rose-50 border-rose-100', textColor: 'text-rose-600' },
+                    ].map((stat) => (
+                      <Card key={stat.label} className={`border ${stat.color} rounded-2xl shadow-sm`}>
+                        <CardContent className="p-5 space-y-1">
+                          <p className="text-[11px] font-bold text-slate-500">{stat.label}</p>
+                          <p className={`text-2xl font-black ${stat.textColor}`}>{stat.value}<span className="text-sm font-bold ml-1">{stat.sub}</span></p>
                         </CardContent>
                       </Card>
                     ))}
                   </div>
-                </div>
-              </div>
 
-              {/* 승급 요청 관리 섹션 */}
-              <div className="lg:col-span-3 space-y-3 pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-sm text-slate-800">등급 승급 요청 관리</h4>
-                  <div className="flex items-center gap-2">
-                    <Chip size="sm" color="warning" variant="flat" className="font-bold text-[10px]">
-                      대기 중 {adminUpgradeRequests.filter(r => r.status === 'pending').length}건
-                    </Chip>
-                    <Button
-                      size="sm"
-                      variant="light"
-                      className="text-[10px] font-bold text-slate-400 h-6 px-2"
-                      onClick={fetchAdminUpgradeRequests}
-                    >
-                      새로고침
-                    </Button>
+                  {/* 승급 요청 관리 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-amber-500" />
+                        <h4 className="font-bold text-sm text-slate-800">등급 승급 요청 관리</h4>
+                        {adminUpgradeRequests.filter(r => r.status === 'pending').length > 0 && (
+                          <Chip size="sm" color="warning" variant="flat" className="font-bold text-[10px]">
+                            대기 중 {adminUpgradeRequests.filter(r => r.status === 'pending').length}건
+                          </Chip>
+                        )}
+                      </div>
+                      <Button size="sm" variant="light" className="text-[10px] font-bold text-slate-400 h-7 px-2" onClick={() => { fetchAdminUpgradeRequests(); fetchAdminData(); }}>
+                        새로고침
+                      </Button>
+                    </div>
+                    {adminUpgradeRequests.length === 0 ? (
+                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                        <CardContent className="p-8 text-center text-xs text-slate-400">제출된 승급 요청이 없습니다.</CardContent>
+                      </Card>
+                    ) : (
+                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto w-full">
+                          <table className="w-full border-collapse text-left text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                                <th className="p-3.5">신청자</th>
+                                <th className="p-3.5">소속</th>
+                                <th className="p-3.5">이메일</th>
+                                <th className="p-3.5">현재→요청</th>
+                                <th className="p-3.5">요청 사유</th>
+                                <th className="p-3.5">신청일시</th>
+                                <th className="p-3.5">상태</th>
+                                <th className="p-3.5 text-center">처리</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {adminUpgradeRequests.map((r) => (
+                                <tr key={r.id} className={`hover:bg-slate-50/50 transition-colors ${r.status !== 'pending' ? 'opacity-40' : ''}`}>
+                                  <td className="p-3.5 font-bold">{r.name}</td>
+                                  <td className="p-3.5 text-slate-500">{r.affiliation || <span className="text-slate-300">—</span>}</td>
+                                  <td className="p-3.5 font-mono text-[10px]">{r.email}</td>
+                                  <td className="p-3.5">
+                                    <div className="flex items-center gap-1">
+                                      <Chip size="sm" variant="flat" color={r.current_level === 2 ? 'primary' : 'default'} className="font-bold text-[9px] h-5 px-1">{r.current_level}단계</Chip>
+                                      <span className="text-slate-300">→</span>
+                                      <Chip size="sm" variant="flat" color={r.requested_level === 3 ? 'secondary' : 'primary'} className="font-bold text-[9px] h-5 px-1">{r.requested_level}단계</Chip>
+                                    </div>
+                                  </td>
+                                  <td className="p-3.5 max-w-[200px]"><p className="text-slate-500 line-clamp-2 leading-relaxed">{r.reason}</p></td>
+                                  <td className="p-3.5 text-slate-400 text-[10px]">{formatDate(r.created_at)}</td>
+                                  <td className="p-3.5">
+                                    <Chip size="sm" variant="flat" color={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'} className="font-bold text-[9px] h-5">
+                                      {r.status === 'approved' ? '승인됨' : r.status === 'rejected' ? '거절됨' : '대기 중'}
+                                    </Chip>
+                                  </td>
+                                  <td className="p-3.5 text-center">
+                                    {r.status === 'pending' ? (
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="sm" color="success" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'approve')}>승인</Button>
+                                        <Button size="sm" color="danger" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'reject')}>거절</Button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-300 font-bold">처리 완료</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+                    )}
                   </div>
-                </div>
 
-                {adminUpgradeRequests.length === 0 ? (
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
-                    <CardContent className="p-8 text-center text-xs text-slate-400">
-                      제출된 승급 요청이 없습니다.
+                  {/* 사용자 권한 등급 관리 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-indigo-500" />
+                        <h4 className="font-bold text-sm text-slate-800">사용자 권한 등급 관리</h4>
+                      </div>
+                      <span className="text-xs text-slate-400">총 {adminUsers.length}명</span>
+                    </div>
+                    <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto w-full">
+                        <table className="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                              <th className="p-3.5">ID</th>
+                              <th className="p-3.5">사용자명</th>
+                              <th className="p-3.5">소속</th>
+                              <th className="p-3.5">이메일</th>
+                              <th className="p-3.5">가입일시</th>
+                              <th className="p-3.5">현재 등급</th>
+                              <th className="p-3.5 text-center">등급 조정</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-700">
+                            {adminUsers.map((u) => {
+                              const isSelf = user && u.id === user.id;
+                              return (
+                                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="p-3.5 font-mono font-bold text-slate-400">{u.id}</td>
+                                  <td className="p-3.5 font-bold">{u.name}{isSelf && <span className="ml-1 text-[9px] text-indigo-600 font-bold">(본인)</span>}</td>
+                                  <td className="p-3.5 text-slate-500">{u.affiliation || <span className="text-slate-300">—</span>}</td>
+                                  <td className="p-3.5 font-mono text-[10px]">{u.email}</td>
+                                  <td className="p-3.5 text-slate-400">{formatDate(u.created_at || null)}</td>
+                                  <td className="p-3.5">
+                                    <Chip size="sm" variant="flat" color={u.level === 4 ? 'danger' : u.level === 3 ? 'secondary' : u.level === 2 ? 'primary' : 'default'} className="font-bold px-1.5 h-5 text-[9px]">
+                                      {u.level === 4 ? '4-최고관리자' : u.level === 3 ? '3-개발자' : u.level === 2 ? '2-인증사용자' : '1-일반회원'}
+                                    </Chip>
+                                  </td>
+                                  <td className="p-3.5 text-center">
+                                    {isSelf ? (
+                                      <span className="text-[10px] text-slate-300 font-bold">본인 조정 불가</span>
+                                    ) : (
+                                      <select value={u.level} onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))} className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400">
+                                        <option value={1}>1-일반회원</option>
+                                        <option value={2}>2-인증사용자</option>
+                                        <option value={3}>3-개발자</option>
+                                        <option value={4}>4-최고관리자</option>
+                                      </select>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  </div>
+
+                </div>
+              )}
+
+              {/* ───────── 2탭: 공지사항 ───────── */}
+              {adminSubTab === 'notices' && (
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+
+                  {/* 작성 / 수정 폼 */}
+                  <Card className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm lg:sticky lg:top-8">
+                    <CardContent className="p-6 space-y-4 text-xs">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2">
+                          <Megaphone className="w-4 h-4 text-rose-500" />
+                          <h4 className="font-bold text-sm text-slate-800">
+                            {editingNotice ? '공지사항 수정' : '새 공지사항 작성'}
+                          </h4>
+                        </div>
+                        {editingNotice && (
+                          <Button size="sm" variant="light" className="text-[10px] h-6 px-2 text-slate-400" onClick={() => setEditingNotice(null)}>
+                            취소
+                          </Button>
+                        )}
+                      </div>
+
+                      <form onSubmit={editingNotice ? handleEditNotice : handleAddNotice} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-600">공지 제목</label>
+                          <Input
+                            size="sm"
+                            required
+                            placeholder="공지사항 제목을 입력하세요"
+                            value={editingNotice ? editNoticeTitle : newNoticeTitle}
+                            onChange={(e) => editingNotice ? setEditNoticeTitle(e.target.value) : setNewNoticeTitle(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-600">공지 내용</label>
+                          <textarea
+                            required
+                            rows={6}
+                            placeholder="내용을 자세히 입력하세요..."
+                            value={editingNotice ? editNoticeContent : newNoticeContent}
+                            onChange={(e) => editingNotice ? setEditNoticeContent(e.target.value) : setNewNoticeContent(e.target.value)}
+                            className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl p-3 text-xs text-slate-800 transition-all resize-none leading-relaxed"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="noticePinToggle"
+                            checked={editingNotice ? editNoticePinned : newNoticePinned}
+                            onChange={(e) => editingNotice ? setEditNoticePinned(e.target.checked) : setNewNoticePinned(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded"
+                          />
+                          <label htmlFor="noticePinToggle" className="font-bold text-slate-600 select-none cursor-pointer">
+                            목록 최상단 고정 (중요 공지)
+                          </label>
+                        </div>
+                        <Button
+                          type="submit"
+                          color={editingNotice ? 'primary' : 'danger'}
+                          isLoading={isSavingNotice}
+                          className="w-full rounded-xl font-bold shadow-md text-white"
+                        >
+                          {editingNotice ? '수정 저장' : '공지사항 등록'}
+                        </Button>
+                      </form>
                     </CardContent>
                   </Card>
-                ) : (
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto w-full">
-                      <table className="w-full border-collapse text-left text-xs">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
-                            <th className="p-4">신청자</th>
-                            <th className="p-4">소속</th>
-                            <th className="p-4">이메일</th>
-                            <th className="p-4">현재→요청</th>
-                            <th className="p-4">요청 사유</th>
-                            <th className="p-4">신청일시</th>
-                            <th className="p-4">상태</th>
-                            <th className="p-4 text-center">처리</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700">
-                          {adminUpgradeRequests.map((r) => (
-                            <tr key={r.id} className={`hover:bg-slate-50/50 transition-colors ${r.status !== 'pending' ? 'opacity-50' : ''}`}>
-                              <td className="p-4 font-bold">{r.name}</td>
-                              <td className="p-4 text-slate-500">{r.affiliation || <span className="text-slate-300">—</span>}</td>
-                              <td className="p-4 font-mono text-[10px]">{r.email}</td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-1.5">
-                                  <Chip size="sm" variant="flat" color={r.current_level === 2 ? 'primary' : 'default'} className="font-bold text-[9px] h-5 px-1.5">
-                                    {r.current_level}단계
-                                  </Chip>
-                                  <span className="text-slate-300">→</span>
-                                  <Chip size="sm" variant="flat" color={r.requested_level === 3 ? 'secondary' : 'primary'} className="font-bold text-[9px] h-5 px-1.5">
-                                    {r.requested_level}단계
-                                  </Chip>
-                                </div>
-                              </td>
-                              <td className="p-4 max-w-[200px]">
-                                <p className="text-slate-500 line-clamp-2 leading-relaxed">{r.reason}</p>
-                              </td>
-                              <td className="p-4 text-slate-400 text-[10px]">{formatDate(r.created_at)}</td>
-                              <td className="p-4">
-                                <Chip
-                                  size="sm"
-                                  variant="flat"
-                                  color={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'}
-                                  className="font-bold text-[9px] h-5"
-                                >
-                                  {r.status === 'approved' ? '승인됨' : r.status === 'rejected' ? '거절됨' : '대기 중'}
-                                </Chip>
-                              </td>
-                              <td className="p-4 text-center">
-                                {r.status === 'pending' ? (
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <Button
-                                      size="sm"
-                                      color="success"
-                                      variant="flat"
-                                      className="h-7 px-2.5 text-[10px] font-bold rounded-lg"
-                                      isLoading={isProcessingRequest === r.id}
-                                      onClick={() => handleProcessUpgradeRequest(r.id, 'approve')}
-                                    >
-                                      승인
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      color="danger"
-                                      variant="flat"
-                                      className="h-7 px-2.5 text-[10px] font-bold rounded-lg"
-                                      isLoading={isProcessingRequest === r.id}
-                                      onClick={() => handleProcessUpgradeRequest(r.id, 'reject')}
-                                    >
-                                      거절
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-slate-300 font-bold">처리 완료</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+
+                  {/* 공지 목록 */}
+                  <div className="lg:col-span-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-slate-800">등록된 공지 목록</h4>
+                      <span className="text-xs text-slate-400">총 {adminNotices.length}건</span>
                     </div>
-                  </Card>
-                )}
-              </div>
-
-              {/* 어드민 사용자 등급 관리 섹션 */}
-              <div className="lg:col-span-3 space-y-3 pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-sm text-slate-800">사용자 권한 등급 관리</h4>
-                  <span className="text-xs text-slate-400">가입된 총 사용자 수: {adminUsers.length}명</span>
-                </div>
-
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto w-full">
-                    <table className="w-full border-collapse text-left text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
-                          <th className="p-4">ID</th>
-                          <th className="p-4">사용자명</th>
-                          <th className="p-4">소속</th>
-                          <th className="p-4">이메일</th>
-                          <th className="p-4">가입일시</th>
-                          <th className="p-4">현재 등급</th>
-                          <th className="p-4 text-center">권한 등급 조정</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {adminUsers.map((u) => {
-                          const isSelf = user && u.id === user.id;
-                          return (
-                          <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-4 font-mono font-bold">{u.id}</td>
-                            <td className="p-4 font-bold">{u.name}{isSelf && <span className="ml-1 text-[9px] text-indigo-600 font-bold">(본인)</span>}</td>
-                            <td className="p-4 text-slate-600">{u.affiliation || <span className="text-slate-300">—</span>}</td>
-                            <td className="p-4 font-mono">{u.email}</td>
-                            <td className="p-4 text-slate-400">{formatDate(u.created_at || null)}</td>
-                            <td className="p-4">
-                              <Chip
-                                size="sm"
-                                variant="flat"
-                                color={
-                                  u.level === 4 ? 'danger' :
-                                  u.level === 3 ? 'secondary' :
-                                  u.level === 2 ? 'primary' : 'default'
-                                }
-                                className="font-bold px-1.5 h-5 text-[9px]"
-                              >
-                                {
-                                  u.level === 4 ? '4-최고관리자' :
-                                  u.level === 3 ? '3-개발자' :
-                                  u.level === 2 ? '2-인증사용자' : '1-일반회원'
-                                }
-                              </Chip>
-                            </td>
-                            <td className="p-4 text-center">
-                              {isSelf ? (
-                                <span className="text-[10px] text-slate-400 font-bold">본인 등급 조정 불가</span>
-                              ) : (
-                                <select
-                                  value={u.level}
-                                  onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))}
-                                  className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400"
-                                >
-                                  <option value={1}>1-일반회원 (연결만)</option>
-                                  <option value={2}>2-인증사용자 (링크생성)</option>
-                                  <option value={3}>3-개발자 (+API키)</option>
-                                  <option value={4}>4-최고관리자 (모든권한)</option>
-                                </select>
-                              )}
-                            </td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    {adminNotices.length === 0 ? (
+                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                        <CardContent className="p-10 text-center text-xs text-slate-400">등록된 공지사항이 없습니다.</CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-2">
+                        {adminNotices.map((n) => (
+                          <Card key={n.id} className={`border rounded-2xl shadow-sm transition-all ${editingNotice?.id === n.id ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-100 bg-white'}`}>
+                            <CardContent className="p-4 text-xs">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0 space-y-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {n.is_pinned === 1 && (
+                                      <Chip size="sm" color="warning" variant="flat" className="h-5 text-[9px] font-bold px-1.5">📌 고정</Chip>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">{formatDate(n.created_at)}</span>
+                                  </div>
+                                  <h5 className="font-bold text-slate-800 truncate">{n.title}</h5>
+                                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{n.content}</p>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <Button
+                                    size="sm" variant="flat" color="primary" isIconOnly
+                                    className="rounded-lg w-8 h-8 min-w-0 p-0"
+                                    onClick={() => {
+                                      setEditingNotice(n);
+                                      setEditNoticeTitle(n.title);
+                                      setEditNoticeContent(n.content);
+                                      setEditNoticePinned(n.is_pinned === 1);
+                                    }}
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm" variant="flat" color="danger" isIconOnly
+                                    className="rounded-lg w-8 h-8 min-w-0 p-0"
+                                    onClick={() => handleDeleteNotice(n.id)}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </Card>
-              </div>
+
+                </div>
+              )}
+
+              {/* ───────── 3탭: 시스템 설정 ───────── */}
+              {adminSubTab === 'settings' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+                  {/* Zero Trust 허용 도메인 */}
+                  <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                    <CardContent className="p-6 space-y-4 text-xs">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <Globe className="w-4 h-4 text-indigo-500" />
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-800">Zero Trust 허용 도메인</h4>
+                          <p className="text-[10px] text-slate-400 mt-0.5">2단계 자동 승급 이메일 도메인 관리</p>
+                        </div>
+                      </div>
+                      <form onSubmit={handleAddDomain} className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-600">이메일 도메인</label>
+                          <Input size="sm" required placeholder="예: dge.go.kr" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className="w-full" />
+                        </div>
+                        <Button type="submit" color="primary" variant="flat" className="w-full rounded-xl font-bold">도메인 등록</Button>
+                      </form>
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <label className="font-bold text-slate-500">현재 허용 도메인 ({adminDomains.length}개)</label>
+                        <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                          {adminDomains.length === 0 ? (
+                            <p className="text-slate-300 text-center py-3">등록된 도메인이 없습니다.</p>
+                          ) : adminDomains.map((d) => (
+                            <div key={d.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl">
+                              <span className="font-mono font-bold text-slate-700">{d.domain}</span>
+                              <Button size="sm" variant="light" color="danger" isIconOnly className="w-5 h-5 min-w-0 p-0 rounded-md" onClick={() => handleDeleteDomain(d.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 향후 설정 확장 영역 */}
+                  <Card className="bg-white border border-dashed border-slate-200 rounded-2xl shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[200px]">
+                      <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                        <Settings className="w-5 h-5 text-slate-300" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400">추가 설정 영역</p>
+                        <p className="text-[10px] text-slate-300 mt-1">향후 기능 확장 시 이 공간에 추가됩니다.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white border border-dashed border-slate-200 rounded-2xl shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[200px]">
+                      <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                        <Terminal className="w-5 h-5 text-slate-300" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400">시스템 로그</p>
+                        <p className="text-[10px] text-slate-300 mt-1">향후 기능 확장 시 이 공간에 추가됩니다.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                </div>
+              )}
 
             </div>
           )}
