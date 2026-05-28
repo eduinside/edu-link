@@ -747,7 +747,7 @@ interface QuestionEditorProps {
 }
 
 function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionEditorProps) {
-  const [showDesc, setShowDesc] = useState(!!(q.description || q.media_url));
+  const [showDesc, setShowDesc] = useState(!!q.description);
 
   return (
     <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
@@ -755,11 +755,11 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
         <span className="text-[10px] font-bold text-indigo-600">Q{idx + 1}</span>
         <Chip size="sm" variant="flat" className="text-[9px] h-4 px-1.5">{QUESTION_TYPE_LABEL[q.type]}</Chip>
         <div className="flex-1" />
-        <Tooltip content="안내문/미디어 추가" delay={200}>
+        <Tooltip content="문항 안내문 입력" delay={200}>
           <button type="button"
             onClick={() => setShowDesc(!showDesc)}
             className={`text-[9px] font-bold px-2 py-1 rounded-lg transition-colors ${showDesc ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-            {showDesc ? '안내 숨기기' : '+ 안내/미디어'}
+            {showDesc ? '안내 숨기기' : '+ 안내문'}
           </button>
         </Tooltip>
         <Button size="sm" variant="light" isIconOnly className="w-6 h-6 min-w-0" onClick={() => onMove(-1)} isDisabled={idx === 0}><ArrowUp className="w-3 h-3" /></Button>
@@ -769,29 +769,27 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
 
       <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2 w-full" />
 
+      {/* 미디어 URL — 항상 표시 */}
+      <div className="mb-2">
+        <input
+          type="url"
+          className="w-full border border-slate-200 rounded-lg p-2 text-[11px] bg-white"
+          placeholder="🎬 YouTube·이미지·동영상 URL (선택)"
+          value={q.media_url || ''}
+          onChange={e => onChange({ media_url: e.target.value })}
+        />
+      </div>
+
       {showDesc && (
-        <div className="space-y-1.5 mt-1 mb-2 p-2 bg-white rounded-lg border border-slate-100">
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">문항 안내문 <span className="font-normal text-slate-400">(URL 자동 링크)</span></label>
-            <textarea
-              className="w-full border border-slate-200 rounded-lg p-2 text-[11px] resize-y"
-              rows={2}
-              placeholder="이 문항에 대한 추가 안내를 입력하세요. URL 입력 시 새 탭 링크로 표시됩니다."
-              value={q.description || ''}
-              onChange={e => onChange({ description: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">미디어 URL <span className="font-normal text-slate-400">(YouTube/mp4/이미지)</span></label>
-            <input
-              type="url"
-              className="w-full border border-slate-200 rounded-lg p-2 text-[11px]"
-              placeholder="https://youtube.com/watch?v=... 또는 이미지/동영상 URL"
-              value={q.media_url || ''}
-              onChange={e => onChange({ media_url: e.target.value })}
-            />
-            {q.media_url && <p className="text-[10px] text-indigo-500 mt-0.5">설문 화면에서 미디어가 임베드됩니다.</p>}
-          </div>
+        <div className="mb-2 p-2 bg-white rounded-lg border border-slate-100">
+          <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">문항 안내문 <span className="font-normal text-slate-400">(URL 자동 링크)</span></label>
+          <textarea
+            className="w-full border border-slate-200 rounded-lg p-2 text-[11px] resize-y"
+            rows={2}
+            placeholder="이 문항에 대한 추가 안내를 입력하세요."
+            value={q.description || ''}
+            onChange={e => onChange({ description: e.target.value })}
+          />
         </div>
       )}
 
