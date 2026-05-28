@@ -2471,37 +2471,178 @@ export default function Dashboard() {
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-3xl text-white space-y-2.5 shadow-lg shadow-indigo-100/50">
                 <h3 className="text-xl font-bold font-sans">에듀링크(edu-link) 활용방법</h3>
                 <p className="text-xs text-indigo-100 leading-relaxed">
-                  에듀링크 서비스의 간단한 활용 방법 안내입니다. 상세 가이드는 추후 업데이트 예정입니다.
+                  단축주소·설문지 생성부터 API 연동까지, 에듀링크의 주요 기능을 한눈에 확인하세요.
                 </p>
               </div>
 
-              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-6 shadow-sm">
+              {/* 회원 등급 안내 */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-4 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">★</span>
+                  회원 등급 안내
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500">
+                        <th className="text-left px-3 py-2 rounded-l-lg font-semibold">등급</th>
+                        <th className="text-left px-3 py-2 font-semibold">단축주소</th>
+                        <th className="text-left px-3 py-2 font-semibold">설문지</th>
+                        <th className="text-left px-3 py-2 font-semibold">API 연동</th>
+                        <th className="text-left px-3 py-2 rounded-r-lg font-semibold">관리</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      <tr className="text-slate-600">
+                        <td className="px-3 py-2.5 font-semibold">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-bold">1</span>
+                            일반 회원
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                      </tr>
+                      <tr className="text-slate-600">
+                        <td className="px-3 py-2.5 font-semibold">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">2</span>
+                            인증 회원
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                      </tr>
+                      <tr className="text-slate-600">
+                        <td className="px-3 py-2.5 font-semibold">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">3</span>
+                            개발자
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ API Key</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
+                      </tr>
+                      <tr className="text-slate-600">
+                        <td className="px-3 py-2.5 font-semibold">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px] font-bold">4</span>
+                            최고관리자
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 전체 관리</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 전체 관리</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ API Key</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 전체 권한</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  등급 상향은 대시보드 우측 하단의 <span className="font-semibold text-indigo-500">등급업 신청</span> 버튼을 통해 요청할 수 있습니다.
+                </p>
+              </div>
+
+              {/* 단축주소 기능 */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">🔗</span>
+                  단축주소 기능
+                </h4>
                 <div className="space-y-4 text-xs text-slate-700">
-                  <div className="border-l-4 border-indigo-500 pl-4 py-1 space-y-1">
-                    <h4 className="font-bold text-slate-800 text-sm">1. 단축주소 생성 방법</h4>
+                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">단축주소 생성</h5>
                     <p className="text-slate-500 leading-relaxed">
-                      대시보드 메인 화면의 주소 입력란에 줄이고자 하는 원본 URL을 입력한 후 '단축주소 생성' 버튼을 클릭합니다. 필요한 경우 원하는 단축 키워드(슬러그)를 직접 지정할 수 있습니다. (한글 슬러그 지원)
+                      대시보드 메인 화면의 주소 입력란에 원본 URL을 입력 후 '단축주소 생성' 버튼을 클릭합니다. 6자리 랜덤 슬러그가 자동 부여되며, 원하는 키워드(한글 포함)를 직접 지정할 수도 있습니다. og:title / &lt;title&gt; 태그 기반으로 페이지 제목이 자동 추출됩니다.
                     </p>
                   </div>
-
-                  <div className="border-l-4 border-indigo-500 pl-4 py-1 space-y-1">
-                    <h4 className="font-bold text-slate-800 text-sm">2. 비밀번호 및 만료일 설정</h4>
+                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">비밀번호 및 만료일</h5>
                     <p className="text-slate-500 leading-relaxed">
-                      링크를 생성하거나 수정할 때 6자리 숫자로 된 비밀번호를 지정하여 보안 링크를 만들 수 있으며, 지정한 일시가 지나면 링크가 자동으로 폭파되어 리디렉션이 차단되도록 만료일을 설정할 수 있습니다.
+                      6자리 숫자 PIN으로 링크를 보호하거나, 특정 일시 이후 자동 비활성화되는 만료일을 설정할 수 있습니다.
                     </p>
                   </div>
-
-                  <div className="border-l-4 border-indigo-500 pl-4 py-1 space-y-1">
-                    <h4 className="font-bold text-slate-800 text-sm">3. QR 코드 및 공유</h4>
+                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">접속 통계 및 QR 코드</h5>
                     <p className="text-slate-500 leading-relaxed">
-                      생성된 링크 우측의 QR 코드 아이콘을 누르면, 모바일에서 바로 스캔하여 접속하거나 이미지로 다운로드할 수 있는 전용 QR 코드 뷰어 페이지가 제공됩니다.
+                      링크별 일별 클릭 수를 30일 바 차트로 확인할 수 있으며, QR 코드 뷰어에서 이미지 다운로드·공유도 지원합니다.
                     </p>
                   </div>
-
-                  <div className="border-l-4 border-indigo-500 pl-4 py-1 space-y-1">
-                    <h4 className="font-bold text-slate-800 text-sm">4. 개발자 도구 (API 연동)</h4>
+                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">공개 목록 노출</h5>
                     <p className="text-slate-500 leading-relaxed">
-                      3단계 개발자 권한 이상의 계정은 개발자 도구 탭에서 고유 API Key를 발급받아, 학교 홈페이지나 외부 시스템에서 직접 단축주소를 API 호출을 통해 대량 생성 및 연동할 수 있습니다.
+                      링크를 '공개'로 설정하면 에듀링크 메인 페이지의 최근 링크 목록에 표시됩니다. '비공개'로 설정하면 URL을 아는 사람만 접속할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 설문지 기능 */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">📋</span>
+                  설문지 기능 <span className="text-[10px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
+                </h4>
+                <div className="space-y-4 text-xs text-slate-700">
+                  <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">설문지 생성</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      '설문 관리' 탭에서 설문을 생성하면 단축주소와 동일한 슬러그 패턴(예: dgedu.link/내슬러그)으로 공유할 수 있습니다. 응답자는 URL 이동 없이 같은 페이지에서 설문을 완료합니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">질문 유형</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      단답형 · 장문형 · 단일선택 · 다중선택 · 만족도(1~5 / 1~7) · 전화번호 · 이메일 · 주소(카카오 우편번호) 등 8가지 질문 유형을 지원합니다. 각 질문에 설명과 미디어(YouTube·이미지·동영상)를 첨부할 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">고급 설정</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      비밀번호 보호, 종료일(자동 마감), 최대 응답 수, 브라우저당 1회 응답 제한, 비활성 안내 문구, 커스텀 슬러그 등을 설정할 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">테마 선택</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      인디고 · 에메랄드 · 로즈 · 앰버 · 스카이 5가지 색상 테마 중 선택하여 설문 페이지의 분위기를 맞출 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">응답 수집 및 내보내기</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      대시보드 설문 관리 탭에서 누적 응답 수가 30초마다 자동 갱신되며, '결과 보기'를 클릭하면 응답 그리드를 확인할 수 있습니다. CSV 다운로드 기능으로 엑셀에서도 분석이 가능합니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* API 연동 */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">⚡</span>
+                  개발자 도구 (API 연동) <span className="text-[10px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
+                </h4>
+                <div className="space-y-4 text-xs text-slate-700">
+                  <div className="border-l-4 border-green-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">API Key 발급</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      '개발자 도구' 탭에서 고유 API Key를 발급받아 외부 시스템에서 단축주소를 프로그래밍 방식으로 생성·조회·삭제할 수 있습니다. API 호출은 분당 15회로 제한됩니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-green-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">주요 엔드포인트</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      <code className="bg-slate-50 px-1.5 py-0.5 rounded text-[11px] font-mono">GET /api/v1/links</code> — 내 단축주소 목록<br/>
+                      <code className="bg-slate-50 px-1.5 py-0.5 rounded text-[11px] font-mono">POST /api/v1/links</code> — 단축주소 생성<br/>
+                      <code className="bg-slate-50 px-1.5 py-0.5 rounded text-[11px] font-mono">DELETE /api/v1/links/:id</code> — 단축주소 삭제<br/>
+                      상세 명세는 개발자 도구 탭의 'API 문서' 링크를 참고하세요.
                     </p>
                   </div>
                 </div>

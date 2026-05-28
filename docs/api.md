@@ -58,6 +58,43 @@
 { "slug": "EHLGmC", "password": "123456" }
 ```
 
+### 설문 응답 제출 (공개, 인증 불필요)
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/survey/:slug/submit` | 설문 응답 제출 |
+
+**POST /survey/:slug/submit 요청**
+```json
+{
+  "answers": {
+    "q_0": "홍길동",
+    "q_1": "teacher@dge.go.kr",
+    "q_2": ["선택지A", "선택지B"],
+    "q_3": 4
+  },
+  "password": "123456"
+}
+```
+- `answers` — 질문 ID(`q_0`, `q_1`, …)를 키로 하는 응답 맵
+  - 단일선택: 문자열
+  - 다중선택: 문자열 배열
+  - 만족도: 숫자
+  - 주소: `{ "zonecode": "41000", "address": "경기 어딘가", "detail": "101호" }` 객체
+- `password` — 비밀번호 보호 설문일 경우에만 필수
+
+**응답 (성공)**
+```json
+{ "success": true }
+```
+
+**응답 (실패 — 마감 / 한도 초과)**
+```json
+{ "success": false, "error": "closed" }
+```
+
+> 제출 시 `urls.response_count += 1`, `survey_responses` 테이블에 행 추가, IP SHA-256 해시 저장.
+
 ---
 
 ## 인증 API
@@ -103,11 +140,11 @@
 { "name": "홍길동", "affiliation": "대구광역시교육청" }
 ```
 
-### 단축 링크 (level ≥ 2 필요)
+### 단축 링크 (level ≥ 1 필요)
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/links` | 내 링크 목록 전체 |
+| GET | `/api/links` | 내 링크 목록 전체 (`kind='link'` 필터) |
 | POST | `/api/links` | 단축 링크 생성 |
 | PATCH | `/api/links/:id` | 링크 수정 |
 | DELETE | `/api/links/:id` | 링크 삭제 |
@@ -152,6 +189,68 @@
 }
 ```
 
+### 설문지 (level ≥ 3 필요)
+
+> 설문지는 대시보드 전용 웹 API입니다. 외부 OpenAPI(v1)에는 노출되지 않습니다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/surveys` | 내 설문 목록 전체 |
+| POST | `/api/surveys` | 설문 생성 |
+| PATCH | `/api/surveys/:id` | 설문 수정 |
+| DELETE | `/api/surveys/:id` | 설문 삭제 |
+| GET | `/api/surveys/:id/responses` | 응답 그리드 (JSON) |
+| GET | `/api/surveys/:id/responses.csv` | 응답 CSV 다운로드 (UTF-8 BOM) |
+
+**POST /api/surveys 요청**
+```json
+{
+  "title": "2026 만족도 조사",
+  "custom_slug": "만족도조사",        // 선택
+  "password": "123456",               // 선택
+  "expires_at": "2026-06-30 00:00:00", // 선택
+  "response_limit": 200,              // 선택, null=무제한
+  "survey_config": {
+    "title": "2026 만족도 조사",
+    "intro": "안녕하세요! 설문에 참여해 주세요.",
+    "outro": "감사합니다!",
+    "theme": "indigo",               // indigo | emerald | rose | amber | sky
+    "one_response_per_browser": true, // 선택, 기본 false
+    "inactive_message": "이 설문은 종료되었습니다.", // 선택
+    "questions": [
+      {
+        "id": "q_0",
+        "type": "short",             // short | long | single | multi | rating | phone | email | address
+        "label": "성함을 입력해 주세요",
+        "required": true,
+        "description": "실명으로 입력해 주세요.",  // 선택
+        "media_url": "",             // 선택 (YouTube / 이미지 / 동영상 URL)
+        "options": [],               // type=single/multi일 때 선택지 배열
+        "scale": 5                   // type=rating일 때 최대값 (5 또는 7)
+      }
+    ]
+  }
+}
+```
+
+**GET /api/surveys/:id/responses 응답**
+```json
+{
+  "success": true,
+  "questions": ["성함", "이메일", "만족도"],
+  "responses": [
+    {
+      "id": 1,
+      "submitted_at": "2026-05-28 10:00:00",
+      "answers": ["홍길동", "teacher@dge.go.kr", "4"]
+    }
+  ]
+}
+```
+
+**GET /api/surveys/:id/responses.csv**  
+UTF-8 BOM CSV 파일 다운로드. 첫 행은 `제출일시, 질문1, 질문2, ...` 헤더.
+
 ### API Keys (level ≥ 3 필요)
 
 | 메서드 | 경로 | 설명 |
@@ -178,7 +277,7 @@
 
 ## OpenAPI v1 (외부 연동, API Key 인증)
 
-외부 시스템에서 단축주소를 API로 생성할 수 있는 공개 엔드포인트.
+외부 시스템에서 단축주소를 API로 생성할 수 있는 공개 엔드포인트. **단축주소 전용** — 설문지는 포함되지 않습니다.
 
 - **Rate Limit**: API Key당 분당 15회
 - **인증 헤더**: `x-api-key: edulink_<key>`
@@ -231,14 +330,18 @@ const data = await res.json(); // { success, short_url, slug, original_url }
 |---|---|---|
 | GET | `/qr/:slug` | QR 코드 PNG 이미지 (600×600, ECC High) |
 
-Worker가 api.qrserver.com에서 PNG를 프록시하여 반환. `Cache-Control: public, max-age=86400`.
+Worker가 api.qrserver.com에서 PNG를 프록시하여 반환. `Cache-Control: public, max-age=86400`.  
+단축주소와 설문지 모두 동일한 슬러그 기반 QR 코드를 사용합니다.
 
 ---
 
-## 리다이렉트
+## 리다이렉트 / 설문 진입
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/:slug` | 단축주소 리다이렉트 (307) |
+| GET | `/:slug` | 단축주소 리다이렉트(307) 또는 설문 페이지 반환 |
 
-비밀번호가 있는 경우 PIN 입력 HTML 반환. 만료된 경우 410 또는 `/` 리다이렉트.
+- `kind = 'link'` — 비밀번호 없으면 307 리다이렉트, 있으면 PIN 입력 HTML 반환.
+- `kind = 'survey'` — 비밀번호 없으면 설문 HTML 반환, 있으면 PIN 검증 후 설문 표시. URL은 변하지 않음.
+- 만료 또는 비활성화된 항목은 종료 안내 HTML 반환 (커스텀 메시지 지원).
+- 응답 한도 초과 설문은 마감 안내 HTML 반환.

@@ -32,32 +32,39 @@ CREATE TABLE users (
 
 ---
 
-### `urls` — 단축 URL
+### `urls` — 단축 URL / 설문지
+
+단축주소와 설문지를 단일 테이블로 관리합니다. `kind` 컬럼으로 종류를 구분합니다.
 
 ```sql
 CREATE TABLE urls (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug          TEXT NOT NULL UNIQUE,       -- 레거시 호환 (= base_slug)
-    base_slug     TEXT NOT NULL UNIQUE,       -- 자동생성 6자리 랜덤, 불변
-    custom_slug   TEXT UNIQUE,               -- 사용자 지정 슬러그 (선택)
-    original_url  TEXT NOT NULL,
-    title         TEXT DEFAULT '',
-    description   TEXT DEFAULT '',
-    user_id       INTEGER NOT NULL,
-    is_active     INTEGER NOT NULL DEFAULT 1,
-    is_public     INTEGER NOT NULL DEFAULT 0, -- 0=비공개, 1=공개
-    click_count   INTEGER NOT NULL DEFAULT 0,
-    expires_at    TEXT,                       -- UTC datetime, NULL=영구
-    password      TEXT,                      -- 6자리 숫자 PIN, NULL=없음
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug           TEXT NOT NULL UNIQUE,       -- 레거시 호환 (= base_slug)
+    base_slug      TEXT NOT NULL UNIQUE,       -- 자동생성 6자리 랜덤, 불변
+    custom_slug    TEXT UNIQUE,               -- 사용자 지정 슬러그 (선택)
+    original_url   TEXT NOT NULL DEFAULT '',   -- 단축링크 대상 URL; 설문일 때 빈 문자열
+    title          TEXT DEFAULT '',
+    description    TEXT DEFAULT '',
+    user_id        INTEGER NOT NULL,
+    created_by     INTEGER,                    -- 생성자 user_id (user_id와 동일, 후속 확장용)
+    is_active      INTEGER NOT NULL DEFAULT 1,
+    is_public      INTEGER NOT NULL DEFAULT 0, -- 0=비공개, 1=공개
+    click_count    INTEGER NOT NULL DEFAULT 0,
+    expires_at     TEXT,                       -- UTC datetime, NULL=영구
+    password       TEXT,                       -- 6자리 숫자 PIN, NULL=없음
+    kind           TEXT NOT NULL DEFAULT 'link', -- 'link' 또는 'survey'
+    survey_config  TEXT,                       -- 설문 메타 JSON (kind='survey'일 때만 사용)
+    response_limit INTEGER,                    -- 최대 응답 수, NULL=무제한
+    response_count INTEGER NOT NULL DEFAULT 0, -- 누적 응답 수
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
 
 #### 슬러그 이중 구조
 
-단축주소는 두 개의 슬러그를 독립적으로 운용합니다.
+단축주소·설문지 모두 동일한 슬러그 패턴을 사용합니다.
 
 ```
 생성 시 사용자 입력: "수학여행"
@@ -71,6 +78,56 @@ CREATE TABLE urls (
 
 QR 코드는 항상 base_slug 기준으로 생성 → 커스텀 슬러그 변경과 무관하게 유지
 ```
+
+#### survey_config JSON 구조
+
+```json
+{
+  "title": "2026 만족도 조사",
+  "intro": "안녕하세요! 설문에 참여해 주세요.",
+  "outro": "감사합니다!",
+  "theme": "indigo",
+  "one_response_per_browser": false,
+  "inactive_message": "이 설문은 종료되었습니다.",
+  "questions": [
+    {
+      "id": "q_0",
+      "type": "short",
+      "label": "성함을 입력해 주세요",
+      "required": true,
+      "description": "설명 텍스트",
+      "media_url": "https://youtube.com/watch?v=...",
+      "options": [],
+      "scale": null
+    }
+  ]
+}
+```
+
+**질문 타입 목록**: `short` · `long` · `single` · `multi` · `rating` · `phone` · `email` · `address`
+
+---
+
+### `survey_responses` — 설문 응답
+
+```sql
+CREATE TABLE survey_responses (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    url_id       INTEGER NOT NULL,
+    answers_json TEXT NOT NULL,   -- { "q_0": "값", "q_1": ["A","B"], "q_2": 4 } JSON
+    ip_hash      TEXT DEFAULT '', -- IP SHA-256 해시 (개인정보 비식별)
+    user_agent   TEXT DEFAULT '',
+    submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
+);
+```
+
+- `answers_json` — 질문 ID(`q_0`, `q_1`, …)를 키로 하는 JSON 객체
+  - 단일선택: 문자열
+  - 다중선택: 문자열 배열
+  - 만족도: 숫자
+  - 주소: `{ "zonecode": "...", "address": "...", "detail": "..." }` 객체
+- 응답 제출 시 `urls.response_count += 1`로 원자적 업데이트
 
 ---
 
@@ -139,7 +196,7 @@ CREATE TABLE reserved_slugs (
 );
 ```
 
-단축주소 생성 시 이 목록과 충돌하면 거부. 기본 예약어:
+단축주소·설문지 생성 시 이 목록과 충돌하면 거부. 기본 예약어:
 
 | 슬러그 | 이유 |
 |---|---|
@@ -151,6 +208,7 @@ CREATE TABLE reserved_slugs (
 | `static` | Static Folder Route |
 | `public` | Public Folder Route |
 | `favicon.ico` | Favicon |
+| `survey` | Survey Submit Route |
 
 ---
 
@@ -176,6 +234,7 @@ CREATE INDEX idx_urls_user_id      ON urls(user_id);
 CREATE INDEX idx_click_logs_url_id ON click_logs(url_id);
 CREATE INDEX idx_click_logs_created_at ON click_logs(created_at);
 CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
+CREATE INDEX idx_survey_responses_url_id ON survey_responses(url_id);
 ```
 
 ---
@@ -190,10 +249,16 @@ CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
 | `0004_add_password_to_urls.sql` | urls.password 컬럼 추가 |
 | `0005_update_user_levels.sql` | users.level (role TEXT → INTEGER) 체계 변경 |
 | `0006_add_base_custom_slug.sql` | urls.base_slug, urls.custom_slug 컬럼 추가 |
-| *(ALTER)* | users.affiliation 컬럼 추가 (CLI로 직접 실행) |
+| `0007_add_affiliation_to_users.sql` | users.affiliation 컬럼 추가 |
+| `0008_add_created_by_to_urls.sql` | urls.created_by 컬럼 추가 |
+| `0009_add_survey_to_urls.sql` | urls.kind, urls.survey_config, urls.response_limit, urls.response_count 컬럼 추가; survey_responses 테이블 생성 |
 
 ### 새 마이그레이션 실행
 
 ```bash
-npx wrangler d1 execute edu-link-db --remote --file=migrations/000X_name.sql
+# 로컬
+npx wrangler d1 migrations apply edu-link-db
+
+# 원격(프로덕션)
+npx wrangler d1 migrations apply edu-link-db --remote
 ```
