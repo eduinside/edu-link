@@ -2,12 +2,11 @@
 
 ## 인증 방식 개요
 
-에듀링크는 세 가지 로그인 방식을 지원합니다.
+에듀링크는 두 가지 로그인 방식을 지원합니다.
 
 | 방식 | 대상 | 상태 |
 |---|---|---|
 | 이메일 OTP (Resend) | 교직원 이메일 | **주요 방식 (운영 중)** |
-| 카카오 OAuth | 일반 사용자 | 구현 완료 (필요 시 활성화) |
 | Cloudflare Access JWT | 기업/기관 Zero Trust 환경 | 지원 (Cf-Access-Jwt-Assertion 헤더) |
 
 ---
@@ -86,7 +85,7 @@ JWT 시크릿은 `JWT_SECRET` Worker Secret으로 관리 (`wrangler secret put J
 |---|---|---|---|
 | 1 | 일반회원 | 화이트리스트 외 이메일 가입 | 단축주소 접속·열람만 |
 | 2 | 인증사용자 | 화이트리스트 도메인 이메일 또는 관리자 수동 승급 | 단축주소 생성·수정·삭제·QR·통계 |
-| 3 | 개발자 | 관리자 수동 승급 | level 2 + API Key 발급·OpenAPI 연동 |
+| 3 | 고급사용자 | 관리자 수동 승급 | level 2 + 설문지 생성·관리 + API Key 발급·OpenAPI 연동 |
 | 4 | 최고관리자 | 관리자 수동 승급 | 전체 제어 (사용자 관리·도메인 관리·공지사항) |
 
 ### 자동 승급 도메인 (화이트리스트)
@@ -124,7 +123,7 @@ JWT 시크릿은 `JWT_SECRET` Worker Secret으로 관리 (`wrangler secret put J
 |---|---|---|
 | 1-일반회원 | `login` | 1 |
 | 2-인증사용자 | `authenticated` | 2 |
-| 3-개발자 | `developer` | 3 |
+| 3-고급사용자 | `developer` | 3 |
 | 4-최고관리자 | `admin` | 4 |
 
 선택값은 `localStorage('mock_role')`에 저장되어 새로고침 후에도 유지.

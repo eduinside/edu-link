@@ -22,7 +22,7 @@
 | UI 컴포넌트 | HeroUI |
 | 데이터베이스 | Cloudflare D1 (SQLite) |
 | 캐시 / Rate Limit | Cloudflare KV |
-| 인증 | 이메일 OTP (Resend) · Kakao OAuth · Cloudflare Access JWT |
+| 인증 | 이메일 OTP (Resend) · Cloudflare Access JWT |
 | 이메일 발송 | Resend API |
 | 빌드 | Vite 8 |
 | 분석 | Google Analytics 4 (G-T9GZNBEXJ0) |
@@ -50,7 +50,7 @@
 - **실시간 카운트** — 30초 간격 자동 갱신
 
 ### 공통
-- **회원 등급제** — 1(일반) / 2(인증사용자) / 3(개발자) / 4(최고관리자)
+- **회원 등급제** — 1(일반) / 2(인증사용자) / 3(고급사용자) / 4(최고관리자)
 - **OpenAPI v1** — API Key 발급 및 외부 시스템 연동 (Rate Limit: 분당 15회), 단축주소 전용
 - **Zero Trust 도메인** — 허용 이메일 도메인 동적 관리
 

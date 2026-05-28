@@ -1134,7 +1134,7 @@ export default function Dashboard() {
                   <option value="default">실제 로그인 계정</option>
                   <option value="login">1-일반회원 (Gmail 등)</option>
                   <option value="authenticated">2-인증사용자 (교직원 등)</option>
-                  <option value="developer">3-개발자 (연동계정)</option>
+                  <option value="developer">3-고급사용자 (연동계정)</option>
                   <option value="admin">4-최고관리자 (전체제어)</option>
                 </select>
               </div>
@@ -1163,7 +1163,7 @@ export default function Dashboard() {
                 >
                   {
                     user.level === 4 ? '👑 최고관리자' :
-                    user.level === 3 ? '🛠️ 개발자' :
+                    user.level === 3 ? '⚡ 고급사용자' :
                     user.level === 2 ? '🛡️ 인증사용자' : '👤 일반회원'
                   }
                 </Chip>
@@ -2081,7 +2081,7 @@ export default function Dashboard() {
                   <div className="space-y-1.5 max-w-md mx-auto">
                     <h3 className="font-bold text-base text-slate-800">설문 기능 권한이 제한되어 있습니다</h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      설문지 생성·관리는 <strong>(3)단계 개발자</strong> 등급 이상부터 사용 가능합니다.
+                      설문지 생성·관리는 <strong>(3)단계 고급사용자</strong> 등급 이상부터 사용 가능합니다.
                     </p>
                   </div>
                 </CardContent>
@@ -2107,7 +2107,7 @@ export default function Dashboard() {
                   <div className="space-y-1.5 max-w-md mx-auto">
                     <h3 className="font-bold text-base text-slate-800">개발자 도구 권한이 제한되어 있습니다</h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      API Key 발급 및 외부 연동 OpenAPI 가이드는 <strong>(3)단계 개발자</strong> 등급 이상부터 액세스하실 수 있습니다.<br />
+                      API Key 발급 및 외부 연동 OpenAPI 가이드는 <strong>(3)단계 고급사용자</strong> 등급 이상부터 액세스하실 수 있습니다.<br />
                       현재 등급은 <strong>{user.level === 2 ? '2단계: 인증사용자' : '1단계: 일반회원'}</strong>이며, 최고관리자에게 승급 인증을 요청해 주시기 바랍니다.
                     </p>
                   </div>
@@ -2354,9 +2354,9 @@ export default function Dashboard() {
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="secondary" className="h-5 text-[9px] font-bold">3단계</Chip>
-                            개발자 (API 연동 권한)
+                            고급사용자 (설문·API 연동 권한)
                           </h5>
-                          <p className="text-[10px] text-slate-400 leading-relaxed">2단계 권한 외에 외부 시스템 및 학교 홈페이지와 API로 연동할 수 있도록 API Key 발급 권한을 제공받습니다.</p>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">2단계 권한 외에 설문지 생성·관리 및 외부 시스템 연동을 위한 API Key 발급 권한을 제공받습니다.</p>
                         </div>
                         {user.level === 3 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
@@ -2401,7 +2401,7 @@ export default function Dashboard() {
                           >
                             <option value={0} disabled>— 요청할 등급 선택 —</option>
                             {user.level < 2 && <option value={2}>2단계: 인증사용자 (링크 생성·관리)</option>}
-                            {user.level < 3 && <option value={3}>3단계: 개발자 (API Key 발급)</option>}
+                            {user.level < 3 && <option value={3}>3단계: 고급사용자 (설문·API Key 발급)</option>}
                           </select>
                         </div>
                         <div className="space-y-1.5">
@@ -2523,7 +2523,7 @@ export default function Dashboard() {
                         <td className="px-3 py-2.5 font-semibold">
                           <span className="inline-flex items-center gap-1">
                             <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">3</span>
-                            개발자
+                            고급사용자
                           </span>
                         </td>
                         <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
@@ -2897,7 +2897,7 @@ export default function Dashboard() {
                                   <td className="p-3.5 text-slate-400">{formatDate(u.created_at || null)}</td>
                                   <td className="p-3.5">
                                     <Chip size="sm" variant="flat" color={u.level === 4 ? 'danger' : u.level === 3 ? 'secondary' : u.level === 2 ? 'primary' : 'default'} className="font-bold px-1.5 h-5 text-[9px]">
-                                      {u.level === 4 ? '4-최고관리자' : u.level === 3 ? '3-개발자' : u.level === 2 ? '2-인증사용자' : '1-일반회원'}
+                                      {u.level === 4 ? '4-최고관리자' : u.level === 3 ? '3-고급사용자' : u.level === 2 ? '2-인증사용자' : '1-일반회원'}
                                     </Chip>
                                   </td>
                                   <td className="p-3.5 text-center">
@@ -2907,7 +2907,7 @@ export default function Dashboard() {
                                       <select value={u.level} onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))} className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400">
                                         <option value={1}>1-일반회원</option>
                                         <option value={2}>2-인증사용자</option>
-                                        <option value={3}>3-개발자</option>
+                                        <option value={3}>3-고급사용자</option>
                                         <option value={4}>4-최고관리자</option>
                                       </select>
                                     )}

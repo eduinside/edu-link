@@ -9,7 +9,7 @@ import { rateLimitMiddleware } from './middleware/rateLimit';
 const app = new Hono<{ Bindings: Env }>();
 
 // ----------------------------------------------------
-// [湲濡쒕쾶 誘몃뱾?⑥뼱] CORS ?ㅼ젙 ?곸슜
+// [글로벌 미들웨어] CORS 설정 적용
 // ----------------------------------------------------
 app.use('/api/v1/*', cors({
     origin: '*',
@@ -21,14 +21,14 @@ app.use('/api/v1/*', cors({
 
 
 // ----------------------------------------------------
-// [?쇰툝由??곸뿭] 鍮꾩씤利??ъ슜?먮룄 ?묎렐 媛?ν븳 ?붾뱶?ъ씤??// ----------------------------------------------------
+// [인증 불필요] 로그인 여부와 무관하게 동작하는 공개 엔드포인트
 
-// 1. ?ъ뒪 泥댄겕 API
+// 1. 헬스 체크 API
 app.get('/api/health', (c) => {
     return c.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// 2. 怨듭??ы빆 紐⑸줉 API
+// 2. 공지사항 목록 API
 app.get('/api/notices', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
@@ -42,7 +42,7 @@ app.get('/api/notices', async (c) => {
     }
 });
 
-// 3. 理쒓렐 怨듭쑀???⑥텞二쇱냼 紐⑸줉 API (?쒕뵫 ?몄텧??- 怨듦컻?ㅼ젙??嫄대쭔 ?몄텧)
+// 3. 최근 공개 단축링크 목록 API (최신 목록 - 기본설정에 따라 공개)
 app.get('/api/links/public', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
@@ -138,7 +138,7 @@ app.post('/api/verify-password', async (c) => {
         const body = await c.req.json();
         const { slug, password } = body;
         if (!slug || !password) {
-            return c.json({ success: false, error: '?꾩닔 ?뚮씪誘명꽣媛 ?꾨씫?섏뿀?듬땲??' }, 400);
+            return c.json({ success: false, error: '필수 파라미터가 누락되었습니다.' }, 400);
         }
 
         const urlRecord = await c.env.DB.prepare(
@@ -148,7 +148,7 @@ app.post('/api/verify-password', async (c) => {
         .first<{ id: number; original_url: string; password: string | null; expires_at: string | null; is_active: number; kind: string }>();
 
         if (!urlRecord || urlRecord.is_active === 0) {
-            return c.json({ success: false, error: '議댁옱?섏? ?딄굅??鍮꾪솢?깊솕??留곹겕?낅땲??' }, 404);
+            return c.json({ success: false, error: '존재하지 않거나 비활성화된 링크입니다.' }, 404);
         }
 
         // 留뚮즺 泥댄겕
@@ -160,7 +160,7 @@ app.post('/api/verify-password', async (c) => {
                     await c.env.DB.prepare("UPDATE urls SET is_active = 0 WHERE slug = ?").bind(slug).run();
                     await c.env.URL_CACHE.delete(slug);
                 })());
-                return c.json({ success: false, error: '留뚮즺???⑥텞 留곹겕?낅땲??' }, 410);
+                return c.json({ success: false, error: '만료된 단축 링크입니다.' }, 410);
             }
         }
 
@@ -290,7 +290,7 @@ app.post('/api/auth/otp/verify', async (c) => {
     try {
         const { email, code } = await c.req.json();
         if (!email || !code) {
-            return c.json({ success: false, error: '?대찓?쇨낵 OTP 肄붾뱶瑜??낅젰??二쇱꽭??' }, 400);
+            return c.json({ success: false, error: '이메일과 OTP 코드를 입력해 주세요.' }, 400);
         }
         
         const cleanEmail = email.trim().toLowerCase();
@@ -298,27 +298,27 @@ app.post('/api/auth/otp/verify', async (c) => {
         const cachedStr = await c.env.URL_CACHE.get(cacheKey);
         
         if (!cachedStr) {
-            return c.json({ success: false, error: 'OTP ?몄쬆 ?쒓컙??留뚮즺?섏뿀嫄곕굹 ?붿껌 ?대젰???놁뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??' }, 400);
+            return c.json({ success: false, error: 'OTP 인증 시간이 만료되었거나 다시 요청해야 합니다. 다시 시도해 주세요.' }, 400);
         }
         
         const cached = JSON.parse(cachedStr);
         if (cached.code !== code.trim()) {
-            return c.json({ success: false, error: 'OTP 肄붾뱶媛 ?쇱튂?섏? ?딆뒿?덈떎.' }, 400);
+            return c.json({ success: false, error: 'OTP 코드가 일치하지 않습니다.' }, 400);
         }
         
-        // ?몄쬆 ?깃났: D1 ?ъ슜???앹꽦 ?먮뒗 議고쉶
+        // 인증 성공: D1 사용자 생성 또는 조회
         const domain = cleanEmail.split('@')[1];
         let userRecord = await c.env.DB.prepare("SELECT id, email, name, affiliation, level FROM users WHERE email = ?")
             .bind(cleanEmail)
             .first<{ id: number; email: string; name: string; affiliation: string; level: number }>();
             
         if (!userRecord) {
-            // ?붿씠?몃━?ㅽ듃 ?꾨찓??泥댄겕
+            // 허용도메인 체크
             const isAllowed = await c.env.DB.prepare("SELECT id FROM allowed_domains WHERE domain = ?")
                 .bind(domain)
                 .first();
             
-            // ?붿씠?몃━?ㅽ듃?대㈃ level 2 (?몄쬆?ъ슜??, ?꾨땲硫?level 1 (濡쒓렇??
+            // 허용도메인이면 level 2 (인증사용자), 아니면 level 1 (일반)
             const level = isAllowed ? 2 : 1;
             
             const insert = await c.env.DB.prepare(
@@ -334,14 +334,14 @@ app.post('/api/auth/otp/verify', async (c) => {
             };
         }
         
-        // 濡쒓렇???몄뀡 荑좏궎 諛쒗뻾???꾪븳 JWT ?앹꽦
+        // 로그인 세션 유지를 위한 JWT 생성
         const secret = new TextEncoder().encode(c.env.JWT_SECRET || 'edulink_jwt_secret_key_2026_xyz');
         const sessionToken = await new SignJWT({ id: userRecord.id, email: userRecord.email, name: userRecord.name, affiliation: userRecord.affiliation, level: userRecord.level })
             .setProtectedHeader({ alg: 'HS256' })
             .setExpirationTime('7d')
             .sign(secret);
             
-        // 荑좏궎 ?ㅼ젙
+        // 쿠키 설정
         const isSecure2 = c.req.url.startsWith('https');
         setCookie(c, 'edulink_token', sessionToken, {
             path: '/',
@@ -351,7 +351,7 @@ app.post('/api/auth/otp/verify', async (c) => {
             sameSite: 'Lax'
         });
         
-        // ?몄쬆 ??罹먯떆 ??젣
+        // 인증 OTP 캐시 삭제
         await c.env.URL_CACHE.delete(cacheKey);
         
         return c.json({ success: true, user: userRecord });
@@ -364,7 +364,7 @@ app.post('/api/auth/google/mock', async (c) => {
     try {
         const { email, name } = await c.req.json();
         if (!email || !name || !email.trim() || !name.trim()) {
-            return c.json({ success: false, error: '?대찓?쇨낵 ?ъ슜?먮챸??紐⑤몢 ?쒓났?댁빞 ?⑸땲??' }, 400);
+            return c.json({ success: false, error: '이메일과 이름은 모두 채워야 합니다.' }, 400);
         }
         
         const cleanEmail = email.trim().toLowerCase();
@@ -375,7 +375,7 @@ app.post('/api/auth/google/mock', async (c) => {
             .first<{ id: number; email: string; name: string; level: number }>();
             
         if (!userRecord) {
-            // ?붿씠?몃━?ㅽ듃 ?꾨찓??泥댄겕
+            // 허용도메인 체크
             const isAllowed = await c.env.DB.prepare("SELECT id FROM allowed_domains WHERE domain = ?")
                 .bind(domain)
                 .first();
@@ -401,7 +401,7 @@ app.post('/api/auth/google/mock', async (c) => {
             .setExpirationTime('7d')
             .sign(secret);
             
-        // 荑좏궎 ?ㅼ젙
+        // 쿠키 설정
         const isSecure1 = c.req.url.startsWith('https');
         setCookie(c, 'edulink_token', sessionToken, {
             path: '/',
@@ -422,11 +422,11 @@ app.post('/api/auth/logout', async (c) => {
         path: '/',
         httpOnly: true
     });
-    return c.json({ success: true, message: '濡쒓렇?꾩썐 ?섏뿀?듬땲??' });
+    return c.json({ success: true, message: '로그아웃 되었습니다.' });
 });
 
 // ----------------------------------------------------
-// [?몄쬆 ?곸뿭] Cloudflare Access ?몄쬆???꾩슂???대? API 洹몃９
+// [인증 라우트] Cloudflare Access 인증이 필요한 내부 API 그룹
 // ----------------------------------------------------
 // 이메일 존재 여부 확인 (공개 API - 로그인 모달 UX)
 app.get('/api/auth/check-email', async (c) => {
@@ -533,12 +533,12 @@ api.use('*', async (c, next) => {
     return authMiddleware()(c, next);
 });
 
-// 4. ???꾨줈???뺣낫 議고쉶
+// 4. 내 프로필 정보 조회
 api.get('/auth/me', (c) => {
     return c.json({ success: true, user: c.get('user') });
 });
 
-// 4.1 ???꾨줈???뺣낫 ?섏젙 (?ъ슜?먮챸 蹂寃?
+// 4.1 내 프로필 정보 설정 (사용자 이름 변경)
 api.patch('/auth/profile', async (c) => {
     const user = c.get('user');
     try {
@@ -624,7 +624,7 @@ api.get('/links', async (c) => {
 api.get('/surveys', async (c) => {
     const user = c.get('user');
     if (user.level < 3) {
-        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+        return c.json({ success: false, error: '설문지 기능은 고급사용자(레벨 3) 이상 권한이 필요합니다.' }, 403);
     }
     try {
         const { results } = await c.env.DB.prepare(
@@ -643,7 +643,7 @@ api.get('/surveys', async (c) => {
 api.post('/surveys', async (c) => {
     const user = c.get('user');
     if (user.level < 3) {
-        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+        return c.json({ success: false, error: '설문지 기능은 고급사용자(레벨 3) 이상 권한이 필요합니다.' }, 403);
     }
     try {
         const body = await c.req.json();
@@ -717,7 +717,7 @@ api.post('/surveys', async (c) => {
 api.patch('/surveys/:id', async (c) => {
     const user = c.get('user');
     if (user.level < 3) {
-        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+        return c.json({ success: false, error: '설문지 기능은 고급사용자(레벨 3) 이상 권한이 필요합니다.' }, 403);
     }
     const id = c.req.param('id');
     try {
@@ -786,7 +786,7 @@ api.patch('/surveys/:id', async (c) => {
 api.delete('/surveys/:id', async (c) => {
     const user = c.get('user');
     if (user.level < 3) {
-        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+        return c.json({ success: false, error: '설문지 기능은 고급사용자(레벨 3) 이상 권한이 필요합니다.' }, 403);
     }
     const id = c.req.param('id');
     try {
@@ -866,7 +866,7 @@ api.get('/surveys/:id/responses.csv', async (c) => {
     }
 });
 
-// 6. ?⑥텞 留곹겕 ?앹꽦
+// 6. 단축 링크 생성
 api.post('/links', async (c) => {
     const user = c.get('user');
 
@@ -1000,14 +1000,14 @@ api.post('/links', async (c) => {
     }
 });
 
-// 7. ?⑥텞 留곹겕 ?섏젙
+// 7. 단축 링크 수정
 api.patch('/links/:id', async (c) => {
     const user = c.get('user');
     const id = c.req.param('id');
     
-    // 沅뚰븳 ?덈꺼 2 (?몄쬆?ъ슜??
+    // 권한 레벨 2 (인증사용자) 이상 필요
     if (user.level < 2) {
-        return c.json({ success: false, error: '?몄쬆?ъ슜???덈꺼 2) 沅뚰븳 ?댁긽留??⑥텞 留곹겕瑜??몄쭛?????덉뒿?덈떎.' }, 403);
+        return c.json({ success: false, error: '인증사용자(레벨 2) 이상만 단축 링크를 수정할 수 있습니다.' }, 403);
     }
     try {
         const body = await c.req.json();
@@ -1018,11 +1018,11 @@ api.patch('/links/:id', async (c) => {
             .first<{ id: number; slug: string; base_slug: string; custom_slug: string | null; original_url: string; is_public: number; expires_at: string | null; password: string | null }>();
 
         if (!link) {
-            return c.json({ success: false, error: '?대떦 留곹겕瑜?李얠쓣 ???녾굅??沅뚰븳???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 링크를 찾을 수 없거나 권한이 없습니다.' }, 404);
         }
 
         if (password !== undefined && password !== null && password !== '' && !/^\d{6}$/.test(password)) {
-            return c.json({ success: false, error: '鍮꾨?踰덊샇???レ옄 6?먮━?ъ빞 ?⑸땲??' }, 400);
+            return c.json({ success: false, error: '비밀번호는 숫자 6자리여야 합니다.' }, 400);
         }
 
         let updatedUrl = link.original_url;
@@ -1031,7 +1031,7 @@ api.patch('/links/:id', async (c) => {
                 new URL(original_url);
                 updatedUrl = original_url;
             } catch {
-                return c.json({ success: false, error: '?좏슚?섏? ?딆? URL ?뺤떇?낅땲??' }, 400);
+                return c.json({ success: false, error: '유효하지 않은 URL 형식입니다.' }, 400);
             }
         }
 
@@ -1147,13 +1147,13 @@ api.get('/links/:id/stats', async (c) => {
     }
 });
 
-// 8.?⑥텞 留곹겕 ??젣
+// 8. 단축 링크 삭제
 api.delete('/links/:id', async (c) => {
     const user = c.get('user');
     const id = c.req.param('id');
     
     if (user.level < 2) {
-        return c.json({ success: false, error: '?몄쬆?ъ슜???덈꺼 2) 沅뚰븳 ?댁긽留??⑥텞 留곹겕瑜???젣?????덉뒿?덈떎.' }, 403);
+        return c.json({ success: false, error: '인증사용자(레벨 2) 이상만 단축 링크를 삭제할 수 있습니다.' }, 403);
     }
     try {
         const link = await c.env.DB.prepare("SELECT id, slug, base_slug, custom_slug FROM urls WHERE id = ? AND user_id = ?")
@@ -1161,14 +1161,14 @@ api.delete('/links/:id', async (c) => {
             .first<{ id: number; slug: string; base_slug: string | null; custom_slug: string | null }>();
 
         if (!link) {
-            return c.json({ success: false, error: '?대떦 留곹겕瑜?李얠쓣 ???녾굅??沅뚰븳???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 링크를 찾을 수 없거나 권한이 없습니다.' }, 404);
         }
 
         await c.env.DB.prepare("DELETE FROM urls WHERE id = ?").bind(id).run();
         await c.env.URL_CACHE.delete(link.base_slug || link.slug);
         if (link.custom_slug) await c.env.URL_CACHE.delete(link.custom_slug);
 
-        return c.json({ success: true, message: '?⑥텞 留곹겕媛 ??젣?섏뿀?듬땲??' });
+        return c.json({ success: true, message: '단축 링크가 삭제되었습니다.' });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
@@ -1178,8 +1178,8 @@ api.delete('/links/:id', async (c) => {
 api.get('/keys', async (c) => {
     const user = c.get('user');
     
-    // 沅뚰븳 ?덈꺼 3 (媛쒕컻??
-    if (user.level < 3) {        return c.json({ success: false, error: '媛쒕컻???덈꺼 3) 沅뚰븳 ?댁긽留?API Key瑜?議고쉶/?앹꽦/?먭린?????덉뒿?덈떎.' }, 403);
+    // 권한 레벨 3 (고급사용자) 이상 필요
+    if (user.level < 3) {        return c.json({ success: false, error: '고급사용자(레벨 3) 이상만 API Key를 조회/생성/삭제할 수 있습니다.' }, 403);
     }
     try {
         const { results } = await c.env.DB.prepare(
@@ -1196,26 +1196,26 @@ api.get('/keys', async (c) => {
     }
 });
 
-// 8.3 API Key ?좉퇋 諛쒓툒
+// 8.3 API Key 신규 발급
 api.post('/keys', async (c) => {
     const user = c.get('user');
     
-    // 沅뚰븳 ?덈꺼 3 (媛쒕컻??
-    if (user.level < 3) {        return c.json({ success: false, error: '媛쒕컻???덈꺼 3) 沅뚰븳 ?댁긽留?API Key瑜?議고쉶/?앹꽦/?먭린?????덉뒿?덈떎.' }, 403);
+    // 권한 레벨 3 (고급사용자) 이상 필요
+    if (user.level < 3) {        return c.json({ success: false, error: '고급사용자(레벨 3) 이상만 API Key를 조회/생성/삭제할 수 있습니다.' }, 403);
     }
     try {
         const body = await c.req.json();
         const { name } = body;
 
-        // edulink_ ?묐몢?ш? 遺숈? 32?먮━ ?쒕뜡 ?뚰뙆踰??レ옄 ?좏겙 ?앹꽦
+        // edulink_ 접두어를 붙인 32자리 랜덤 영파벳 문자 토큰 생성
         const rawToken = 'edulink_' + Array.from(crypto.getRandomValues(new Uint8Array(20)))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('')
             .slice(0, 32);
         
-        // ?묐몢??
+        // 식별용 prefix
         const key_prefix = rawToken.slice(0, 12) + '...';
-        // ?댁떆 ?앹꽦 (SHA-256)
+        // 해시 생성 (SHA-256)
         const encoder = new TextEncoder();
         const data = encoder.encode(rawToken);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -1223,7 +1223,7 @@ api.post('/keys', async (c) => {
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
 
-        // DB ???
+        // DB 저장
         await c.env.DB.prepare(
             `INSERT INTO api_keys (user_id, key_hash, key_prefix, name)
              VALUES (?, ?, ?, ?)`
@@ -1231,7 +1231,7 @@ api.post('/keys', async (c) => {
         .bind(user.id, key_hash, key_prefix, name || 'Default Key')
         .run();
 
-        // 諛쒓툒???됰Ц API Key??蹂댁븞??????踰덈쭔 ?몄텧
+        // 발급된 원본 API Key는 이 응답에서만 평문 전달
         return c.json({
             success: true,
             api_key: rawToken,
@@ -1243,25 +1243,25 @@ api.post('/keys', async (c) => {
     }
 });
 
-// 8.4 API Key ?먭린
+// 8.4 API Key 폐기
 api.delete('/keys/:id', async (c) => {
     const user = c.get('user');
     const id = c.req.param('id');
     
-    // 沅뚰븳 ?덈꺼 3 (媛쒕컻??
-    if (user.level < 3) {        return c.json({ success: false, error: '媛쒕컻???덈꺼 3) 沅뚰븳 ?댁긽留?API Key瑜?議고쉶/?앹꽦/?먭린?????덉뒿?덈떎.' }, 403);
+    // 권한 레벨 3 (고급사용자) 이상 필요
+    if (user.level < 3) {        return c.json({ success: false, error: '고급사용자(레벨 3) 이상만 API Key를 조회/생성/삭제할 수 있습니다.' }, 403);
     }
     try {
-        // ?뚯쑀沅??뺤씤 諛???젣
+        // 소유권 확인 후 삭제
         const result = await c.env.DB.prepare("DELETE FROM api_keys WHERE id = ? AND user_id = ?")
             .bind(id, user.id)
             .run();
         
         if (result.meta.changes === 0) {
-            return c.json({ success: false, error: '?대떦 API ?ㅻ? 李얠쓣 ???녾굅??沅뚰븳???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 API 키를 찾을 수 없거나 권한이 없습니다.' }, 404);
         }
 
-        return c.json({ success: true, message: 'API ?ㅺ? ?깃났?곸쑝濡??먭린?섏뿀?듬땲??' });
+        return c.json({ success: true, message: 'API 키가 성공적으로 폐기되었습니다.' });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
@@ -1270,11 +1270,11 @@ api.delete('/keys/:id', async (c) => {
 app.route("/api", api);
 
 // ----------------------------------------------------
-// [理쒓퀬愿由ъ옄 ?곸뿭] 理쒓퀬愿由ъ옄 沅뚰븳(admin)???꾩슂???대? API 洹몃９
+// [최고관리자 영역] 최고관리자 권한(admin)이 필요한 보호된 API 그룹
 // ----------------------------------------------------
 const adminApi = new Hono<{ Bindings: Env; Variables: UserVariables }>();
 
-// 愿由ъ옄 誘몃뱾?⑥뼱 諛붿씤??adminApi.use('*', authMiddleware());
+// 관리자 미들웨어 바인딩
 adminApi.use('*', adminMiddleware());
 
 // 10.1 allowed_domains 議고쉶
@@ -1289,28 +1289,28 @@ adminApi.get('/domains', async (c) => {
     }
 });
 
-// 10.2 allowed_domains 異붽?
+// 10.2 allowed_domains 추가
 adminApi.post('/domains', async (c) => {
     try {
         const { domain } = await c.req.json();
         if (!domain || !domain.trim()) {
-            return c.json({ success: false, error: '?꾨찓??紐낆씠 ?꾩슂?⑸땲??' }, 400);
+            return c.json({ success: false, error: '도메인 명이 필요합니다.' }, 400);
         }
         
         await c.env.DB.prepare("INSERT INTO allowed_domains (domain) VALUES (?)")
             .bind(domain.trim().toLowerCase())
             .run();
             
-        return c.json({ success: true, message: '?꾨찓?몄씠 ?깃났?곸쑝濡??깅줉?섏뿀?듬땲??' });
+        return c.json({ success: true, message: '도메인이 성공적으로 등록되었습니다.' });
     } catch (err: any) {
         if (err.message.includes('UNIQUE')) {
-            return c.json({ success: false, error: '?대? ?깅줉???꾨찓?몄엯?덈떎.' }, 400);
+            return c.json({ success: false, error: '이미 등록된 도메인입니다.' }, 400);
         }
         return c.json({ success: false, error: err.message }, 500);
     }
 });
 
-// 10.3 allowed_domains ??젣
+// 10.3 allowed_domains 삭제
 adminApi.delete('/domains/:id', async (c) => {
     const id = c.req.param('id');
     try {
@@ -1319,20 +1319,20 @@ adminApi.delete('/domains/:id', async (c) => {
             .run();
             
         if (result.meta.changes === 0) {
-            return c.json({ success: false, error: '?대떦 ?꾨찓?몄쓣 李얠쓣 ???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 도메인을 찾을 수 없습니다.' }, 404);
         }
-        return c.json({ success: true, message: '?꾨찓?몄씠 ??젣?섏뿀?듬땲??' });
+        return c.json({ success: true, message: '도메인이 삭제되었습니다.' });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
 });
 
-// 10.4 怨듭??ы빆 異붽?
+// 10.4 공지사항 추가
 adminApi.post('/notices', async (c) => {
     try {
         const { title, content, is_pinned } = await c.req.json();
         if (!title || !content) {
-            return c.json({ success: false, error: '?쒕ぉ怨??댁슜??紐⑤몢 ?낅젰??二쇱꽭??' }, 400);
+            return c.json({ success: false, error: '제목과 내용을 모두 입력해 주세요.' }, 400);
         }
         
         const pinned = is_pinned ? 1 : 0;
@@ -1342,13 +1342,13 @@ adminApi.post('/notices', async (c) => {
         .bind(title, content, pinned)
         .run();
         
-        return c.json({ success: true, message: '怨듭??ы빆???깅줉?섏뿀?듬땲??' });
+        return c.json({ success: true, message: '공지사항이 등록되었습니다.' });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
 });
 
-// 10.5 怨듭??ы빆 ??젣
+// 10.5 공지사항 수정/삭제
 adminApi.patch('/notices/:id', async (c) => {
     const id = c.req.param('id');
     try {
@@ -1376,14 +1376,14 @@ adminApi.delete('/notices/:id', async (c) => {
             .run();
             
         if (result.meta.changes === 0) {
-            return c.json({ success: false, error: '?대떦 怨듭??ы빆??李얠쓣 ???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 공지사항을 찾을 수 없습니다.' }, 404);
         }
-        return c.json({ success: true, message: '怨듭??ы빆????젣?섏뿀?듬땲??' });
+        return c.json({ success: true, message: '공지사항이 삭제되었습니다.' });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
 });
-// 10.6 ?ъ슜??紐⑸줉 議고쉶 (?대뱶誘쇱슜)
+// 10.6 사용자 목록 조회 (어드민용)
 adminApi.get('/users', async (c) => {
     try {
         const { results } = await c.env.DB.prepare(
@@ -1395,14 +1395,14 @@ adminApi.get('/users', async (c) => {
     }
 });
 
-// 10.7 ?ъ슜???깃툒 ?섏젙 (?대뱶誘쇱슜 ?섎룞?몄쬆)
+// 10.7 사용자 등급 설정 (최고관리자 전용)
 adminApi.patch('/users/:id', async (c) => {
     const id = c.req.param('id');
     try {
         const { level } = await c.req.json();
         const numericLevel = Number(level);
         if (isNaN(numericLevel) || numericLevel < 1 || numericLevel > 4) {
-            return c.json({ success: false, error: '?щ컮瑜댁? ?딆? 沅뚰븳 ?깃툒?낅땲?? (1~4)' }, 400);
+            return c.json({ success: false, error: '유효하지 않은 권한 등급입니다. (1~4)' }, 400);
         }
         
         // 본인 등급 변경 차단 (최고관리자 권한 해제 방지)
@@ -1416,10 +1416,10 @@ adminApi.patch('/users/:id', async (c) => {
             .run();
             
         if (result.meta.changes === 0) {
-            return c.json({ success: false, error: '?대떦 ?ъ슜?먮? 李얠쓣 ???놁뒿?덈떎.' }, 404);
+            return c.json({ success: false, error: '해당 사용자를 찾을 수 없습니다.' }, 404);
         }
         
-        return c.json({ success: true, message: `?ъ슜??沅뚰븳 ?깃툒??${numericLevel}濡??깃났?곸쑝濡?蹂寃쎈릺?덉뒿?덈떎.` });
+        return c.json({ success: true, message: `사용자 권한 등급이 ${numericLevel}단계로 변경되었습니다.` });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
     }
@@ -1483,9 +1483,9 @@ app.route("/api/admin", adminApi);
 // [媛쒕컻?먯슜 OpenAPI ?곸뿭] API Key 諛?Rate Limiting 諛붿씤??// ----------------------------------------------------
 
 
-// CORS & Rate Limit 寃고빀 (API Key???뱀? IP??遺꾨떦 理쒕? 15???덉슜)
+// CORS & Rate Limit 결합 (API Key마다 IP마다 분당 최대 15회 사용)
 
-// 8.5 ?몃????⑥텞 URL ?앹꽦 API
+// 8.5 외부용 단축 URL 생성 API
 app.post('/api/v1/shorten', async (c) => {
     try {
         // ?몄쬆 ?섎떒 ?뺤씤 (?ㅻ뜑 Authorization ?먮뒗 x-api-key)
@@ -1497,28 +1497,28 @@ app.post('/api/v1/shorten', async (c) => {
         }
 
         if (!token) {
-            return c.json({ success: false, error: 'API Key?몄쬆???꾨씫?섏뿀?듬땲?? x-api-key ?먮뒗 Bearer ?좏겙???ㅻ뜑???숇큺??二쇱꽭??' }, 401);
+            return c.json({ success: false, error: 'API Key 인증이 누락되었습니다. x-api-key 또는 Bearer 토큰을 헤더에 넣어 주세요.' }, 401);
         }
 
-        // SHA-256 ?댁떆 蹂??
+        // SHA-256 해시 조회
         const encoder = new TextEncoder();        const data = encoder.encode(token);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const keyHash = Array.from(new Uint8Array(hashBuffer))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
 
-        // D1?먯꽌 ?쒖꽦?붾맂 ??諛??뚯쑀 ?ъ슜??李얘린
+        // D1에서 발급된 키의 유효 사용자 찾기
         const keyRecord = await c.env.DB.prepare(`SELECT k.id, k.user_id, k.name, u.level FROM api_keys k JOIN users u ON k.user_id = u.id WHERE k.key_hash = ? AND k.is_active = 1`
         )
         .bind(keyHash)
         .first<{ id: number; user_id: number; name: string; level: number }>();
 
         if (!keyRecord) {
-            return c.json({ success: false, error: '?좏슚?섏? ?딄굅??鍮꾪솢?깊솕??API Key?낅땲??' }, 401);
+            return c.json({ success: false, error: '유효하지 않거나 비활성화된 API Key입니다.' }, 401);
         }
 
         if (keyRecord.level < 3) {
-            return c.json({ success: false, error: '?대떦 API Key ?뚯쑀?먯쓽 沅뚰븳 ?덈꺼??遺議깊빀?덈떎.' }, 403);
+            return c.json({ success: false, error: '해당 API Key 소유자의 권한 레벨이 부족합니다.' }, 403);
         }
 
         const body = await c.req.json();
@@ -1526,16 +1526,16 @@ app.post('/api/v1/shorten', async (c) => {
         let { slug } = body;
 
         if (!original_url) {
-            return c.json({ success: false, error: 'original_url???꾩슂?⑸땲??' }, 400);
+            return c.json({ success: false, error: 'original_url이 필요합니다.' }, 400);
         }
         try {
             new URL(original_url);
         } catch {
-            return c.json({ success: false, error: '?좏슚?섏? ?딆? URL ?뺤떇?낅땲??' }, 400);
+            return c.json({ success: false, error: '유효하지 않은 URL 형식입니다.' }, 400);
         }
 
         if (password && !/^\d{6}$/.test(password)) {
-            return c.json({ success: false, error: '鍮꾨?踰덊샇???レ옄 6?먮━?ъ빞 ?⑸땲??' }, 400);
+            return c.json({ success: false, error: '비밀번호는 숫자 6자리여야 합니다.' }, 400);
         }
 
         const reservedSlugs = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
@@ -1549,15 +1549,15 @@ app.post('/api/v1/shorten', async (c) => {
                 slug = slug.normalize('NFC');
             }
             if (!isValidCustomSlug(slug)) {
-                return c.json({ success: false, error: '?щ윭洹몃뒗 4~20?먯쓽 ?곸닽?? ?쒓? 諛??섏씠?덈쭔 ?ъ슜?????덉뒿?덈떎.' }, 400);
+                return c.json({ success: false, error: '슬러그는 4~20자의 한글, 영숫자, 하이픈만 허용됩니다.' }, 400);
             }
             if (reservedSet.has(slug.toLowerCase())) {
-                return c.json({ success: false, error: '?ъ슜?????녿뒗 ?덉빟???щ윭洹몄엯?덈떎.' }, 400);
+                return c.json({ success: false, error: '사용할 수 없는 예약된 슬러그입니다.' }, 400);
             }
             
             const exists = await c.env.DB.prepare("SELECT id FROM urls WHERE slug = ?").bind(slug).first();
             if (exists) {
-                return c.json({ success: false, error: '?대? ?ъ슜 以묒씤 ?щ윭洹몄엯?덈떎.' }, 400);
+                return c.json({ success: false, error: '이미 사용 중인 슬러그입니다.' }, 409);
             }
         } else {
             // ?쒕뜡 ?앹꽦
@@ -1578,7 +1578,7 @@ app.post('/api/v1/shorten', async (c) => {
             }
 
             if (!isUnique) {
-                return c.json({ success: false, error: '?щ윭洹??앹꽦???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??' }, 500);
+                return c.json({ success: false, error: '슬러그 생성에 실패했습니다. 다시 시도해 주세요.' }, 500);
             }
             slug = generated;
         }
@@ -1593,14 +1593,14 @@ app.post('/api/v1/shorten', async (c) => {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api')`
         ).bind(slug, slug, original_url, title || keyRecord.name, description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
 
-        // KV 罹먯떆 ?낅뜲?댄듃
+        // KV 캐시 업데이트
         if (!pass && !expiration) {
             await c.env.URL_CACHE.put(slug, original_url);
         } else {
             await c.env.URL_CACHE.delete(slug);
         }
 
-        // API ??留덉?留??ъ슜 湲곕줉 ?낅뜲?댄듃 (waitUntil ?쒖슜 鍮꾨룞湲?泥섎━)
+        // API 키 마지막 사용 기록 업데이트 (waitUntil 사용 비동기 처리)
         c.executionCtx.waitUntil(
             c.env.DB.prepare("UPDATE api_keys SET last_used_at = datetime('now') WHERE key_hash = ?")
                 .bind(keyHash)
@@ -1621,7 +1621,7 @@ app.post('/api/v1/shorten', async (c) => {
 
 
 // ----------------------------------------------------
-// [?쇰툝由?由щ뵒?됱뀡 諛?SPA ?쒕튃]
+// [공개 리디렉션 및 SPA 서빙]
 // ----------------------------------------------------
 
 // /qr/:slug 및 /:slug.qr — DB 확인 후 외부 QR 이미지로 302 리다이렉트
@@ -1892,14 +1892,14 @@ app.all('*', (c) => {
     return c.env.ASSETS.fetch(c.req.raw);
 });
 
-// HTML ?쒗뵆由??앹꽦 ?ы띁 ?⑥닔
+// HTML 템플릿 생성 헬퍼 함수
 function getPasswordPageHtml(slug: string): string {
     return `<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蹂댄샇??留곹겕 - ?먮?留곹겕</title>
+    <title>보호된 링크 - 에듀링크</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; }
@@ -2219,7 +2219,8 @@ function linkify(text) {
 // ── 미디어 임베드 ─────────────────────────────────────────
 function renderMedia(url) {
   if (!url) return '';
-  const ytMatch = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([\\w-]{11})/);
+  // YouTube: watch?v=, youtu.be/, shorts/, embed/
+  const ytMatch = url.match(/(?:youtube\\.com\\/(?:watch\\?v=|shorts\\/|embed\\/)|youtu\\.be\\/)([\\w-]{11})/);
   if (ytMatch) {
     return '<iframe src="https://www.youtube.com/embed/' + ytMatch[1] + '" class="q-media" style="aspect-ratio:16/9;border:none" allowfullscreen loading="lazy"></iframe>';
   }

@@ -609,6 +609,34 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
 
                 {formShowAdvanced && (
                   <div className="p-4 space-y-3 border-t border-slate-200">
+                    {/* 초기화 버튼 */}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormCustomSlug('');
+                          setFormPassword('');
+                          setFormExpiresAt('');
+                          setFormResponseLimit('');
+                          setFormOneResponsePerBrowser(false);
+                          setFormInactiveMessage('');
+                        }}
+                        className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+                      >
+                        고급 설정 초기화
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">
+                        응답 비활성화 시 안내 문구
+                        <span className="text-slate-400 font-normal ml-1">(설문 종료·비활성 시 표시)</span>
+                      </label>
+                      <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
+                        placeholder="예: 이 설문은 종료되었습니다. 문의: 000-0000-0000"
+                        value={formInactiveMessage} onChange={e => setFormInactiveMessage(e.target.value)} />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-bold text-slate-600 mb-1">커스텀 슬러그 (선택)</label>
@@ -639,16 +667,6 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                           같은 브라우저에서 재접속 시 이미 응답했다는 안내를 표시합니다. (localStorage 기반 — 시크릿/다른 기기는 제외)
                         </span>
                       </label>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-1">
-                        응답 비활성화 시 안내 문구
-                        <span className="text-slate-400 font-normal ml-1">(설문 종료·비활성 시 표시)</span>
-                      </label>
-                      <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
-                        placeholder="예: 이 설문은 종료되었습니다. 문의: 000-0000-0000"
-                        value={formInactiveMessage} onChange={e => setFormInactiveMessage(e.target.value)} />
                     </div>
                   </div>
                 )}
