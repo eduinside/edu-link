@@ -2217,22 +2217,35 @@ function linkify(text) {
 }
 
 // ── 미디어 임베드 ─────────────────────────────────────────
-function renderMedia(url) {
-  if (!url) return '';
+function buildMediaEl(url) {
+  if (!url || !url.trim()) return null;
+  url = url.trim();
   // YouTube: watch?v=, youtu.be/, shorts/, embed/
   const ytMatch = url.match(/(?:youtube\\.com\\/(?:watch\\?v=|shorts\\/|embed\\/)|youtu\\.be\\/)([\\w-]{11})/);
   if (ytMatch) {
-    return '<iframe src="https://www.youtube.com/embed/' + ytMatch[1] + '" class="q-media" style="aspect-ratio:16/9;border:none" allowfullscreen loading="lazy"></iframe>';
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://www.youtube.com/embed/' + ytMatch[1];
+    iframe.className = 'q-media';
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+    iframe.style.cssText = 'width:100%;height:360px;border:none;border-radius:12px;margin-bottom:12px;display:block';
+    return iframe;
   }
   if (/\\.(mp4|webm|ogg)(\\?|$)/i.test(url)) {
-    const e = url.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-    return '<video src="' + e + '" controls class="q-media"></video>';
+    const vid = document.createElement('video');
+    vid.src = url;
+    vid.controls = true;
+    vid.className = 'q-media';
+    return vid;
   }
   if (/\\.(jpe?g|png|gif|webp|svg)(\\?|$)/i.test(url)) {
-    const e = url.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-    return '<img src="' + e + '" class="q-media-img" loading="lazy">';
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'q-media-img';
+    img.loading = 'lazy';
+    return img;
   }
-  return '';
+  return null;
 }
 
 // ── 브라우저 1회 제한 체크 ───────────────────────────────
@@ -2272,8 +2285,8 @@ function renderQuestions(){
     block.dataset.qid = q.id;
     const reqHtml = q.required ? '<span class="req">*</span>' : '';
 
-    // 미디어 임베드
-    const mediaHtml = q.media_url ? renderMedia(q.media_url) : '';
+    // 미디어 임베드 (createElement로 삽입 — innerHTML보다 안정적)
+    const mediaEl = q.media_url ? buildMediaEl(q.media_url) : null;
     // 문항 안내문 (URL 자동 링크)
     const descHtml = q.description ? '<div class="q-desc">' + linkify(q.description) + '</div>' : '';
 
@@ -2305,10 +2318,11 @@ function renderQuestions(){
         break;
       default: body = '<input type="text" data-input>';
     }
-    block.innerHTML = mediaHtml
-      + '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
+    // innerHTML 먼저, 그 뒤 미디어 요소를 맨 앞에 삽입
+    block.innerHTML = '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
       + descHtml
       + body;
+    if (mediaEl) block.insertBefore(mediaEl, block.firstChild);
     container.appendChild(block);
 
     if(q.type === 'rating'){
