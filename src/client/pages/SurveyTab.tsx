@@ -1,9 +1,9 @@
 // src/client/pages/SurveyTab.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, CardContent, Chip, Input, Tooltip } from '@heroui/react';
 import {
   FileText, Plus, Copy, ExternalLink, Trash2, Edit3, Check, BarChart3,
-  Download, QrCode, ArrowUp, ArrowDown, X
+  Download, QrCode, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Settings
 } from 'lucide-react';
 
 type QuestionType = 'short' | 'long' | 'single' | 'multi' | 'rating' | 'phone' | 'email' | 'address';
@@ -15,6 +15,8 @@ interface Question {
   required: boolean;
   options?: string[];
   scale?: number;
+  description?: string; // 문항 안내문 (URL 자동 링크)
+  media_url?: string;   // mp4/youtube/이미지 임베드
 }
 
 interface SurveyConfig {
@@ -22,6 +24,8 @@ interface SurveyConfig {
   intro: string;
   outro: string;
   questions: Question[];
+  one_response_per_browser?: boolean; // 브라우저당 1회 제한
+  inactive_message?: string;           // 비활성화 시 표시 문구
 }
 
 interface SurveyItem {
@@ -30,7 +34,7 @@ interface SurveyItem {
   base_slug: string;
   custom_slug: string | null;
   title: string;
-  survey_config: string; // JSON string
+  survey_config: string;
   response_limit: number | null;
   response_count: number;
   is_active: number;
@@ -85,25 +89,38 @@ function formatDate(s: string | null | undefined) {
   catch { return s; }
 }
 
+function hasAdvancedSettings(s: SurveyItem): boolean {
+  try {
+    const cfg: SurveyConfig = JSON.parse(s.survey_config || '{}');
+    return !!(s.custom_slug || s.password || s.expires_at || s.response_limit
+      || cfg.one_response_per_browser || cfg.inactive_message);
+  } catch { return !!(s.custom_slug || s.password || s.expires_at || s.response_limit); }
+}
+
 export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrModalLink }: Props) {
   const [surveys, setSurveys] = useState<SurveyItem[]>([]);
   const [editing, setEditing] = useState<SurveyItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Form state
+  // Form state — basic
   const [formTitle, setFormTitle] = useState('');
   const [formIntro, setFormIntro] = useState(DEFAULT_CONFIG.intro);
   const [formOutro, setFormOutro] = useState(DEFAULT_CONFIG.outro);
   const [formQuestions, setFormQuestions] = useState<Question[]>([]);
-  const [formCustomSlug, setFormCustomSlug] = useState('');
-  const [formPassword, setFormPassword] = useState('');
-  const [formExpiresAt, setFormExpiresAt] = useState('');
-  const [formResponseLimit, setFormResponseLimit] = useState('');
   const [formActive, setFormActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  // Results inline panel (대시보드 화면 내 표시)
+  // Form state — advanced (접기/펼치기)
+  const [formShowAdvanced, setFormShowAdvanced] = useState(false);
+  const [formCustomSlug, setFormCustomSlug] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formExpiresAt, setFormExpiresAt] = useState('');
+  const [formResponseLimit, setFormResponseLimit] = useState('');
+  const [formOneResponsePerBrowser, setFormOneResponsePerBrowser] = useState(false);
+  const [formInactiveMessage, setFormInactiveMessage] = useState('');
+
+  // Results inline panel
   const [resultsView, setResultsView] = useState<{ survey: any; responses: any[] } | null>(null);
   const [resultsTab, setResultsTab] = useState<'summary' | 'byQuestion' | 'individual'>('summary');
   const [individualIdx, setIndividualIdx] = useState(0);
@@ -111,30 +128,39 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
   // 빠른 생성 입력바
   const [quickTitle, setQuickTitle] = useState('');
 
-  // 새 문항 기본 필수 여부 (+ 버튼 클릭 시 적용)
+  // 새 문항 기본 필수 여부
   const [nextRequired, setNextRequired] = useState(false);
+
+  // 폴링 타이머
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchSurveys = async () => {
     try {
       const res = await fetch('/api/surveys', { headers: getHeaders() });
       const data = await res.json();
       if (data.success) setSurveys(data.surveys || []);
-      else setError(data.error || '설문 목록 조회 실패');
-    } catch { setError('서버 연결 실패'); }
+    } catch { /* silent */ }
   };
 
-  useEffect(() => { fetchSurveys(); }, []);
+  useEffect(() => {
+    fetchSurveys();
+    pollRef.current = setInterval(fetchSurveys, 30_000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   const resetForm = () => {
     setFormTitle('');
     setFormIntro(DEFAULT_CONFIG.intro);
     setFormOutro(DEFAULT_CONFIG.outro);
     setFormQuestions([]);
+    setFormActive(true);
+    setFormShowAdvanced(false);
     setFormCustomSlug('');
     setFormPassword('');
     setFormExpiresAt('');
     setFormResponseLimit('');
-    setFormActive(true);
+    setFormOneResponsePerBrowser(false);
+    setFormInactiveMessage('');
   };
 
   const startCreate = (prefillTitle = '') => {
@@ -150,18 +176,23 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     try {
       const cfg: SurveyConfig = JSON.parse(s.survey_config || '{}');
       setFormTitle(s.title || cfg.title || '');
-      setFormIntro(cfg.intro || '');
-      setFormOutro(cfg.outro || '');
+      setFormIntro(cfg.intro || DEFAULT_CONFIG.intro);
+      setFormOutro(cfg.outro || DEFAULT_CONFIG.outro);
       setFormQuestions(cfg.questions || []);
+      setFormOneResponsePerBrowser(!!cfg.one_response_per_browser);
+      setFormInactiveMessage(cfg.inactive_message || '');
     } catch {
       setFormTitle(s.title);
       setFormQuestions([]);
+      setFormOneResponsePerBrowser(false);
+      setFormInactiveMessage('');
     }
     setFormCustomSlug(s.custom_slug || '');
     setFormPassword(s.password || '');
     setFormExpiresAt(s.expires_at ? s.expires_at.replace(' ', 'T').slice(0, 16) : '');
     setFormResponseLimit(s.response_limit ? String(s.response_limit) : '');
     setFormActive(s.is_active === 1);
+    setFormShowAdvanced(hasAdvancedSettings(s));
   };
 
   const closeDrawer = () => {
@@ -170,12 +201,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
   };
 
   const addQuestion = (type: QuestionType) => {
-    const q: Question = {
-      id: genQid(),
-      type,
-      label: '',
-      required: nextRequired,
-    };
+    const q: Question = { id: genQid(), type, label: '', required: nextRequired };
     if (type === 'single' || type === 'multi') q.options = ['선택 1', '선택 2'];
     if (type === 'rating') q.scale = 5;
     setFormQuestions([...formQuestions, q]);
@@ -215,6 +241,8 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       intro: formIntro,
       outro: formOutro,
       questions: formQuestions,
+      one_response_per_browser: formOneResponsePerBrowser || undefined,
+      inactive_message: formInactiveMessage.trim() || undefined,
     };
     const expirationUtc = formExpiresAt
       ? new Date(formExpiresAt).toISOString().replace('T', ' ').split('.')[0]
@@ -288,7 +316,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
 
   return (
     <>
-      {/* 상단: 통계 카드 + 생성 버튼 */}
+      {/* 상단 통계 카드 */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
           <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
@@ -317,6 +345,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
         </Card>
       </div>
 
+      {/* 빠른 생성 입력바 */}
       <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden mb-6">
         <CardContent className="p-4 sm:p-5">
           <form
@@ -347,6 +376,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
         </CardContent>
       </Card>
 
+      {/* 설문 목록 */}
       {surveys.length === 0 ? (
         <Card className="bg-white border border-slate-100 rounded-3xl py-16 shadow-sm">
           <CardContent className="text-center flex flex-col items-center gap-2">
@@ -410,11 +440,16 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                           </Tooltip>
                           <Tooltip content="QR 코드">
                             <Button size="sm" variant="flat" color="secondary" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
-                              onClick={() => setQrModalLink({ id: s.id, slug: slugShown, base_slug: s.base_slug, custom_slug: s.custom_slug, title: s.title } as any)}>
+                              onClick={() => setQrModalLink({
+                                id: s.id, slug: slugShown, base_slug: s.base_slug,
+                                custom_slug: s.custom_slug, title: s.title,
+                                kind: 'survey', response_count: s.response_count,
+                                original_url: '', click_count: 0,
+                              } as any)}>
                               <QrCode className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="결과 보기">
+                          <Tooltip content="응답 결과 보기">
                             <Button size="sm" variant="flat" color="primary" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => openResults(s.id)}>
                               <BarChart3 className="w-3 h-3" />
@@ -453,68 +488,122 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       <div className={`fixed inset-0 z-50 ${isDrawerOpen ? 'visible' : 'invisible pointer-events-none'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity ${isDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={closeDrawer} />
-        <div className={`absolute inset-y-0 right-0 max-w-full flex pl-10`}>
+        <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
           <div className={`w-screen max-w-xl bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <h3 className="font-bold text-base text-slate-800">{editing ? '설문 편집' : '새 설문 만들기'}</h3>
               <Button size="sm" variant="light" isIconOnly onClick={closeDrawer}><X className="w-4 h-4" /></Button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+              {/* 제목 — 전체 폭 */}
               <div>
                 <label className="block font-bold text-slate-600 mb-1.5">제목 *</label>
-                <Input size="sm" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="설문 제목" />
+                <Input size="sm" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="설문 제목" className="w-full" />
               </div>
+
               <div>
-                <label className="block font-bold text-slate-600 mb-1.5">설문 안내 (intro)</label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs" rows={3}
+                <label className="block font-bold text-slate-600 mb-1.5">
+                  설문 안내
+                  <span className="text-slate-400 font-normal ml-1">(URL 입력 시 자동 링크)</span>
+                </label>
+                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={3}
                   value={formIntro} onChange={e => setFormIntro(e.target.value)} />
               </div>
+
               <div>
-                <label className="block font-bold text-slate-600 mb-1.5">종료 안내 (outro)</label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs" rows={2}
+                <label className="block font-bold text-slate-600 mb-1.5">
+                  종료 안내
+                  <span className="text-slate-400 font-normal ml-1">(URL 입력 시 자동 링크)</span>
+                </label>
+                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
                   value={formOutro} onChange={e => setFormOutro(e.target.value)} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-600 mb-1.5">커스텀 슬러그 (선택)</label>
-                  <Input size="sm" value={formCustomSlug} onChange={e => setFormCustomSlug(e.target.value)} placeholder="4~20자" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-1.5">비밀번호 (6자리, 선택)</label>
-                  <Input size="sm" value={formPassword} onChange={e => setFormPassword(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-1.5">종료일 (선택)</label>
-                  <input type="datetime-local" className="w-full border border-slate-200 rounded-xl p-2 text-xs"
-                    value={formExpiresAt} onChange={e => setFormExpiresAt(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-1.5">최대 응답 수 (선택)</label>
-                  <Input size="sm" type="number" value={formResponseLimit} onChange={e => setFormResponseLimit(e.target.value)} placeholder="빈 값=무제한" />
-                </div>
-              </div>
-
               {editing && (
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl">
+                <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl">
                   <input type="checkbox" id="formActive" checked={formActive} onChange={e => setFormActive(e.target.checked)} />
                   <label htmlFor="formActive" className="font-bold text-slate-600">활성화</label>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-slate-100">
+              {/* 고급 설정 아코디언 */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setFormShowAdvanced(!formShowAdvanced)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                >
+                  <span className="flex items-center gap-2 font-bold text-slate-600">
+                    <Settings className="w-3.5 h-3.5 text-slate-400" />
+                    고급 설정
+                    {(formCustomSlug || formPassword || formExpiresAt || formResponseLimit || formOneResponsePerBrowser || formInactiveMessage) && (
+                      <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold">설정됨</span>
+                    )}
+                  </span>
+                  {formShowAdvanced
+                    ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                </button>
+
+                {formShowAdvanced && (
+                  <div className="p-4 space-y-3 border-t border-slate-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">커스텀 슬러그 (선택)</label>
+                        <Input size="sm" value={formCustomSlug} onChange={e => setFormCustomSlug(e.target.value)} placeholder="4~20자" />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">비밀번호 (6자리, 선택)</label>
+                        <Input size="sm" value={formPassword} onChange={e => setFormPassword(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">종료일 (선택)</label>
+                        <input type="datetime-local" className="w-full border border-slate-200 rounded-xl p-2 text-xs"
+                          value={formExpiresAt} onChange={e => setFormExpiresAt(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">최대 응답 수</label>
+                        <Input size="sm" type="number" value={formResponseLimit} onChange={e => setFormResponseLimit(e.target.value)} placeholder="빈 값=무제한" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 p-2.5 bg-blue-50 rounded-xl">
+                      <input type="checkbox" id="formOnePerBrowser" checked={formOneResponsePerBrowser}
+                        onChange={e => setFormOneResponsePerBrowser(e.target.checked)}
+                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 flex-shrink-0" />
+                      <label htmlFor="formOnePerBrowser" className="font-bold text-slate-600 leading-relaxed">
+                        브라우저 기준 중복 응답 제한
+                        <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
+                          같은 브라우저에서 재접속 시 이미 응답했다는 안내를 표시합니다. (localStorage 기반 — 시크릿/다른 기기는 제외)
+                        </span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">
+                        응답 비활성화 시 안내 문구
+                        <span className="text-slate-400 font-normal ml-1">(설문 종료·비활성 시 표시)</span>
+                      </label>
+                      <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
+                        placeholder="예: 이 설문은 종료되었습니다. 문의: 000-0000-0000"
+                        value={formInactiveMessage} onChange={e => setFormInactiveMessage(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 질문 빌더 */}
+              <div className="pt-1 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-bold text-slate-700">질문 ({formQuestions.length}개)</h4>
                   <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={nextRequired}
-                      onChange={e => setNextRequired(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                    />
-                    추가할 문항을 <span className={nextRequired ? 'text-indigo-600' : 'text-slate-400'}>필수</span>로 설정
+                    <input type="checkbox" checked={nextRequired} onChange={e => setNextRequired(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                    추가할 문항을 <span className={nextRequired ? 'text-indigo-600' : 'text-slate-400'}>필수</span>로
                   </label>
                 </div>
+
                 <div className="flex flex-wrap gap-1 mb-3">
                   {(Object.keys(QUESTION_TYPE_LABEL) as QuestionType[]).map(t => (
                     <Tooltip key={t} content={QUESTION_TYPE_TOOLTIP[t]} delay={200}>
@@ -524,54 +613,34 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                     </Tooltip>
                   ))}
                 </div>
+
                 <div className="space-y-2">
                   {formQuestions.map((q, idx) => (
-                    <div key={q.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-bold text-indigo-600">Q{idx + 1}</span>
-                        <Chip size="sm" variant="flat" className="text-[9px] h-4 px-1.5">{QUESTION_TYPE_LABEL[q.type]}</Chip>
-                        <div className="flex-1" />
-                        <Button size="sm" variant="light" isIconOnly className="w-6 h-6 min-w-0" onClick={() => moveQuestion(idx, -1)}><ArrowUp className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="light" isIconOnly className="w-6 h-6 min-w-0" onClick={() => moveQuestion(idx, 1)}><ArrowDown className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="light" color="danger" isIconOnly className="w-6 h-6 min-w-0" onClick={() => removeQuestion(idx)}><Trash2 className="w-3 h-3" /></Button>
-                      </div>
-                      <Input size="sm" placeholder="질문 라벨" value={q.label} onChange={e => updateQuestion(idx, { label: e.target.value })} />
-                      {(q.type === 'single' || q.type === 'multi') && (
-                        <textarea
-                          className="mt-2 w-full border border-slate-200 rounded-lg p-2 text-[11px] font-mono"
-                          rows={3}
-                          placeholder="선택지 한 줄에 하나씩"
-                          value={(q.options || []).join('\n')}
-                          onChange={e => updateQuestion(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-                        />
-                      )}
-                      {q.type === 'rating' && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <label className="text-[11px] font-bold text-slate-600">척도 최댓값</label>
-                          <Input size="sm" type="number" className="w-20" value={String(q.scale || 5)}
-                            onChange={e => updateQuestion(idx, { scale: Math.max(2, Math.min(10, Number(e.target.value) || 5)) })} />
-                        </div>
-                      )}
-                      <label className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
-                        <input type="checkbox" checked={q.required} onChange={e => updateQuestion(idx, { required: e.target.checked })} />
-                        필수 응답
-                      </label>
-                    </div>
+                    <QuestionEditor
+                      key={q.id}
+                      q={q}
+                      idx={idx}
+                      total={formQuestions.length}
+                      onChange={patch => updateQuestion(idx, patch)}
+                      onRemove={() => removeQuestion(idx)}
+                      onMove={dir => moveQuestion(idx, dir)}
+                    />
                   ))}
                 </div>
               </div>
             </div>
-            <div className="p-4 border-t border-slate-100 flex gap-2">
+
+            <div className="p-4 border-t border-slate-100 flex gap-2 flex-shrink-0">
               <Button variant="flat" className="flex-1 rounded-xl" onClick={closeDrawer}>취소</Button>
-              <Button color="primary" className="flex-1 rounded-xl font-bold" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? '저장 중...' : (editing ? '저장' : '생성')}
+              <Button color="primary" className="flex-1 rounded-xl font-bold" onClick={handleSave} isLoading={isSaving}>
+                {editing ? '저장' : '생성'}
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Results inline panel (대시보드 내) — 3탭: 통계 / 문항별 / 개별 */}
+      {/* 결과 패널 (인라인) */}
       {resultsView && (
         <ResultsPanel
           data={resultsView}
@@ -587,7 +656,92 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
 }
 
 // ───────────────────────────────────────────────────────────
-// Results panel: 통계 / 문항별 / 개별 응답 (Google Forms 스타일)
+// 문항 편집 컴포넌트
+// ───────────────────────────────────────────────────────────
+interface QuestionEditorProps {
+  q: Question;
+  idx: number;
+  total: number;
+  onChange: (patch: Partial<Question>) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+}
+
+function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionEditorProps) {
+  const [showDesc, setShowDesc] = useState(!!(q.description || q.media_url));
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] font-bold text-indigo-600">Q{idx + 1}</span>
+        <Chip size="sm" variant="flat" className="text-[9px] h-4 px-1.5">{QUESTION_TYPE_LABEL[q.type]}</Chip>
+        <div className="flex-1" />
+        <Tooltip content="안내문/미디어 추가" delay={200}>
+          <button type="button"
+            onClick={() => setShowDesc(!showDesc)}
+            className={`text-[9px] font-bold px-2 py-1 rounded-lg transition-colors ${showDesc ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+            {showDesc ? '안내 숨기기' : '+ 안내/미디어'}
+          </button>
+        </Tooltip>
+        <Button size="sm" variant="light" isIconOnly className="w-6 h-6 min-w-0" onClick={() => onMove(-1)} isDisabled={idx === 0}><ArrowUp className="w-3 h-3" /></Button>
+        <Button size="sm" variant="light" isIconOnly className="w-6 h-6 min-w-0" onClick={() => onMove(1)} isDisabled={idx === total - 1}><ArrowDown className="w-3 h-3" /></Button>
+        <Button size="sm" variant="light" color="danger" isIconOnly className="w-6 h-6 min-w-0" onClick={onRemove}><Trash2 className="w-3 h-3" /></Button>
+      </div>
+
+      <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2" />
+
+      {showDesc && (
+        <div className="space-y-1.5 mt-1 mb-2 p-2 bg-white rounded-lg border border-slate-100">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">문항 안내문 <span className="font-normal text-slate-400">(URL 자동 링크)</span></label>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg p-2 text-[11px] resize-y"
+              rows={2}
+              placeholder="이 문항에 대한 추가 안내를 입력하세요. URL 입력 시 새 탭 링크로 표시됩니다."
+              value={q.description || ''}
+              onChange={e => onChange({ description: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">미디어 URL <span className="font-normal text-slate-400">(YouTube/mp4/이미지)</span></label>
+            <input
+              type="url"
+              className="w-full border border-slate-200 rounded-lg p-2 text-[11px]"
+              placeholder="https://youtube.com/watch?v=... 또는 이미지/동영상 URL"
+              value={q.media_url || ''}
+              onChange={e => onChange({ media_url: e.target.value })}
+            />
+            {q.media_url && <p className="text-[10px] text-indigo-500 mt-0.5">설문 화면에서 미디어가 임베드됩니다.</p>}
+          </div>
+        </div>
+      )}
+
+      {(q.type === 'single' || q.type === 'multi') && (
+        <textarea
+          className="mt-1 w-full border border-slate-200 rounded-lg p-2 text-[11px] font-mono"
+          rows={3}
+          placeholder="선택지 한 줄에 하나씩"
+          value={(q.options || []).join('\n')}
+          onChange={e => onChange({ options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+        />
+      )}
+      {q.type === 'rating' && (
+        <div className="mt-1 flex items-center gap-2">
+          <label className="text-[11px] font-bold text-slate-600">척도 최댓값</label>
+          <Input size="sm" type="number" className="w-20" value={String(q.scale || 5)}
+            onChange={e => onChange({ scale: Math.max(2, Math.min(10, Number(e.target.value) || 5)) })} />
+        </div>
+      )}
+      <label className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+        <input type="checkbox" checked={q.required} onChange={e => onChange({ required: e.target.checked })} />
+        필수 응답
+      </label>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// Results panel
 // ───────────────────────────────────────────────────────────
 interface ResultsPanelProps {
   data: { survey: any; responses: any[] };
@@ -610,7 +764,6 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
   const questions: Question[] = survey.survey_config.questions || [];
   const total = responses.length;
 
-  // 집계 — 단일/다중/만족도만 그래프, 텍스트류는 응답 수만
   const aggregate = (q: Question) => {
     if (q.type === 'single' || q.type === 'multi') {
       const counts: Record<string, number> = {};
@@ -638,7 +791,6 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
       });
       return { kind: 'rating' as const, counts, answered, avg: answered ? sum / answered : 0, scale };
     }
-    // text-like
     const answered = responses.filter(r => {
       const v = r.answers[q.id];
       return v !== undefined && v !== null && v !== '' && !(typeof v === 'object' && !v.address && !v.zonecode);
@@ -662,21 +814,16 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
               CSV 다운로드
             </Button>
           </Tooltip>
-          <Tooltip content="결과 패널 닫기" delay={200}>
-            <Button size="sm" variant="light" isIconOnly onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </Tooltip>
+          <Button size="sm" variant="light" isIconOnly onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
       </div>
 
-      {/* 탭 헤더 */}
       <div className="px-5 pt-3 border-b border-slate-100">
         <div className="flex gap-1">
           {[
-            { k: 'summary', label: '통계', tip: '응답 수 / 질문 수 / 선택지·만족도 분포 그래프' },
-            { k: 'byQuestion', label: '문항별 응답', tip: '질문 한 개에 대한 모든 응답을 한 번에 보기' },
-            { k: 'individual', label: '개별 응답', tip: '응답자 1명의 전체 답변을 한 페이지로 보기' },
+            { k: 'summary', label: '통계', tip: '응답 분포 그래프' },
+            { k: 'byQuestion', label: '문항별 응답', tip: '질문별 전체 답변 목록' },
+            { k: 'individual', label: '개별 응답', tip: '응답자 1명씩 순서 보기' },
           ].map(t => (
             <Tooltip key={t.k} content={t.tip} delay={200}>
               <button
@@ -698,7 +845,6 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
         <div className="text-center py-16 text-xs text-slate-400">아직 응답이 없습니다.</div>
       ) : (
         <div className="p-5 max-h-[640px] overflow-y-auto">
-          {/* === 통계 탭 === */}
           {tab === 'summary' && (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3 mb-4">
@@ -725,9 +871,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                       <div className="font-bold text-slate-800 text-sm">{qi + 1}. {q.label}</div>
                       <span className="text-[10px] text-slate-400 font-bold">응답 {agg.answered}건</span>
                     </div>
-                    {agg.kind === 'choice' && (
-                      <ChoiceBars counts={agg.counts} total={agg.answered} />
-                    )}
+                    {agg.kind === 'choice' && <ChoiceBars counts={agg.counts} total={agg.answered} />}
                     {agg.kind === 'rating' && (
                       <div>
                         <div className="text-[11px] text-slate-500 mb-2">
@@ -740,7 +884,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                       </div>
                     )}
                     {agg.kind === 'text' && (
-                      <p className="text-[11px] text-slate-400">텍스트 응답은 "문항별 응답" 탭에서 전체를 확인하세요.</p>
+                      <p className="text-[11px] text-slate-400">텍스트 응답은 "문항별 응답" 탭에서 확인하세요.</p>
                     )}
                   </div>
                 );
@@ -748,7 +892,6 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
             </div>
           )}
 
-          {/* === 문항별 응답 탭 === */}
           {tab === 'byQuestion' && (
             <div className="space-y-4">
               {questions.map((q, qi) => (
@@ -773,20 +916,15 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
             </div>
           )}
 
-          {/* === 개별 응답 탭 === */}
           {tab === 'individual' && current && (
             <div>
               <div className="flex items-center justify-between mb-4 bg-slate-50 rounded-2xl p-3">
-                <Button size="sm" variant="flat" isDisabled={idx <= 0} onClick={() => setIdx(Math.max(0, idx - 1))}>
-                  ← 이전
-                </Button>
+                <Button size="sm" variant="flat" isDisabled={idx <= 0} onClick={() => setIdx(Math.max(0, idx - 1))}>← 이전</Button>
                 <div className="text-center">
                   <div className="text-sm font-bold text-slate-800">응답 #{idx + 1} / {total}</div>
                   <div className="text-[10px] text-slate-400 mt-0.5">제출: {formatDate(current.submitted_at)}</div>
                 </div>
-                <Button size="sm" variant="flat" isDisabled={idx >= total - 1} onClick={() => setIdx(Math.min(total - 1, idx + 1))}>
-                  다음 →
-                </Button>
+                <Button size="sm" variant="flat" isDisabled={idx >= total - 1} onClick={() => setIdx(Math.min(total - 1, idx + 1))}>다음 →</Button>
               </div>
               <div className="space-y-3">
                 {questions.map((q, qi) => {

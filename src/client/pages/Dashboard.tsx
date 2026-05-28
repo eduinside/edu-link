@@ -3239,20 +3239,38 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                       <span className="text-slate-800 font-semibold text-right break-words max-w-[240px]">{link.title}</span>
                     </div>
                   )}
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-slate-400 font-bold flex-shrink-0">원본 주소</span>
-                    <a
-                      href={link.original_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
-                    >
-                      {link.original_url}
-                    </a>
-                  </div>
+                  {/* 설문은 원본 주소 행 생략 */}
+                  {(link as any).kind !== 'survey' && link.original_url && (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-slate-400 font-bold flex-shrink-0">원본 주소</span>
+                      <a
+                        href={link.original_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                      >
+                        {link.original_url}
+                      </a>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
-                    <span className="text-slate-400 font-bold">누적 클릭</span>
-                    <span className="text-slate-800 font-extrabold text-base">{link.click_count ?? 0}<span className="text-xs font-normal text-slate-400 ml-1">회</span></span>
+                    {(link as any).kind === 'survey' ? (
+                      <>
+                        <span className="text-slate-400 font-bold">누적 응답</span>
+                        <span className="text-slate-800 font-extrabold text-base">
+                          {(link as any).response_count ?? 0}
+                          <span className="text-xs font-normal text-slate-400 ml-1">건</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-slate-400 font-bold">누적 클릭</span>
+                        <span className="text-slate-800 font-extrabold text-base">
+                          {link.click_count ?? 0}
+                          <span className="text-xs font-normal text-slate-400 ml-1">회</span>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1775,7 +1775,9 @@ app.get('/:slug', async (c) => {
                 // 비활성 링크 처리
                 if (urlRecord.is_active === 0) {
                     if (urlRecord.kind === 'survey') {
-                        return c.html(getSurveyClosedHtml('설문이 종료되었습니다.'));
+                        let inactiveMsg = '';
+                        try { inactiveMsg = JSON.parse(urlRecord.survey_config || '{}').inactive_message || ''; } catch {}
+                        return c.html(getSurveyClosedHtml('설문이 종료되었습니다.', inactiveMsg || undefined));
                     }
                     return c.redirect('/');
                 }
@@ -1792,7 +1794,9 @@ app.get('/:slug', async (c) => {
                             })());
                         } catch {}
                         if (urlRecord.kind === 'survey') {
-                            return c.html(getSurveyClosedHtml('설문 응답 기간이 종료되었습니다.'));
+                            let inactiveMsg2 = '';
+                            try { inactiveMsg2 = JSON.parse(urlRecord.survey_config || '{}').inactive_message || ''; } catch {}
+                            return c.html(getSurveyClosedHtml('설문 응답 기간이 종료되었습니다.', inactiveMsg2 || undefined));
                         }
                         return c.redirect('/');
                     }
@@ -1801,7 +1805,9 @@ app.get('/:slug', async (c) => {
                 // 설문지 처리 (단축 링크 패턴 공유, 사용자 접속 결과만 다름)
                 if (urlRecord.kind === 'survey') {
                     if (urlRecord.response_limit && (urlRecord.response_count ?? 0) >= urlRecord.response_limit) {
-                        return c.html(getSurveyClosedHtml('설문이 마감되었습니다. (최대 응답 수에 도달)'));
+                        let inactiveMsg3 = '';
+                        try { inactiveMsg3 = JSON.parse(urlRecord.survey_config || '{}').inactive_message || ''; } catch {}
+                        return c.html(getSurveyClosedHtml('설문이 마감되었습니다. (최대 응답 수에 도달)', inactiveMsg3 || undefined));
                     }
                     // 비밀번호 체크 (쿠키 매칭)
                     if (urlRecord.password) {
@@ -2068,8 +2074,10 @@ function getPasswordPageHtml(slug: string): string {
 </html>`;
 }
 
-function getSurveyClosedHtml(message: string): string {
-    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>설문 종료 · 에듀링크</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.06)}h2{font-size:18px;color:#1e293b;margin-bottom:12px}p{font-size:13px;color:#64748b;line-height:1.7}</style></head><body><div class="card"><h2>📋 ${message.replace(/</g,'&lt;')}</h2><p>관리자에게 문의해 주세요.</p></div></body></html>`;
+function getSurveyClosedHtml(message: string, customMsg?: string): string {
+  const displayMsg = customMsg || message;
+  const escMsg = displayMsg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>설문 종료 · 에듀링크</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:480px;width:100%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.06)}h2{font-size:18px;color:#1e293b;margin-bottom:12px}p{font-size:13px;color:#64748b;line-height:1.8;white-space:pre-wrap}a{color:#4f46e5;text-decoration:underline}</style></head><body><div class="card"><h2>📋 ${escMsg}</h2><p>관리자에게 문의해 주세요.</p></div></body></html>`;
 }
 
 function getSurveyPageHtml(urlId: number, slug: string, configJson: string): string {
@@ -2090,10 +2098,15 @@ body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;padding
 .logo img{width:28px;height:28px;border-radius:6px}
 .logo span{font-size:16px;font-weight:900;background:linear-gradient(to right,#2563eb,#4f46e5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 h1{font-size:22px;font-weight:900;color:#1e293b;margin-bottom:12px;text-align:center}
-.intro,.outro{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
+.intro-text,.outro-text{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
+.intro-text a,.outro-text a{color:#4f46e5;text-decoration:underline}
 .q-block{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.04);border:1px solid #f1f5f9}
-.q-label{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.q-label{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:6px;display:flex;align-items:baseline;gap:6px}
+.q-desc{font-size:12px;color:#64748b;line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
+.q-desc a{color:#4f46e5;text-decoration:underline}
 .req{color:#ef4444;font-size:12px}
+.q-media{width:100%;border-radius:12px;margin-bottom:12px;display:block}
+.q-media-img{max-width:100%;border-radius:12px;margin-bottom:12px;display:block}
 input[type=text],input[type=tel],input[type=email],input[type=number],textarea{width:100%;padding:12px 14px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;outline:none;background:#f8fafc;color:#1e293b;font-family:inherit}
 textarea{min-height:96px;resize:vertical}
 input:focus,textarea:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0 4px rgba(79,70,229,.1)}
@@ -2113,28 +2126,49 @@ input:focus,textarea:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0
 .error{color:#ef4444;font-size:12px;margin-top:8px;display:none}
 .error.show{display:block}
 .hidden{display:none}
+.outro-btns{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.btn-secondary{padding:12px 24px;border:2px solid #e2e8f0;background:#fff;color:#475569;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-secondary:hover{border-color:#4f46e5;color:#4f46e5}
+.already-card{background:#fff;border-radius:24px;padding:32px 28px;box-shadow:0 20px 40px rgba(0,0,0,.06);margin-bottom:20px;text-align:center}
+.already-card h2{font-size:18px;font-weight:900;color:#1e293b;margin-bottom:10px}
+.already-card p{font-size:13px;color:#64748b;line-height:1.7;margin-bottom:16px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="logo"><img src="/edulink_logo.png" alt=""><span>에듀링크 설문</span></div>
 
+  <!-- 이미 응답한 브라우저 안내 -->
+  <div id="alreadyScreen" class="already-card hidden">
+    <h2>✅ 이미 응답하셨습니다</h2>
+    <p>이 브라우저에서 이미 응답을 제출했습니다.<br>추가로 응답하려면 아래 버튼을 누르세요.</p>
+    <div class="outro-btns">
+      <button class="submit-btn" id="ignoreAlreadyBtn" style="width:auto;padding:12px 28px">추가 응답하기</button>
+    </div>
+  </div>
+
   <div id="introScreen" class="card">
     <h1 id="introTitle"></h1>
-    <div class="intro" id="introText"></div>
+    <div class="intro-text" id="introText"></div>
     <div style="text-align:center"><button class="start-btn" id="startBtn">설문 시작 →</button></div>
   </div>
 
   <div id="formScreen" class="hidden">
     <div class="card"><h1 id="formTitle"></h1></div>
     <div id="questions"></div>
-    <button class="submit-btn" id="submitBtn">응답 제출</button>
-    <div class="error" id="errorMsg"></div>
+    <div class="card" style="padding:16px">
+      <button class="submit-btn" id="submitBtn">응답 제출</button>
+      <div class="error" id="errorMsg"></div>
+    </div>
   </div>
 
   <div id="outroScreen" class="card hidden">
     <h1>✅ 응답이 제출되었습니다</h1>
-    <div class="outro" id="outroText" style="margin-top:16px"></div>
+    <div class="outro-text" id="outroText" style="margin-top:16px"></div>
+    <div class="outro-btns">
+      <button class="btn-secondary" id="resubmitBtn">추가 응답하기</button>
+      <button class="btn-secondary" id="editBtn">다시 작성하기</button>
+    </div>
   </div>
 </div>
 
@@ -2142,20 +2176,77 @@ input:focus,textarea:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0
 const SLUG = ${JSON.stringify(slug)};
 const CONFIG = ${configJson};
 const questions = CONFIG.questions || [];
+const BROWSER_KEY = 'survey_resp_' + SLUG;
+
 const introScreen = document.getElementById('introScreen');
-const formScreen = document.getElementById('formScreen');
+const formScreen  = document.getElementById('formScreen');
 const outroScreen = document.getElementById('outroScreen');
-const errorMsg = document.getElementById('errorMsg');
+const alreadyScreen = document.getElementById('alreadyScreen');
+const errorMsg    = document.getElementById('errorMsg');
 
+// ── URL 자동 링크화 ──────────────────────────────────────
+function linkify(text) {
+  const parts = text.split(/(https?:\\/\\/[^\\s]+)/g);
+  return parts.map((p, i) => {
+    if (i % 2 === 1) {
+      const e = p.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      return '<a href="' + e + '" target="_blank" rel="noopener noreferrer">' + e + '</a>';
+    }
+    return p.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  }).join('');
+}
+
+// ── 미디어 임베드 ─────────────────────────────────────────
+function renderMedia(url) {
+  if (!url) return '';
+  const ytMatch = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([\\w-]{11})/);
+  if (ytMatch) {
+    return '<iframe src="https://www.youtube.com/embed/' + ytMatch[1] + '" class="q-media" style="aspect-ratio:16/9;border:none" allowfullscreen loading="lazy"></iframe>';
+  }
+  if (/\\.(mp4|webm|ogg)(\\?|$)/i.test(url)) {
+    const e = url.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    return '<video src="' + e + '" controls class="q-media"></video>';
+  }
+  if (/\\.(jpe?g|png|gif|webp|svg)(\\?|$)/i.test(url)) {
+    const e = url.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    return '<img src="' + e + '" class="q-media-img" loading="lazy">';
+  }
+  return '';
+}
+
+// ── 브라우저 1회 제한 체크 ───────────────────────────────
+if (CONFIG.one_response_per_browser && localStorage.getItem(BROWSER_KEY)) {
+  introScreen.classList.add('hidden');
+  alreadyScreen.classList.remove('hidden');
+}
+document.getElementById('ignoreAlreadyBtn').addEventListener('click', () => {
+  alreadyScreen.classList.add('hidden');
+  introScreen.classList.remove('hidden');
+});
+
+// ── intro/outro 텍스트 (URL 자동 링크) ──────────────────
 document.getElementById('introTitle').textContent = CONFIG.title || '설문 응답';
-document.getElementById('formTitle').textContent = CONFIG.title || '설문 응답';
-document.getElementById('introText').textContent = CONFIG.intro || '아래 설문에 응답해 주세요.';
-document.getElementById('outroText').textContent = CONFIG.outro || '응답해 주셔서 감사합니다.';
+document.getElementById('formTitle').textContent  = CONFIG.title || '설문 응답';
+document.getElementById('introText').innerHTML  = linkify(CONFIG.intro  || '아래 설문에 응답해 주세요.');
+document.getElementById('outroText').innerHTML  = linkify(CONFIG.outro  || '응답해 주셔서 감사합니다.');
 
+// ── 설문 시작 ────────────────────────────────────────────
 document.getElementById('startBtn').addEventListener('click', () => {
   introScreen.classList.add('hidden');
   formScreen.classList.remove('hidden');
   renderQuestions();
+});
+
+// ── 추가 응답 / 다시 작성하기 ───────────────────────────
+document.getElementById('resubmitBtn').addEventListener('click', () => {
+  window.location.reload();
+});
+document.getElementById('editBtn').addEventListener('click', () => {
+  outroScreen.classList.add('hidden');
+  formScreen.classList.remove('hidden');
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitBtn').textContent = '응답 제출';
+  window.scrollTo({top:0,behavior:'smooth'});
 });
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);}
@@ -2168,6 +2259,12 @@ function renderQuestions(){
     block.className = 'q-block';
     block.dataset.qid = q.id;
     const reqHtml = q.required ? '<span class="req">*</span>' : '';
+
+    // 미디어 임베드
+    const mediaHtml = q.media_url ? renderMedia(q.media_url) : '';
+    // 문항 안내문 (URL 자동 링크)
+    const descHtml = q.description ? '<div class="q-desc">' + linkify(q.description) + '</div>' : '';
+
     let body = '';
     switch(q.type){
       case 'short':
@@ -2175,9 +2272,9 @@ function renderQuestions(){
       case 'long':
         body = '<textarea data-input></textarea>'; break;
       case 'single':
-        body = (q.options||[]).map((o,i)=>'<label class="choice"><input type="radio" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
+        body = (q.options||[]).map(o=>'<label class="choice"><input type="radio" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
       case 'multi':
-        body = (q.options||[]).map((o,i)=>'<label class="choice"><input type="checkbox" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
+        body = (q.options||[]).map(o=>'<label class="choice"><input type="checkbox" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
       case 'rating': {
         const scale = q.scale || 5;
         body = '<div class="rating">';
@@ -2196,7 +2293,10 @@ function renderQuestions(){
         break;
       default: body = '<input type="text" data-input>';
     }
-    block.innerHTML = '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>' + body;
+    block.innerHTML = mediaHtml
+      + '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
+      + descHtml
+      + body;
     container.appendChild(block);
 
     if(q.type === 'rating'){
@@ -2266,8 +2366,9 @@ document.getElementById('submitBtn').addEventListener('click', async ()=>{
         || (Array.isArray(v) && v.length === 0)
         || (typeof v === 'object' && !Array.isArray(v) && !v.address);
       if(empty){
-        errorMsg.textContent = '필수 항목 누락: ' + q.label;
+        errorMsg.textContent = '필수 항목을 입력해 주세요: ' + q.label;
         errorMsg.classList.add('show');
+        errorMsg.scrollIntoView({behavior:'smooth',block:'center'});
         return;
       }
     }
@@ -2282,6 +2383,9 @@ document.getElementById('submitBtn').addEventListener('click', async ()=>{
     });
     const data = await res.json();
     if(data.success){
+      if(CONFIG.one_response_per_browser) {
+        try { localStorage.setItem(BROWSER_KEY, '1'); } catch(e){}
+      }
       formScreen.classList.add('hidden');
       outroScreen.classList.remove('hidden');
       window.scrollTo({top:0,behavior:'smooth'});
