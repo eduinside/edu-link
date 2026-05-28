@@ -6,7 +6,7 @@ import {
   Download, QrCode, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Settings
 } from 'lucide-react';
 
-type QuestionType = 'short' | 'long' | 'single' | 'multi' | 'rating' | 'phone' | 'email' | 'address';
+type QuestionType = 'short' | 'long' | 'single' | 'multi' | 'rating' | 'phone' | 'email' | 'address' | 'media';
 type SurveyTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'sky';
 
 interface Question {
@@ -69,6 +69,7 @@ const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
   phone: '휴대전화',
   email: '이메일',
   address: '주소(한국)',
+  media: '미디어',
 };
 
 const QUESTION_TYPE_TOOLTIP: Record<QuestionType, string> = {
@@ -80,6 +81,7 @@ const QUESTION_TYPE_TOOLTIP: Record<QuestionType, string> = {
   phone: '휴대전화 번호 — 자동 하이픈 입력',
   email: '이메일 주소 — 형식 검증',
   address: '카카오 우편번호 검색 — 도로명/지번 + 상세주소',
+  media: 'YouTube·이미지·동영상 URL을 설문에 삽입 (응답 불필요)',
 };
 
 const DEFAULT_CONFIG: SurveyConfig = {
@@ -215,7 +217,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
   };
 
   const addQuestion = (type: QuestionType) => {
-    const q: Question = { id: genQid(), type, label: '', required: nextRequired };
+    const q: Question = { id: genQid(), type, label: '', required: type !== 'media' ? nextRequired : false };
     if (type === 'single' || type === 'multi') q.options = ['선택 1', '선택 2'];
     if (type === 'rating') q.scale = 5;
     setFormQuestions([...formQuestions, q]);
@@ -241,7 +243,8 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     if (!formTitle.trim()) { setError('설문 제목을 입력해 주세요.'); return; }
     if (formQuestions.length === 0) { setError('최소 1개 이상의 질문을 추가해 주세요.'); return; }
     for (const q of formQuestions) {
-      if (!q.label.trim()) { setError('모든 질문에 라벨을 입력해 주세요.'); return; }
+      if (q.type !== 'media' && !q.label.trim()) { setError('모든 질문에 라벨을 입력해 주세요.'); return; }
+      if (q.type === 'media' && !q.media_url?.trim()) { setError('미디어 항목에 URL을 입력해 주세요.'); return; }
       if ((q.type === 'single' || q.type === 'multi') && (!q.options || q.options.filter(o => o.trim()).length < 2)) {
         setError('선택지가 2개 이상 필요한 질문이 있습니다.'); return;
       }
@@ -767,52 +770,69 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
         <Button size="sm" variant="light" color="danger" isIconOnly className="w-6 h-6 min-w-0" onClick={onRemove}><Trash2 className="w-3 h-3" /></Button>
       </div>
 
-      <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2 w-full" />
-
-      {/* 미디어 URL — 항상 표시 */}
-      <div className="mb-2">
-        <input
-          type="url"
-          className="w-full border border-slate-200 rounded-lg p-2 text-[11px] bg-white"
-          placeholder="🎬 YouTube·이미지·동영상 URL (선택)"
-          value={q.media_url || ''}
-          onChange={e => onChange({ media_url: e.target.value })}
-        />
-      </div>
-
-      {showDesc && (
-        <div className="mb-2 p-2 bg-white rounded-lg border border-slate-100">
-          <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">문항 안내문 <span className="font-normal text-slate-400">(URL 자동 링크)</span></label>
-          <textarea
-            className="w-full border border-slate-200 rounded-lg p-2 text-[11px] resize-y"
-            rows={2}
-            placeholder="이 문항에 대한 추가 안내를 입력하세요."
-            value={q.description || ''}
-            onChange={e => onChange({ description: e.target.value })}
+      {q.type === 'media' ? (
+        /* 미디어 전용 UI */
+        <div className="space-y-1.5">
+          <input
+            type="url"
+            className="w-full border-2 border-indigo-200 rounded-lg p-2.5 text-[11px] bg-white focus:border-indigo-400 outline-none"
+            placeholder="🎬 YouTube·이미지·동영상 URL을 입력하세요 *"
+            value={q.media_url || ''}
+            onChange={e => onChange({ media_url: e.target.value })}
+            required
           />
+          <p className="text-[10px] text-slate-400">설문 화면에서 미디어만 표시됩니다. 응답 입력칸은 없습니다.</p>
         </div>
-      )}
+      ) : (
+        <>
+          <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2 w-full" />
 
-      {(q.type === 'single' || q.type === 'multi') && (
-        <textarea
-          className="mt-1 w-full border border-slate-200 rounded-lg p-2 text-[11px] font-mono"
-          rows={3}
-          placeholder="선택지 한 줄에 하나씩"
-          value={(q.options || []).join('\n')}
-          onChange={e => onChange({ options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-        />
+          {/* 미디어 URL — 항상 표시 */}
+          <div className="mb-2">
+            <input
+              type="url"
+              className="w-full border border-slate-200 rounded-lg p-2 text-[11px] bg-white"
+              placeholder="🎬 YouTube·이미지·동영상 URL (선택)"
+              value={q.media_url || ''}
+              onChange={e => onChange({ media_url: e.target.value })}
+            />
+          </div>
+
+          {showDesc && (
+            <div className="mb-2 p-2 bg-white rounded-lg border border-slate-100">
+              <label className="text-[10px] font-bold text-slate-500 mb-0.5 block">문항 안내문 <span className="font-normal text-slate-400">(URL 자동 링크)</span></label>
+              <textarea
+                className="w-full border border-slate-200 rounded-lg p-2 text-[11px] resize-y"
+                rows={2}
+                placeholder="이 문항에 대한 추가 안내를 입력하세요."
+                value={q.description || ''}
+                onChange={e => onChange({ description: e.target.value })}
+              />
+            </div>
+          )}
+
+          {(q.type === 'single' || q.type === 'multi') && (
+            <textarea
+              className="mt-1 w-full border border-slate-200 rounded-lg p-2 text-[11px] font-mono"
+              rows={3}
+              placeholder="선택지 한 줄에 하나씩"
+              value={(q.options || []).join('\n')}
+              onChange={e => onChange({ options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+            />
+          )}
+          {q.type === 'rating' && (
+            <div className="mt-1 flex items-center gap-2">
+              <label className="text-[11px] font-bold text-slate-600">척도 최댓값</label>
+              <Input size="sm" type="number" className="w-20" value={String(q.scale || 5)}
+                onChange={e => onChange({ scale: Math.max(2, Math.min(10, Number(e.target.value) || 5)) })} />
+            </div>
+          )}
+          <label className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+            <input type="checkbox" checked={q.required} onChange={e => onChange({ required: e.target.checked })} />
+            필수 응답
+          </label>
+        </>
       )}
-      {q.type === 'rating' && (
-        <div className="mt-1 flex items-center gap-2">
-          <label className="text-[11px] font-bold text-slate-600">척도 최댓값</label>
-          <Input size="sm" type="number" className="w-20" value={String(q.scale || 5)}
-            onChange={e => onChange({ scale: Math.max(2, Math.min(10, Number(e.target.value) || 5)) })} />
-        </div>
-      )}
-      <label className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
-        <input type="checkbox" checked={q.required} onChange={e => onChange({ required: e.target.checked })} />
-        필수 응답
-      </label>
     </div>
   );
 }

@@ -1704,6 +1704,7 @@ app.post('/survey/:slug/submit', async (c) => {
 
         const config = JSON.parse(row.survey_config) as { questions: Array<{ id: string; label: string; type: string; required?: boolean }> };
         for (const q of (config.questions || [])) {
+            if (q.type === 'media') continue;
             if (q.required) {
                 const v = answers[q.id];
                 const empty = v === undefined || v === null || v === ''
@@ -2316,9 +2317,17 @@ function renderQuestions(){
              + '<div class="addr-row"><input type="text" data-input-addr placeholder="기본 주소" readonly></div>'
              + '<div class="addr-row"><input type="text" data-input-detail placeholder="상세 주소"></div>';
         break;
+      case 'media': body = ''; break;
       default: body = '<input type="text" data-input>';
     }
-    // innerHTML 먼저, 그 뒤 미디어 요소를 맨 앞에 삽입
+    // 미디어 전용 항목: 미디어 요소만 표시, 라벨/응답칸 없음
+    if (q.type === 'media') {
+      if (mediaEl) block.appendChild(mediaEl);
+      block.dataset.mediaOnly = '1';
+      container.appendChild(block);
+      return;
+    }
+    // 일반 항목: innerHTML 먼저, 그 뒤 미디어 요소를 맨 앞에 삽입
     block.innerHTML = '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
       + descHtml
       + body;
@@ -2370,7 +2379,7 @@ function collectAnswers(){
   document.querySelectorAll('.q-block').forEach(block=>{
     const qid = block.dataset.qid;
     const q = questions.find(x=>x.id===qid);
-    if(!q) return;
+    if(!q || q.type === 'media') return;
     if(q.type === 'single'){
       const sel = block.querySelector('input[type=radio]:checked');
       out[qid] = sel ? sel.value : '';
@@ -2395,6 +2404,7 @@ function collectAnswers(){
 document.getElementById('submitBtn').addEventListener('click', async ()=>{
   const answers = collectAnswers();
   for(const q of questions){
+    if(q.type === 'media') continue;
     if(q.required){
       const v = answers[q.id];
       const empty = v === undefined || v === null || v === ''
