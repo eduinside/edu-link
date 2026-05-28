@@ -1437,7 +1437,7 @@ export default function Dashboard() {
                                     {/* 작업 버튼 */}
                                     <td className="p-3 pr-4 align-middle">
                                       <div className="flex items-center justify-end gap-1">
-                                        <Tooltip content={isCopied ? '복사됨!' : '주소 복사'}>
+                                        <Tooltip content={isCopied ? '복사됨!' : '단축주소 클립보드에 복사'} delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -1450,7 +1450,7 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
-                                        <Tooltip content="링크 열기">
+                                        <Tooltip content="새 탭에서 단축주소 열기" delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -1463,7 +1463,7 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
-                                        <Tooltip content="QR 코드">
+                                        <Tooltip content="QR 코드 보기 및 PNG 저장" delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -1476,7 +1476,7 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
-                                        <Tooltip content="통계">
+                                        <Tooltip content="접속 통계 보기 (최근 30일 클릭 차트)" delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -1489,7 +1489,7 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
-                                        <Tooltip content="편집">
+                                        <Tooltip content="제목·URL·비밀번호·만료일 편집" delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -1503,7 +1503,7 @@ export default function Dashboard() {
                                           </Button>
                                         </Tooltip>
 
-                                        <Tooltip content="삭제">
+                                        <Tooltip content="단축주소 영구 삭제" delay={200}>
                                           <Button
                                             size="sm"
                                             variant="flat"
@@ -2005,11 +2005,13 @@ export default function Dashboard() {
                                   {statsDrawerLink.custom_slug && <span className="text-slate-400 font-normal"> · /{statsDrawerLink.custom_slug}</span>}
                                 </p>
                               </div>
-                              <Button
-                                size="sm" variant="light" isIconOnly
-                                onClick={() => setStatsDrawerLink(null)}
-                                className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
-                              >✕</Button>
+                              <Tooltip content="통계 패널 닫기" delay={300}>
+                                <Button
+                                  size="sm" variant="light" isIconOnly
+                                  onClick={() => setStatsDrawerLink(null)}
+                                  className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                                >✕</Button>
+                              </Tooltip>
                             </div>
 
                             {/* 컨텐츠 */}
@@ -2700,18 +2702,20 @@ export default function Dashboard() {
                                 {notice.title}
                               </h4>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="light"
-                              isIconOnly
-                              className="w-6 h-6 min-w-0 p-0 rounded-full"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedNoticeId(isExpanded ? null : notice.id);
-                              }}
-                            >
-                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                            </Button>
+                            <Tooltip content={isExpanded ? '접기' : '본문 펼치기'} delay={300}>
+                              <Button
+                                size="sm"
+                                variant="light"
+                                isIconOnly
+                                className="w-6 h-6 min-w-0 p-0 rounded-full"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedNoticeId(isExpanded ? null : notice.id);
+                                }}
+                              >
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                              </Button>
+                            </Tooltip>
                           </div>
 
                           {isExpanded && (
@@ -2838,8 +2842,12 @@ export default function Dashboard() {
                                   <td className="p-3.5 text-center">
                                     {r.status === 'pending' ? (
                                       <div className="flex items-center justify-center gap-1">
-                                        <Button size="sm" color="success" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'approve')}>승인</Button>
-                                        <Button size="sm" color="danger" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'reject')}>거절</Button>
+                                        <Tooltip content={`${r.name}의 등급을 ${r.current_level}단계 → ${r.requested_level}단계로 승급`} delay={200}>
+                                          <Button size="sm" color="success" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'approve')}>승인</Button>
+                                        </Tooltip>
+                                        <Tooltip content="요청을 거절하고 현재 등급 유지" delay={200}>
+                                          <Button size="sm" color="danger" variant="flat" className="h-7 px-2 text-[10px] font-bold rounded-lg" isLoading={isProcessingRequest === r.id} onClick={() => handleProcessUpgradeRequest(r.id, 'reject')}>거절</Button>
+                                        </Tooltip>
                                       </div>
                                     ) : (
                                       <span className="text-[10px] text-slate-300 font-bold">처리 완료</span>
@@ -3011,25 +3019,29 @@ export default function Dashboard() {
                                   <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{n.content}</p>
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  <Button
-                                    size="sm" variant="flat" color="primary" isIconOnly
-                                    className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                    onClick={() => {
-                                      setEditingNotice(n);
-                                      setEditNoticeTitle(n.title);
-                                      setEditNoticeContent(n.content);
-                                      setEditNoticePinned(n.is_pinned === 1);
-                                    }}
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="sm" variant="flat" color="danger" isIconOnly
-                                    className="rounded-lg w-8 h-8 min-w-0 p-0"
-                                    onClick={() => handleDeleteNotice(n.id)}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
+                                  <Tooltip content="공지사항 편집" delay={200}>
+                                    <Button
+                                      size="sm" variant="flat" color="primary" isIconOnly
+                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
+                                      onClick={() => {
+                                        setEditingNotice(n);
+                                        setEditNoticeTitle(n.title);
+                                        setEditNoticeContent(n.content);
+                                        setEditNoticePinned(n.is_pinned === 1);
+                                      }}
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip content="공지사항 삭제" delay={200}>
+                                    <Button
+                                      size="sm" variant="flat" color="danger" isIconOnly
+                                      className="rounded-lg w-8 h-8 min-w-0 p-0"
+                                      onClick={() => handleDeleteNotice(n.id)}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </Tooltip>
                                 </div>
                               </div>
                             </CardContent>
@@ -3071,9 +3083,11 @@ export default function Dashboard() {
                           ) : adminDomains.map((d) => (
                             <div key={d.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl">
                               <span className="font-mono font-bold text-slate-700">{d.domain}</span>
-                              <Button size="sm" variant="light" color="danger" isIconOnly className="w-5 h-5 min-w-0 p-0 rounded-md" onClick={() => handleDeleteDomain(d.id)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                              <Tooltip content="도메인 삭제" delay={200}>
+                                <Button size="sm" variant="light" color="danger" isIconOnly className="w-5 h-5 min-w-0 p-0 rounded-md" onClick={() => handleDeleteDomain(d.id)}>
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </Tooltip>
                             </div>
                           ))}
                         </div>
@@ -3134,16 +3148,18 @@ export default function Dashboard() {
 
               <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-2xl flex items-center justify-between font-mono font-bold text-slate-800 break-all select-all">
                 <span>{generatedKeyResult}</span>
-                <Button
-                  size="sm"
-                  color={keyResultCopied ? 'success' : 'primary'}
-                  variant={keyResultCopied ? 'flat' : 'light'}
-                  onClick={copyGeneratedKey}
-                  isIconOnly
-                  className="rounded-lg ml-2 flex-shrink-0"
-                >
-                  {keyResultCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                </Button>
+                <Tooltip content={keyResultCopied ? '복사됨!' : 'API Key 클립보드에 복사'} delay={200}>
+                  <Button
+                    size="sm"
+                    color={keyResultCopied ? 'success' : 'primary'}
+                    variant={keyResultCopied ? 'flat' : 'light'}
+                    onClick={copyGeneratedKey}
+                    isIconOnly
+                    className="rounded-lg ml-2 flex-shrink-0"
+                  >
+                    {keyResultCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </Tooltip>
               </div>
 
               <Button
@@ -3324,11 +3340,13 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                     {link.custom_slug && <span className="text-slate-400 font-normal"> · /{link.custom_slug}</span>}
                   </p>
                 </div>
-                <Button
-                  size="sm" variant="light" isIconOnly
-                  onClick={onClose}
-                  className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
-                >✕</Button>
+                <Tooltip content="QR 패널 닫기" delay={300}>
+                  <Button
+                    size="sm" variant="light" isIconOnly
+                    onClick={onClose}
+                    className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                  >✕</Button>
+                </Tooltip>
               </div>
 
               {/* 컨텐츠 */}
