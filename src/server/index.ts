@@ -142,10 +142,10 @@ app.post('/api/verify-password', async (c) => {
         }
 
         const urlRecord = await c.env.DB.prepare(
-            "SELECT original_url, password, expires_at, is_active FROM urls WHERE slug = ?"
+            "SELECT id, original_url, password, expires_at, is_active, kind FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
         )
-        .bind(slug)
-        .first<{ original_url: string; password: string | null; expires_at: string | null; is_active: number }>();
+        .bind(slug, slug, slug)
+        .first<{ id: number; original_url: string; password: string | null; expires_at: string | null; is_active: number; kind: string }>();
 
         if (!urlRecord || urlRecord.is_active === 0) {
             return c.json({ success: false, error: '議댁옱?섏? ?딄굅??鍮꾪솢?깊솕??留곹겕?낅땲??' }, 404);
@@ -165,7 +165,14 @@ app.post('/api/verify-password', async (c) => {
         }
 
         if (urlRecord.password !== password) {
-            return c.json({ success: false, error: '鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆뒿?덈떎.' }, 401);
+            return c.json({ success: false, error: "비밀번호가 일치하지 않습니다." }, 401);
+        }
+
+        if (urlRecord.kind === "survey") {
+            setCookie(c, "edulink_survey_" + urlRecord.id, password, {
+                path: "/", secure: true, httpOnly: false, maxAge: 3600, sameSite: "Lax",
+            });
+            return c.json({ success: true, kind: "survey", reload: true });
         }
 
         return c.json({ success: true, original_url: urlRecord.original_url });
@@ -600,9 +607,9 @@ api.get('/links', async (c) => {
     const user = c.get('user');
     try {
         const { results } = await c.env.DB.prepare(
-            `SELECT id, slug, base_slug, custom_slug, original_url, title, description, click_count, is_active, is_public, expires_at, password, created_at, created_by 
-             FROM urls 
-             WHERE user_id = ? 
+            `SELECT id, slug, base_slug, custom_slug, original_url, title, description, click_count, is_active, is_public, expires_at, password, created_at, created_by
+             FROM urls
+             WHERE user_id = ? AND (kind IS NULL OR kind = 'link')
              ORDER BY created_at DESC`
         )
         .bind(user.id)
@@ -610,6 +617,252 @@ api.get('/links', async (c) => {
         return c.json({ success: true, links: results });
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5b. 설문지 목록 조회 (level >= 3)
+api.get('/surveys', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) {
+        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+    }
+    try {
+        const { results } = await c.env.DB.prepare(
+            `SELECT id, slug, base_slug, custom_slug, title, survey_config, response_limit, response_count, is_active, expires_at, password, created_at
+             FROM urls
+             WHERE user_id = ? AND kind = 'survey'
+             ORDER BY created_at DESC`
+        ).bind(user.id).all();
+        return c.json({ success: true, surveys: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5c. 설문지 생성
+api.post('/surveys', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) {
+        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+    }
+    try {
+        const body = await c.req.json();
+        const { title, survey_config, response_limit, expires_at, password } = body;
+        const inputCustomSlug = body.custom_slug ?? body.slug ?? null;
+        if (!title || !String(title).trim()) {
+            return c.json({ success: false, error: '설문 제목이 필요합니다.' }, 400);
+        }
+        if (!survey_config || typeof survey_config !== 'object') {
+            return c.json({ success: false, error: 'survey_config가 필요합니다.' }, 400);
+        }
+        if (password && !/^\d{6}$/.test(password)) {
+            return c.json({ success: false, error: '비밀번호는 숫자 6자리여야 합니다.' }, 400);
+        }
+
+        const reservedSlugs = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
+        const reservedSet = new Set(reservedSlugs.results.map(r => r.slug.toLowerCase()));
+
+        let customSlug: string | null = null;
+        if (inputCustomSlug && String(inputCustomSlug).trim()) {
+            let cs = String(inputCustomSlug).trim();
+            try { cs = decodeURIComponent(cs).normalize('NFC'); } catch { cs = cs.normalize('NFC'); }
+            if (!isValidCustomSlug(cs)) {
+                return c.json({ success: false, error: '슬러그는 4~20자의 영숫자, 한글, 하이픈만 사용할 수 있습니다.' }, 400);
+            }
+            if (reservedSet.has(cs.toLowerCase())) {
+                return c.json({ success: false, error: '사용할 수 없는 예약 슬러그입니다.' }, 400);
+            }
+            const dup = await c.env.DB.prepare(
+                "SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+            ).bind(cs, cs, cs).first();
+            if (dup) return c.json({ success: false, error: '이미 사용 중인 슬러그입니다.' }, 400);
+            customSlug = cs;
+        }
+
+        let baseSlug = '';
+        for (let i = 0; i < 10; i++) {
+            const cand = generateRandomSlug(6);
+            if (reservedSet.has(cand.toLowerCase())) continue;
+            const dup = await c.env.DB.prepare(
+                "SELECT id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+            ).bind(cand, cand, cand).first();
+            if (!dup) { baseSlug = cand; break; }
+        }
+        if (!baseSlug) {
+            return c.json({ success: false, error: '슬러그 생성에 실패했습니다.' }, 500);
+        }
+
+        const limitVal = Number.isFinite(Number(response_limit)) && Number(response_limit) > 0 ? Number(response_limit) : null;
+        const expiration = expires_at ? expires_at : null;
+        const pass = password ? password : null;
+
+        const result = await c.env.DB.prepare(
+            `INSERT INTO urls (slug, base_slug, custom_slug, original_url, title, description, is_public, expires_at, password, user_id, kind, survey_config, response_limit)
+             VALUES (?, ?, ?, '', ?, '', 0, ?, ?, ?, 'survey', ?, ?)`
+        ).bind(baseSlug, baseSlug, customSlug, String(title).trim(), expiration, pass, user.id, JSON.stringify(survey_config), limitVal).run();
+
+        return c.json({
+            success: true,
+            id: result.meta.last_row_id,
+            base_slug: baseSlug,
+            custom_slug: customSlug,
+            slug: customSlug || baseSlug,
+        });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5d. 설문지 수정
+api.patch('/surveys/:id', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) {
+        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+    }
+    const id = c.req.param('id');
+    try {
+        const body = await c.req.json();
+        const { title, survey_config, response_limit, expires_at, password, is_active, custom_slug } = body;
+
+        const row = await c.env.DB.prepare(
+            "SELECT id, base_slug, custom_slug, password, expires_at FROM urls WHERE id = ? AND user_id = ? AND kind = 'survey'"
+        ).bind(id, user.id).first<{ id: number; base_slug: string; custom_slug: string | null; password: string | null; expires_at: string | null }>();
+        if (!row) return c.json({ success: false, error: '설문을 찾을 수 없거나 권한이 없습니다.' }, 404);
+
+        if (password !== undefined && password !== null && password !== '' && !/^\d{6}$/.test(password)) {
+            return c.json({ success: false, error: '비밀번호는 숫자 6자리여야 합니다.' }, 400);
+        }
+
+        let updatedCustomSlug = row.custom_slug;
+        if (custom_slug !== undefined) {
+            if (!custom_slug || String(custom_slug).trim() === '') {
+                updatedCustomSlug = null;
+            } else {
+                let cs = String(custom_slug).trim();
+                try { cs = decodeURIComponent(cs).normalize('NFC'); } catch { cs = cs.normalize('NFC'); }
+                if (cs === row.base_slug) {
+                    updatedCustomSlug = null;
+                } else {
+                    if (!isValidCustomSlug(cs)) {
+                        return c.json({ success: false, error: '슬러그는 4~20자의 영숫자, 한글, 하이픈만 사용할 수 있습니다.' }, 400);
+                    }
+                    const reserved = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
+                    if (new Set(reserved.results.map(r => r.slug.toLowerCase())).has(cs.toLowerCase())) {
+                        return c.json({ success: false, error: '사용할 수 없는 예약 슬러그입니다.' }, 400);
+                    }
+                    const dup = await c.env.DB.prepare(
+                        "SELECT id FROM urls WHERE (base_slug = ? OR custom_slug = ? OR slug = ?) AND id != ?"
+                    ).bind(cs, cs, cs, id).first();
+                    if (dup) return c.json({ success: false, error: '이미 사용 중인 슬러그입니다.' }, 400);
+                    updatedCustomSlug = cs;
+                }
+            }
+        }
+
+        const activeStatus = is_active !== undefined ? (is_active ? 1 : 0) : 1;
+        const pass = password === '' ? null : (password !== undefined ? password : row.password);
+        const expiration = expires_at === '' ? null : (expires_at !== undefined ? expires_at : row.expires_at);
+        const cfg = survey_config !== undefined ? JSON.stringify(survey_config) : null;
+        const limitVal = response_limit === '' || response_limit === null ? null
+            : (response_limit !== undefined && Number.isFinite(Number(response_limit)) && Number(response_limit) > 0 ? Number(response_limit) : null);
+
+        if (cfg !== null) {
+            await c.env.DB.prepare(
+                `UPDATE urls SET custom_slug = ?, title = ?, survey_config = ?, response_limit = ?, expires_at = ?, password = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`
+            ).bind(updatedCustomSlug, title ?? '', cfg, limitVal, expiration, pass, activeStatus, id).run();
+        } else {
+            await c.env.DB.prepare(
+                `UPDATE urls SET custom_slug = ?, title = ?, response_limit = ?, expires_at = ?, password = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`
+            ).bind(updatedCustomSlug, title ?? '', limitVal, expiration, pass, activeStatus, id).run();
+        }
+
+        return c.json({ success: true });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5e. 설문지 삭제
+api.delete('/surveys/:id', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) {
+        return c.json({ success: false, error: '설문지 기능은 개발자(레벨 3) 이상 권한이 필요합니다.' }, 403);
+    }
+    const id = c.req.param('id');
+    try {
+        const r = await c.env.DB.prepare("DELETE FROM urls WHERE id = ? AND user_id = ? AND kind = 'survey'")
+            .bind(id, user.id).run();
+        if (r.meta.changes === 0) return c.json({ success: false, error: '설문을 찾을 수 없습니다.' }, 404);
+        return c.json({ success: true });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5f. 설문 응답 결과 (JSON)
+api.get('/surveys/:id/responses', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) return c.json({ success: false, error: '권한이 없습니다.' }, 403);
+    const id = c.req.param('id');
+    try {
+        const survey = await c.env.DB.prepare(
+            "SELECT id, title, survey_config FROM urls WHERE id = ? AND user_id = ? AND kind = 'survey'"
+        ).bind(id, user.id).first<{ id: number; title: string; survey_config: string }>();
+        if (!survey) return c.json({ success: false, error: '설문을 찾을 수 없습니다.' }, 404);
+
+        const { results } = await c.env.DB.prepare(
+            "SELECT id, answers_json, submitted_at FROM survey_responses WHERE url_id = ? ORDER BY submitted_at DESC"
+        ).bind(id).all<{ id: number; answers_json: string; submitted_at: string }>();
+
+        const responses = results.map(r => ({ id: r.id, submitted_at: r.submitted_at, answers: JSON.parse(r.answers_json) }));
+        return c.json({ success: true, survey: { ...survey, survey_config: JSON.parse(survey.survey_config) }, responses });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 5g. 설문 응답 CSV 다운로드
+api.get('/surveys/:id/responses.csv', async (c) => {
+    const user = c.get('user');
+    if (user.level < 3) return c.text('forbidden', 403);
+    const id = c.req.param('id');
+    try {
+        const survey = await c.env.DB.prepare(
+            "SELECT id, title, survey_config FROM urls WHERE id = ? AND user_id = ? AND kind = 'survey'"
+        ).bind(id, user.id).first<{ id: number; title: string; survey_config: string }>();
+        if (!survey) return c.text('not found', 404);
+
+        const config = JSON.parse(survey.survey_config) as { questions: Array<{ id: string; label: string; type: string }> };
+        const questions = config.questions || [];
+
+        const { results } = await c.env.DB.prepare(
+            "SELECT answers_json, submitted_at FROM survey_responses WHERE url_id = ? ORDER BY submitted_at ASC"
+        ).bind(id).all<{ answers_json: string; submitted_at: string }>();
+
+        const escapeCsv = (v: any) => {
+            if (v === null || v === undefined) return '';
+            const s = Array.isArray(v) ? v.join(' | ')
+                : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+            if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        };
+        const header = ['제출일시', ...questions.map(q => q.label)];
+        const lines = [header.map(escapeCsv).join(',')];
+        for (const r of results) {
+            const ans = JSON.parse(r.answers_json) as Record<string, any>;
+            const row = [r.submitted_at, ...questions.map(q => escapeCsv(ans[q.id]))];
+            lines.push(row.join(','));
+        }
+        const csv = '﻿' + lines.join('\r\n');
+        const filename = encodeURIComponent((survey.title || 'survey') + '_responses.csv');
+        return new Response(csv, {
+            headers: {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': `attachment; filename*=UTF-8''${filename}`,
+            },
+        });
+    } catch (err: any) {
+        return c.text('error: ' + err.message, 500);
     }
 });
 
@@ -1419,6 +1672,66 @@ app.get('/:slug{[^/]+\\.qr}', async (c) => {
     return handleQrRequest(slug, c.req.url, c.env);
 });
 
+// 설문 응답 제출 (공개)
+app.post('/survey/:slug/submit', async (c) => {
+    let slug = c.req.param('slug');
+    try { slug = decodeURIComponent(slug).normalize('NFC'); } catch { slug = slug.normalize('NFC'); }
+    try {
+        const row = await c.env.DB.prepare(
+            "SELECT id, password, expires_at, is_active, kind, survey_config, response_limit, response_count FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+        ).bind(slug, slug, slug).first<{ id: number; password: string | null; expires_at: string | null; is_active: number; kind: string; survey_config: string; response_limit: number | null; response_count: number }>();
+        if (!row || row.kind !== 'survey' || row.is_active === 0) {
+            return c.json({ success: false, error: '설문을 찾을 수 없습니다.' }, 404);
+        }
+        if (row.expires_at && new Date() > new Date(row.expires_at)) {
+            return c.json({ success: false, error: '설문 기간이 종료되었습니다.' }, 410);
+        }
+        if (row.response_limit && row.response_count >= row.response_limit) {
+            return c.json({ success: false, error: '설문이 마감되었습니다.' }, 410);
+        }
+        if (row.password) {
+            const cookieVal = getCookie(c, `edulink_survey_${row.id}`);
+            if (cookieVal !== row.password) {
+                return c.json({ success: false, error: '비밀번호 인증이 필요합니다.' }, 401);
+            }
+        }
+
+        const body = await c.req.json();
+        const answers = body.answers;
+        if (!answers || typeof answers !== 'object') {
+            return c.json({ success: false, error: '응답 데이터가 올바르지 않습니다.' }, 400);
+        }
+
+        const config = JSON.parse(row.survey_config) as { questions: Array<{ id: string; label: string; type: string; required?: boolean }> };
+        for (const q of (config.questions || [])) {
+            if (q.required) {
+                const v = answers[q.id];
+                const empty = v === undefined || v === null || v === ''
+                    || (Array.isArray(v) && v.length === 0)
+                    || (typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(x => !x));
+                if (empty) return c.json({ success: false, error: `필수 항목 누락: ${q.label}` }, 400);
+            }
+        }
+
+        const ip = c.req.header('cf-connecting-ip') || '';
+        const ua = c.req.header('user-agent') || '';
+        let ipHash = '';
+        try {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip));
+            ipHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch {}
+
+        await c.env.DB.prepare(
+            "INSERT INTO survey_responses (url_id, answers_json, ip_hash, user_agent) VALUES (?, ?, ?, ?)"
+        ).bind(row.id, JSON.stringify(answers), ipHash, ua).run();
+        await c.env.DB.prepare("UPDATE urls SET response_count = response_count + 1 WHERE id = ?").bind(row.id).run();
+
+        return c.json({ success: true });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
 // 9. /{slug} 리다이렉트 怨좎냽 由щ뵒?됱뀡
 app.get('/:slug', async (c) => {
     let slug = c.req.param('slug');
@@ -1448,19 +1761,22 @@ app.get('/:slug', async (c) => {
 
         // 1. KV 캐시 확인 (만료/비밀번호 없는 활성 링크만 캐싱됨)
         let destination = await c.env.URL_CACHE.get(slug);
-        let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null } | null = null;
+        let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind?: string; survey_config?: string | null; response_limit?: number | null; response_count?: number } | null = null;
 
         if (!destination) {
             // 2. D1 DB 조회 (base_slug, custom_slug, slug 모두 검색)
             urlRecord = await c.env.DB.prepare(
-                "SELECT id, original_url, is_active, expires_at, password FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+                "SELECT id, original_url, is_active, expires_at, password, kind, survey_config, response_limit, response_count FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
             )
             .bind(slug, slug, slug)
-            .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null }>();
+            .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind: string; survey_config: string | null; response_limit: number | null; response_count: number }>();
 
             if (urlRecord) {
                 // 비활성 링크 처리
                 if (urlRecord.is_active === 0) {
+                    if (urlRecord.kind === 'survey') {
+                        return c.html(getSurveyClosedHtml('설문이 종료되었습니다.'));
+                    }
                     return c.redirect('/');
                 }
 
@@ -1475,8 +1791,27 @@ app.get('/:slug', async (c) => {
                                 await c.env.URL_CACHE.delete(slug);
                             })());
                         } catch {}
+                        if (urlRecord.kind === 'survey') {
+                            return c.html(getSurveyClosedHtml('설문 응답 기간이 종료되었습니다.'));
+                        }
                         return c.redirect('/');
                     }
+                }
+
+                // 설문지 처리 (단축 링크 패턴 공유, 사용자 접속 결과만 다름)
+                if (urlRecord.kind === 'survey') {
+                    if (urlRecord.response_limit && (urlRecord.response_count ?? 0) >= urlRecord.response_limit) {
+                        return c.html(getSurveyClosedHtml('설문이 마감되었습니다. (최대 응답 수에 도달)'));
+                    }
+                    // 비밀번호 체크 (쿠키 매칭)
+                    if (urlRecord.password) {
+                        const cookieName = `edulink_survey_${urlRecord.id}`;
+                        const cookieVal = getCookie(c, cookieName);
+                        if (cookieVal !== urlRecord.password) {
+                            return c.html(getPasswordPageHtml(slug));
+                        }
+                    }
+                    return c.html(getSurveyPageHtml(urlRecord.id, slug, urlRecord.survey_config || '{}'));
                 }
 
                 // 비밀번호 보호 처리 (비밀번호 기능 유지)
@@ -1707,6 +2042,8 @@ function getPasswordPageHtml(slug: string): string {
                 const data = await res.json();
                 if (data.success && data.original_url) {
                     window.location.replace(data.original_url);
+                } else if (data.success && data.reload) {
+                    window.location.reload();
                 } else {
                     showError(data.error || '비밀번호가 올바르지 않습니다.');
                 }
@@ -1727,6 +2064,239 @@ function getPasswordPageHtml(slug: string): string {
         
         inputs[0].focus();
     </script>
+</body>
+</html>`;
+}
+
+function getSurveyClosedHtml(message: string): string {
+    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>설문 종료 · 에듀링크</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.06)}h2{font-size:18px;color:#1e293b;margin-bottom:12px}p{font-size:13px;color:#64748b;line-height:1.7}</style></head><body><div class="card"><h2>📋 ${message.replace(/</g,'&lt;')}</h2><p>관리자에게 문의해 주세요.</p></div></body></html>`;
+}
+
+function getSurveyPageHtml(urlId: number, slug: string, configJson: string): string {
+    return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>설문 응답 · 에듀링크</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}
+body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;padding:24px 16px;color:#1e293b}
+.wrap{max-width:640px;margin:0 auto}
+.card{background:#fff;border-radius:24px;padding:32px 28px;box-shadow:0 20px 40px rgba(0,0,0,.06);margin-bottom:20px}
+.logo{display:flex;align-items:center;gap:8px;margin-bottom:24px;justify-content:center}
+.logo img{width:28px;height:28px;border-radius:6px}
+.logo span{font-size:16px;font-weight:900;background:linear-gradient(to right,#2563eb,#4f46e5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+h1{font-size:22px;font-weight:900;color:#1e293b;margin-bottom:12px;text-align:center}
+.intro,.outro{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
+.q-block{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.04);border:1px solid #f1f5f9}
+.q-label{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.req{color:#ef4444;font-size:12px}
+input[type=text],input[type=tel],input[type=email],input[type=number],textarea{width:100%;padding:12px 14px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;outline:none;background:#f8fafc;color:#1e293b;font-family:inherit}
+textarea{min-height:96px;resize:vertical}
+input:focus,textarea:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0 4px rgba(79,70,229,.1)}
+.choice{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:8px;cursor:pointer;font-size:13px;transition:all .15s}
+.choice:hover{background:#f8fafc;border-color:#cbd5e1}
+.choice input{margin:0;accent-color:#4f46e5}
+.rating{display:flex;gap:6px;flex-wrap:wrap}
+.rating button{flex:1;min-width:40px;padding:12px 8px;border:2px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-weight:700;cursor:pointer;transition:all .15s}
+.rating button.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
+.addr-row{display:flex;gap:8px;margin-bottom:8px}
+.addr-row input{flex:1}
+.addr-row button{padding:10px 14px;background:#4f46e5;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+.submit-btn{width:100%;padding:16px;background:#4f46e5;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.25);transition:all .2s;margin-top:8px}
+.submit-btn:hover{background:#4338ca;transform:translateY(-1px)}
+.submit-btn:disabled{background:#cbd5e1;cursor:not-allowed;transform:none}
+.start-btn{display:inline-block;margin-top:20px;padding:14px 32px;background:#4f46e5;color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.25)}
+.error{color:#ef4444;font-size:12px;margin-top:8px;display:none}
+.error.show{display:block}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo"><img src="/edulink_logo.png" alt=""><span>에듀링크 설문</span></div>
+
+  <div id="introScreen" class="card">
+    <h1 id="introTitle"></h1>
+    <div class="intro" id="introText"></div>
+    <div style="text-align:center"><button class="start-btn" id="startBtn">설문 시작 →</button></div>
+  </div>
+
+  <div id="formScreen" class="hidden">
+    <div class="card"><h1 id="formTitle"></h1></div>
+    <div id="questions"></div>
+    <button class="submit-btn" id="submitBtn">응답 제출</button>
+    <div class="error" id="errorMsg"></div>
+  </div>
+
+  <div id="outroScreen" class="card hidden">
+    <h1>✅ 응답이 제출되었습니다</h1>
+    <div class="outro" id="outroText" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<script>
+const SLUG = ${JSON.stringify(slug)};
+const CONFIG = ${configJson};
+const questions = CONFIG.questions || [];
+const introScreen = document.getElementById('introScreen');
+const formScreen = document.getElementById('formScreen');
+const outroScreen = document.getElementById('outroScreen');
+const errorMsg = document.getElementById('errorMsg');
+
+document.getElementById('introTitle').textContent = CONFIG.title || '설문 응답';
+document.getElementById('formTitle').textContent = CONFIG.title || '설문 응답';
+document.getElementById('introText').textContent = CONFIG.intro || '아래 설문에 응답해 주세요.';
+document.getElementById('outroText').textContent = CONFIG.outro || '응답해 주셔서 감사합니다.';
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  introScreen.classList.add('hidden');
+  formScreen.classList.remove('hidden');
+  renderQuestions();
+});
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);}
+
+function renderQuestions(){
+  const container = document.getElementById('questions');
+  container.innerHTML = '';
+  questions.forEach((q, idx) => {
+    const block = document.createElement('div');
+    block.className = 'q-block';
+    block.dataset.qid = q.id;
+    const reqHtml = q.required ? '<span class="req">*</span>' : '';
+    let body = '';
+    switch(q.type){
+      case 'short':
+        body = '<input type="text" data-input>'; break;
+      case 'long':
+        body = '<textarea data-input></textarea>'; break;
+      case 'single':
+        body = (q.options||[]).map((o,i)=>'<label class="choice"><input type="radio" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
+      case 'multi':
+        body = (q.options||[]).map((o,i)=>'<label class="choice"><input type="checkbox" name="q_'+q.id+'" value="'+esc(o)+'" data-input> <span>'+esc(o)+'</span></label>').join(''); break;
+      case 'rating': {
+        const scale = q.scale || 5;
+        body = '<div class="rating">';
+        for(let i=1;i<=scale;i++) body += '<button type="button" data-val="'+i+'">'+i+'</button>';
+        body += '</div>';
+        break;
+      }
+      case 'phone':
+        body = '<input type="tel" data-input placeholder="010-0000-0000" inputmode="numeric">'; break;
+      case 'email':
+        body = '<input type="email" data-input placeholder="example@email.com">'; break;
+      case 'address':
+        body = '<div class="addr-row"><input type="text" data-input-zone placeholder="우편번호" readonly><button type="button" data-addr-btn>주소 검색</button></div>'
+             + '<div class="addr-row"><input type="text" data-input-addr placeholder="기본 주소" readonly></div>'
+             + '<div class="addr-row"><input type="text" data-input-detail placeholder="상세 주소"></div>';
+        break;
+      default: body = '<input type="text" data-input>';
+    }
+    block.innerHTML = '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>' + body;
+    container.appendChild(block);
+
+    if(q.type === 'rating'){
+      block.querySelectorAll('.rating button').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          block.querySelectorAll('.rating button').forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          block.dataset.value = b.dataset.val;
+        });
+      });
+    }
+    if(q.type === 'address'){
+      block.querySelector('[data-addr-btn]').addEventListener('click', ()=>{
+        if(typeof daum === 'undefined' || !daum.Postcode){ alert('주소 검색 스크립트 로드 실패'); return; }
+        new daum.Postcode({ oncomplete: (data)=>{
+          block.querySelector('[data-input-zone]').value = data.zonecode;
+          block.querySelector('[data-input-addr]').value = data.roadAddress || data.jibunAddress;
+          block.querySelector('[data-input-detail]').focus();
+        }}).open();
+      });
+    }
+    if(q.type === 'phone'){
+      const inp = block.querySelector('[data-input]');
+      inp.addEventListener('input', e=>{
+        let v = e.target.value.replace(/\\D/g,'').slice(0,11);
+        if(v.length >= 7) v = v.replace(/(\\d{3})(\\d{3,4})(\\d{0,4}).*/, '$1-$2-$3').replace(/-$/,'');
+        else if(v.length >= 4) v = v.replace(/(\\d{3})(\\d{0,4}).*/, '$1-$2');
+        e.target.value = v;
+      });
+    }
+  });
+}
+
+function collectAnswers(){
+  const out = {};
+  document.querySelectorAll('.q-block').forEach(block=>{
+    const qid = block.dataset.qid;
+    const q = questions.find(x=>x.id===qid);
+    if(!q) return;
+    if(q.type === 'single'){
+      const sel = block.querySelector('input[type=radio]:checked');
+      out[qid] = sel ? sel.value : '';
+    } else if(q.type === 'multi'){
+      out[qid] = Array.from(block.querySelectorAll('input[type=checkbox]:checked')).map(x=>x.value);
+    } else if(q.type === 'rating'){
+      out[qid] = block.dataset.value ? Number(block.dataset.value) : '';
+    } else if(q.type === 'address'){
+      out[qid] = {
+        zonecode: block.querySelector('[data-input-zone]').value,
+        address: block.querySelector('[data-input-addr]').value,
+        detail: block.querySelector('[data-input-detail]').value,
+      };
+    } else {
+      const el = block.querySelector('[data-input]');
+      out[qid] = el ? el.value.trim() : '';
+    }
+  });
+  return out;
+}
+
+document.getElementById('submitBtn').addEventListener('click', async ()=>{
+  const answers = collectAnswers();
+  for(const q of questions){
+    if(q.required){
+      const v = answers[q.id];
+      const empty = v === undefined || v === null || v === ''
+        || (Array.isArray(v) && v.length === 0)
+        || (typeof v === 'object' && !Array.isArray(v) && !v.address);
+      if(empty){
+        errorMsg.textContent = '필수 항목 누락: ' + q.label;
+        errorMsg.classList.add('show');
+        return;
+      }
+    }
+  }
+  errorMsg.classList.remove('show');
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '제출 중...';
+  try {
+    const res = await fetch('/survey/' + encodeURIComponent(SLUG) + '/submit', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ answers })
+    });
+    const data = await res.json();
+    if(data.success){
+      formScreen.classList.add('hidden');
+      outroScreen.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      errorMsg.textContent = data.error || '제출에 실패했습니다.';
+      errorMsg.classList.add('show');
+      btn.disabled = false; btn.textContent = '응답 제출';
+    }
+  } catch(e){
+    errorMsg.textContent = '서버 오류가 발생했습니다.';
+    errorMsg.classList.add('show');
+    btn.disabled = false; btn.textContent = '응답 제출';
+  }
+});
+</script>
 </body>
 </html>`;
 }

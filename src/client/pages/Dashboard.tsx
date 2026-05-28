@@ -40,6 +40,8 @@ import {
   LogIn
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SurveyTab from './SurveyTab';
+import { FileText } from 'lucide-react';
 
 interface LinkItem {
   id: number;
@@ -126,7 +128,7 @@ export default function Dashboard() {
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'links' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'surveys' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
   const [linkSourceFilter, setLinkSourceFilter] = useState<'web' | 'api'>('web');
   
   // 새 단축 링크 상태
@@ -312,7 +314,7 @@ export default function Dashboard() {
         if (data.user.level < 2) {
           // 1단계 일반회원은 단축주소 생성이 불가하므로 개인정보관리 탭을 보여줍니다.
           setActiveTab('profile');
-        } else if (data.user.level < 3 && activeTab === 'apikeys') {
+        } else if (data.user.level < 3 && (activeTab === 'apikeys' || activeTab === 'surveys')) {
           setActiveTab('links');
         } else if (data.user.level < 4 && activeTab === 'admin') {
           setActiveTab('links');
@@ -929,92 +931,120 @@ export default function Dashboard() {
             )}
             
             {isSidebarOpen && (
-              <Button 
-                size="sm" 
-                variant="light" 
-                isIconOnly 
-                className="rounded-full"
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                <ChevronLeft className="w-4 h-4 text-slate-400" />
-              </Button>
+              <Tooltip content="사이드바 접기" placement="right" delay={300}>
+                <Button
+                  size="sm"
+                  variant="light"
+                  isIconOnly
+                  className="rounded-full"
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <ChevronLeft className="w-4 h-4 text-slate-400" />
+                </Button>
+              </Tooltip>
             )}
           </div>
 
           <nav className="p-3 space-y-1">
             {user && user.level >= 2 && (
-              <Button 
-                variant={activeTab === 'links' ? 'flat' : 'light'}
-                color={activeTab === 'links' ? 'primary' : 'default'}
-                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-                onClick={() => setActiveTab('links')}
-                startContent={<LayoutDashboard className="w-4 h-4 flex-shrink-0" />}
-              >
-                {isSidebarOpen && <span>단축주소 관리</span>}
-              </Button>
+              <Tooltip content="단축주소 만들기·편집·통계" placement="right" delay={200} isDisabled={isSidebarOpen}>
+                <Button
+                  variant={activeTab === 'links' ? 'flat' : 'light'}
+                  color={activeTab === 'links' ? 'primary' : 'default'}
+                  className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                  onClick={() => setActiveTab('links')}
+                  startContent={<LayoutDashboard className="w-4 h-4 flex-shrink-0" />}
+                >
+                  {isSidebarOpen && <span>단축주소 관리</span>}
+                </Button>
+              </Tooltip>
             )}
 
             {user && user.level >= 3 && (
-              <Button 
-                variant={activeTab === 'apikeys' ? 'flat' : 'light'}
-                color={activeTab === 'apikeys' ? 'primary' : 'default'}
-                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-                onClick={() => setActiveTab('apikeys')}
-                startContent={<Terminal className="w-4 h-4 flex-shrink-0" />}
-              >
-                {isSidebarOpen && <span>개발자 도구</span>}
-              </Button>
+              <Tooltip content="설문지 만들기·결과 조회 (Lv.3 이상)" placement="right" delay={200} isDisabled={isSidebarOpen}>
+                <Button
+                  variant={activeTab === 'surveys' ? 'flat' : 'light'}
+                  color={activeTab === 'surveys' ? 'primary' : 'default'}
+                  className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                  onClick={() => setActiveTab('surveys')}
+                  startContent={<FileText className="w-4 h-4 flex-shrink-0" />}
+                >
+                  {isSidebarOpen && <span>설문 관리</span>}
+                </Button>
+              </Tooltip>
             )}
 
-            <Button 
-              variant={activeTab === 'profile' ? 'flat' : 'light'}
-              color={activeTab === 'profile' ? 'primary' : 'default'}
-              className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-              onClick={() => {
-                setActiveTab('profile');
-                if (user) {
-                  setNewProfileName(user.name);
-                  setNewProfileAffiliation(user.affiliation || '');
-                }
-              }}
-              startContent={<User className="w-4 h-4 flex-shrink-0" />}
-            >
-              {isSidebarOpen && <span>개인정보관리</span>}
-            </Button>
+            {user && user.level >= 3 && (
+              <Tooltip content="API Key 발급 및 외부 연동 (Lv.3 이상)" placement="right" delay={200} isDisabled={isSidebarOpen}>
+                <Button
+                  variant={activeTab === 'apikeys' ? 'flat' : 'light'}
+                  color={activeTab === 'apikeys' ? 'primary' : 'default'}
+                  className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                  onClick={() => setActiveTab('apikeys')}
+                  startContent={<Terminal className="w-4 h-4 flex-shrink-0" />}
+                >
+                  {isSidebarOpen && <span>개발자 도구</span>}
+                </Button>
+              </Tooltip>
+            )}
 
-            <Button 
-              variant={activeTab === 'guide' ? 'flat' : 'light'}
-              color={activeTab === 'guide' ? 'primary' : 'default'}
-              className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-              onClick={() => setActiveTab('guide')}
-              startContent={<BookOpen className="w-4 h-4 flex-shrink-0" />}
-            >
-              {isSidebarOpen && <span>활용방법</span>}
-            </Button>
+            <Tooltip content="이름·소속·등급 정보 관리" placement="right" delay={200} isDisabled={isSidebarOpen}>
+              <Button
+                variant={activeTab === 'profile' ? 'flat' : 'light'}
+                color={activeTab === 'profile' ? 'primary' : 'default'}
+                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                onClick={() => {
+                  setActiveTab('profile');
+                  if (user) {
+                    setNewProfileName(user.name);
+                    setNewProfileAffiliation(user.affiliation || '');
+                  }
+                }}
+                startContent={<User className="w-4 h-4 flex-shrink-0" />}
+              >
+                {isSidebarOpen && <span>개인정보관리</span>}
+              </Button>
+            </Tooltip>
 
-            <Button 
-              variant={activeTab === 'notices' ? 'flat' : 'light'}
-              color={activeTab === 'notices' ? 'primary' : 'default'}
-              className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-              onClick={() => {
-                setActiveTab('notices');
-                fetchNotices();
-              }}
-              startContent={<Megaphone className="w-4 h-4 flex-shrink-0" />}
-            >
-              {isSidebarOpen && <span>공지사항</span>}
-            </Button>
+            <Tooltip content="에듀링크 사용 가이드" placement="right" delay={200} isDisabled={isSidebarOpen}>
+              <Button
+                variant={activeTab === 'guide' ? 'flat' : 'light'}
+                color={activeTab === 'guide' ? 'primary' : 'default'}
+                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                onClick={() => setActiveTab('guide')}
+                startContent={<BookOpen className="w-4 h-4 flex-shrink-0" />}
+              >
+                {isSidebarOpen && <span>활용방법</span>}
+              </Button>
+            </Tooltip>
+
+            <Tooltip content="공지사항 보기" placement="right" delay={200} isDisabled={isSidebarOpen}>
+              <Button
+                variant={activeTab === 'notices' ? 'flat' : 'light'}
+                color={activeTab === 'notices' ? 'primary' : 'default'}
+                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                onClick={() => {
+                  setActiveTab('notices');
+                  fetchNotices();
+                }}
+                startContent={<Megaphone className="w-4 h-4 flex-shrink-0" />}
+              >
+                {isSidebarOpen && <span>공지사항</span>}
+              </Button>
+            </Tooltip>
 
             {user?.level === 4 && (
-              <Button 
-                variant={activeTab === 'admin' ? 'flat' : 'light'}
-                color={activeTab === 'admin' ? 'danger' : 'default'}
-                className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-                onClick={() => setActiveTab('admin')}
-                startContent={<ShieldAlert className="w-4 h-4 flex-shrink-0" />}
-              >
-                {isSidebarOpen && <span>최고관리자 모드</span>}
-              </Button>
+              <Tooltip content="도메인·사용자·승급 요청 관리 (Lv.4)" placement="right" delay={200} isDisabled={isSidebarOpen}>
+                <Button
+                  variant={activeTab === 'admin' ? 'flat' : 'light'}
+                  color={activeTab === 'admin' ? 'danger' : 'default'}
+                  className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                  onClick={() => setActiveTab('admin')}
+                  startContent={<ShieldAlert className="w-4 h-4 flex-shrink-0" />}
+                >
+                  {isSidebarOpen && <span>최고관리자 모드</span>}
+                </Button>
+              </Tooltip>
             )}
           </nav>
         </div>
@@ -1035,32 +1065,36 @@ export default function Dashboard() {
             </div>
           )}
 
-          <Button 
-            variant="flat" 
-            color="danger" 
-            className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-            onClick={async () => {
-              try {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                navigate('/');
-              } catch (e) {
-                console.error(e);
-                navigate('/');
-              }
-            }}
-            startContent={<LogOut className="w-4 h-4" />}
-          >
-            {isSidebarOpen && <span>로그아웃</span>}
-          </Button>
+          <Tooltip content="현재 세션을 종료하고 로그아웃합니다" placement="right" delay={200} isDisabled={isSidebarOpen}>
+            <Button
+              variant="flat"
+              color="danger"
+              className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+              onClick={async () => {
+                try {
+                  await fetch('/api/auth/logout', { method: 'POST' });
+                  navigate('/');
+                } catch (e) {
+                  console.error(e);
+                  navigate('/');
+                }
+              }}
+              startContent={<LogOut className="w-4 h-4" />}
+            >
+              {isSidebarOpen && <span>로그아웃</span>}
+            </Button>
+          </Tooltip>
 
-          <Button 
-            variant="light" 
-            className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
-            onClick={() => navigate('/')}
-            startContent={<Globe className="w-4 h-4 text-slate-400" />}
-          >
-            {isSidebarOpen && <span>홈페이지 이동</span>}
-          </Button>
+          <Tooltip content="에듀링크 메인 홈페이지로 이동" placement="right" delay={200} isDisabled={isSidebarOpen}>
+            <Button
+              variant="light"
+              className={`w-full rounded-xl justify-start ${isSidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+              onClick={() => navigate('/')}
+              startContent={<Globe className="w-4 h-4 text-slate-400" />}
+            >
+              {isSidebarOpen && <span>홈페이지 이동</span>}
+            </Button>
+          </Tooltip>
         </div>
       </aside>
 
@@ -1069,6 +1103,7 @@ export default function Dashboard() {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 flex-shrink-0">
           <h2 className="text-lg font-bold text-slate-800">
             {activeTab === 'links' && '단축주소 관리'}
+            {activeTab === 'surveys' && '설문 관리'}
             {activeTab === 'apikeys' && '개발자 도구 (API Keys)'}
             {activeTab === 'profile' && '개인정보관리'}
             {activeTab === 'guide' && '에듀링크 활용방법'}
@@ -1078,6 +1113,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2">
             {!window.location.host.includes('dgedu.link') && (
+              <Tooltip content="개발/테스트 환경에서만 표시 — 다른 권한 등급의 UX를 미리 확인할 수 있습니다" delay={200} className="max-w-xs">
               <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
                 <span className="text-[10px] font-bold text-slate-500 px-1.5">🧪 모의 권한:</span>
                 <select
@@ -1102,45 +1138,58 @@ export default function Dashboard() {
                   <option value="admin">4-최고관리자 (전체제어)</option>
                 </select>
               </div>
+              </Tooltip>
             )}
 
             {user && (
-              <Chip 
-                size="sm" 
-                variant="flat" 
-                color={
-                  user.level === 4 ? 'danger' :
-                  user.level === 3 ? 'secondary' :
-                  user.level === 2 ? 'primary' : 'default'
-                } 
-                className="font-semibold px-2"
-              >
-                {
-                  user.level === 4 ? '👑 최고관리자' :
-                  user.level === 3 ? '🛠️ 개발자' :
-                  user.level === 2 ? '🛡️ 인증사용자' : '👤 일반회원'
+              <Tooltip
+                delay={200}
+                content={
+                  user.level === 4 ? '모든 권한 + 도메인·사용자·승급 요청 관리' :
+                  user.level === 3 ? '단축주소 + 설문 + API Key 발급/외부 연동 가능' :
+                  user.level === 2 ? '단축주소 생성·관리 가능' :
+                  '조회만 가능 — 인증 후 승급 요청 필요'
                 }
-              </Chip>
+              >
+                <Chip
+                  size="sm"
+                  variant="flat"
+                  color={
+                    user.level === 4 ? 'danger' :
+                    user.level === 3 ? 'secondary' :
+                    user.level === 2 ? 'primary' : 'default'
+                  }
+                  className="font-semibold px-2 cursor-help"
+                >
+                  {
+                    user.level === 4 ? '👑 최고관리자' :
+                    user.level === 3 ? '🛠️ 개발자' :
+                    user.level === 2 ? '🛡️ 인증사용자' : '👤 일반회원'
+                  }
+                </Chip>
+              </Tooltip>
             )}
 
-            <Button
-              size="sm"
-              variant="flat"
-              color="danger"
-              className="font-semibold rounded-xl"
-              onClick={async () => {
-                try {
-                  await fetch('/api/auth/logout', { method: 'POST' });
-                  navigate('/');
-                } catch (e) {
-                  console.error(e);
-                  navigate('/');
-                }
-              }}
-              startContent={<LogOut className="w-3.5 h-3.5" />}
-            >
-              로그아웃
-            </Button>
+            <Tooltip content="현재 세션을 종료합니다" delay={200}>
+              <Button
+                size="sm"
+                variant="flat"
+                color="danger"
+                className="font-semibold rounded-xl"
+                onClick={async () => {
+                  try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    navigate('/');
+                  } catch (e) {
+                    console.error(e);
+                    navigate('/');
+                  }
+                }}
+                startContent={<LogOut className="w-3.5 h-3.5" />}
+              >
+                로그아웃
+              </Button>
+            </Tooltip>
           </div>
         </header>
 
@@ -1227,14 +1276,16 @@ export default function Dashboard() {
                             disabled={user && user.level < 2}
                           />
                         </div>
-                        <Button
-                          type="submit"
-                          color={user && user.level < 2 ? 'default' : 'primary'}
-                          className="rounded-2xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
-                          disabled={user && user.level < 2}
-                        >
-                          단축주소 생성
-                        </Button>
+                        <Tooltip content={user && user.level < 2 ? '인증사용자(Lv.2) 이상만 생성 가능' : '상세 설정 드로어가 열립니다'} delay={200}>
+                          <Button
+                            type="submit"
+                            color={user && user.level < 2 ? 'default' : 'primary'}
+                            className="rounded-2xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
+                            disabled={user && user.level < 2}
+                          >
+                            단축주소 생성
+                          </Button>
+                        </Tooltip>
                       </form>
                     </CardContent>
                   </Card>
@@ -1244,6 +1295,7 @@ export default function Dashboard() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <h4 className="font-bold text-sm text-slate-800">단축 링크 목록</h4>
                       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/40">
+                        <Tooltip content="대시보드에서 직접 생성한 단축주소" delay={200}>
                         <button
                           type="button"
                           onClick={() => setLinkSourceFilter('web')}
@@ -1263,6 +1315,8 @@ export default function Dashboard() {
                             {links.filter(l => l.created_by !== 'api').length}
                           </span>
                         </button>
+                        </Tooltip>
+                        <Tooltip content="API Key로 외부에서 생성한 단축주소" delay={200}>
                         <button
                           type="button"
                           onClick={() => setLinkSourceFilter('api')}
@@ -1282,6 +1336,7 @@ export default function Dashboard() {
                             {links.filter(l => l.created_by === 'api').length}
                           </span>
                         </button>
+                        </Tooltip>
                       </div>
                     </div>
 
@@ -2011,6 +2066,32 @@ export default function Dashboard() {
 
                 </div>
             </>
+          )}
+
+          {/* 설문 관리 탭 */}
+          {activeTab === 'surveys' && (
+            user && user.level < 3 ? (
+              <Card className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                <CardContent className="text-center flex flex-col items-center gap-4 py-8">
+                  <div className="bg-amber-50 p-4 rounded-2xl text-amber-500">
+                    <ShieldAlert className="w-10 h-10" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <h3 className="font-bold text-base text-slate-800">설문 기능 권한이 제한되어 있습니다</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      설문지 생성·관리는 <strong>(3)단계 개발자</strong> 등급 이상부터 사용 가능합니다.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <SurveyTab
+                getHeaders={getHeaders}
+                setSuccessMsg={setSuccessMsg}
+                setError={setError}
+                setQrModalLink={setQrModalLink}
+              />
+            )
           )}
 
           {/* API Keys 탭 */}
