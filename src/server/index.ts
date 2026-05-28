@@ -2080,7 +2080,24 @@ function getSurveyClosedHtml(message: string, customMsg?: string): string {
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>설문 종료 · 에듀링크</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:480px;width:100%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.06)}h2{font-size:18px;color:#1e293b;margin-bottom:12px}p{font-size:13px;color:#64748b;line-height:1.8;white-space:pre-wrap}a{color:#4f46e5;text-decoration:underline}</style></head><body><div class="card"><h2>📋 ${escMsg}</h2><p>관리자에게 문의해 주세요.</p></div></body></html>`;
 }
 
+const SURVEY_THEMES: Record<string, { primary: string; dark: string; shadow: string; bgFrom: string; bgTo: string; ring: string; addrBtn: string }> = {
+    indigo:  { primary:'#4f46e5', dark:'#4338ca', shadow:'rgba(79,70,229,.25)',   bgFrom:'#f5f7fa', bgTo:'#e4e8f0', ring:'rgba(79,70,229,.1)',   addrBtn:'#4f46e5' },
+    emerald: { primary:'#059669', dark:'#047857', shadow:'rgba(5,150,105,.25)',   bgFrom:'#ecfdf5', bgTo:'#d1fae5', ring:'rgba(5,150,105,.1)',   addrBtn:'#059669' },
+    rose:    { primary:'#e11d48', dark:'#be123c', shadow:'rgba(225,29,72,.25)',   bgFrom:'#fff1f2', bgTo:'#fce7f3', ring:'rgba(225,29,72,.1)',   addrBtn:'#e11d48' },
+    amber:   { primary:'#d97706', dark:'#b45309', shadow:'rgba(217,119,6,.25)',   bgFrom:'#fffbeb', bgTo:'#fef3c7', ring:'rgba(217,119,6,.1)',   addrBtn:'#d97706' },
+    sky:     { primary:'#0284c7', dark:'#0369a1', shadow:'rgba(2,132,199,.25)',   bgFrom:'#f0f9ff', bgTo:'#e0f2fe', ring:'rgba(2,132,199,.1)',   addrBtn:'#0284c7' },
+};
+
 function getSurveyPageHtml(urlId: number, slug: string, configJson: string): string {
+    // 테마 CSS 변수 결정
+    let parsedTheme = 'indigo';
+    try { parsedTheme = JSON.parse(configJson).theme || 'indigo'; } catch {}
+    const t = SURVEY_THEMES[parsedTheme] || SURVEY_THEMES['indigo'];
+    const themeVars = `
+:root {
+  --p:${t.primary};--pd:${t.dark};--ps:${t.shadow};
+  --bg-from:${t.bgFrom};--bg-to:${t.bgTo};--ring:${t.ring};
+}`;
     return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2090,45 +2107,46 @@ function getSurveyPageHtml(urlId: number, slug: string, configJson: string): str
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
+${themeVars}
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Noto Sans KR',sans-serif}
-body{background:linear-gradient(135deg,#f5f7fa,#e4e8f0);min-height:100vh;padding:24px 16px;color:#1e293b}
+body{background:linear-gradient(135deg,var(--bg-from),var(--bg-to));min-height:100vh;padding:24px 16px;color:#1e293b}
 .wrap{max-width:640px;margin:0 auto}
 .card{background:#fff;border-radius:24px;padding:32px 28px;box-shadow:0 20px 40px rgba(0,0,0,.06);margin-bottom:20px}
 .logo{display:flex;align-items:center;gap:8px;margin-bottom:24px;justify-content:center}
 .logo img{width:28px;height:28px;border-radius:6px}
-.logo span{font-size:16px;font-weight:900;background:linear-gradient(to right,#2563eb,#4f46e5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-size:16px;font-weight:900;color:var(--p)}
 h1{font-size:22px;font-weight:900;color:#1e293b;margin-bottom:12px;text-align:center}
 .intro-text,.outro-text{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
-.intro-text a,.outro-text a{color:#4f46e5;text-decoration:underline}
+.intro-text a,.outro-text a{color:var(--p);text-decoration:underline}
 .q-block{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.04);border:1px solid #f1f5f9}
 .q-label{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:6px;display:flex;align-items:baseline;gap:6px}
 .q-desc{font-size:12px;color:#64748b;line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
-.q-desc a{color:#4f46e5;text-decoration:underline}
+.q-desc a{color:var(--p);text-decoration:underline}
 .req{color:#ef4444;font-size:12px}
 .q-media{width:100%;border-radius:12px;margin-bottom:12px;display:block}
 .q-media-img{max-width:100%;border-radius:12px;margin-bottom:12px;display:block}
 input[type=text],input[type=tel],input[type=email],input[type=number],textarea{width:100%;padding:12px 14px;border:2px solid #e2e8f0;border-radius:12px;font-size:14px;outline:none;background:#f8fafc;color:#1e293b;font-family:inherit}
 textarea{min-height:96px;resize:vertical}
-input:focus,textarea:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0 4px rgba(79,70,229,.1)}
+input:focus,textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 0 4px var(--ring)}
 .choice{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:8px;cursor:pointer;font-size:13px;transition:all .15s}
 .choice:hover{background:#f8fafc;border-color:#cbd5e1}
-.choice input{margin:0;accent-color:#4f46e5}
+.choice input{margin:0;accent-color:var(--p)}
 .rating{display:flex;gap:6px;flex-wrap:wrap}
 .rating button{flex:1;min-width:40px;padding:12px 8px;border:2px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-weight:700;cursor:pointer;transition:all .15s}
-.rating button.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
+.rating button.active{background:var(--p);color:#fff;border-color:var(--p)}
 .addr-row{display:flex;gap:8px;margin-bottom:8px}
 .addr-row input{flex:1}
-.addr-row button{padding:10px 14px;background:#4f46e5;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;white-space:nowrap}
-.submit-btn{width:100%;padding:16px;background:#4f46e5;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.25);transition:all .2s;margin-top:8px}
-.submit-btn:hover{background:#4338ca;transform:translateY(-1px)}
+.addr-row button{padding:10px 14px;background:var(--p);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+.submit-btn{width:100%;padding:16px;background:var(--p);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px var(--ps);transition:all .2s;margin-top:8px}
+.submit-btn:hover{background:var(--pd);transform:translateY(-1px)}
 .submit-btn:disabled{background:#cbd5e1;cursor:not-allowed;transform:none}
-.start-btn{display:inline-block;margin-top:20px;padding:14px 32px;background:#4f46e5;color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.25)}
+.start-btn{display:inline-block;margin-top:20px;padding:14px 32px;background:var(--p);color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px var(--ps)}
 .error{color:#ef4444;font-size:12px;margin-top:8px;display:none}
 .error.show{display:block}
 .hidden{display:none}
 .outro-btns{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
 .btn-secondary{padding:12px 24px;border:2px solid #e2e8f0;background:#fff;color:#475569;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
-.btn-secondary:hover{border-color:#4f46e5;color:#4f46e5}
+.btn-secondary:hover{border-color:var(--p);color:var(--p)}
 .already-card{background:#fff;border-radius:24px;padding:32px 28px;box-shadow:0 20px 40px rgba(0,0,0,.06);margin-bottom:20px;text-align:center}
 .already-card h2{font-size:18px;font-weight:900;color:#1e293b;margin-bottom:10px}
 .already-card p{font-size:13px;color:#64748b;line-height:1.7;margin-bottom:16px}

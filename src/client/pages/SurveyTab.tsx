@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 type QuestionType = 'short' | 'long' | 'single' | 'multi' | 'rating' | 'phone' | 'email' | 'address';
+type SurveyTheme = 'indigo' | 'emerald' | 'rose' | 'amber' | 'sky';
 
 interface Question {
   id: string;
@@ -15,8 +16,8 @@ interface Question {
   required: boolean;
   options?: string[];
   scale?: number;
-  description?: string; // 문항 안내문 (URL 자동 링크)
-  media_url?: string;   // mp4/youtube/이미지 임베드
+  description?: string;
+  media_url?: string;
 }
 
 interface SurveyConfig {
@@ -24,9 +25,18 @@ interface SurveyConfig {
   intro: string;
   outro: string;
   questions: Question[];
-  one_response_per_browser?: boolean; // 브라우저당 1회 제한
-  inactive_message?: string;           // 비활성화 시 표시 문구
+  theme?: SurveyTheme;
+  one_response_per_browser?: boolean;
+  inactive_message?: string;
 }
+
+const THEMES: Record<SurveyTheme, { label: string; color: string; bg: string; text: string }> = {
+  indigo:  { label: '인디고',   color: '#4f46e5', bg: 'from-slate-100 to-indigo-100',  text: 'text-indigo-700'  },
+  emerald: { label: '에메랄드', color: '#059669', bg: 'from-emerald-50 to-teal-100',   text: 'text-emerald-700' },
+  rose:    { label: '로즈',     color: '#e11d48', bg: 'from-rose-50 to-pink-100',       text: 'text-rose-700'    },
+  amber:   { label: '앰버',     color: '#d97706', bg: 'from-amber-50 to-yellow-100',    text: 'text-amber-700'   },
+  sky:     { label: '스카이',   color: '#0284c7', bg: 'from-sky-50 to-blue-100',        text: 'text-sky-700'     },
+};
 
 interface SurveyItem {
   id: number;
@@ -107,6 +117,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
   const [formIntro, setFormIntro] = useState(DEFAULT_CONFIG.intro);
   const [formOutro, setFormOutro] = useState(DEFAULT_CONFIG.outro);
   const [formQuestions, setFormQuestions] = useState<Question[]>([]);
+  const [formTheme, setFormTheme] = useState<SurveyTheme>('indigo');
   const [formActive, setFormActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -153,6 +164,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     setFormIntro(DEFAULT_CONFIG.intro);
     setFormOutro(DEFAULT_CONFIG.outro);
     setFormQuestions([]);
+    setFormTheme('indigo');
     setFormActive(true);
     setFormShowAdvanced(false);
     setFormCustomSlug('');
@@ -179,11 +191,13 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       setFormIntro(cfg.intro || DEFAULT_CONFIG.intro);
       setFormOutro(cfg.outro || DEFAULT_CONFIG.outro);
       setFormQuestions(cfg.questions || []);
+      setFormTheme((cfg.theme as SurveyTheme) || 'indigo');
       setFormOneResponsePerBrowser(!!cfg.one_response_per_browser);
       setFormInactiveMessage(cfg.inactive_message || '');
     } catch {
       setFormTitle(s.title);
       setFormQuestions([]);
+      setFormTheme('indigo');
       setFormOneResponsePerBrowser(false);
       setFormInactiveMessage('');
     }
@@ -241,6 +255,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       intro: formIntro,
       outro: formOutro,
       questions: formQuestions,
+      theme: formTheme,
       one_response_per_browser: formOneResponsePerBrowser || undefined,
       inactive_message: formInactiveMessage.trim() || undefined,
     };
@@ -409,7 +424,21 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                         {s.custom_slug && <div className="font-mono text-[10px] text-indigo-500 mt-0.5">/{s.custom_slug}</div>}
                       </td>
                       <td className="p-3 max-w-xs">
-                        <div className="font-semibold text-slate-700 truncate max-w-[260px]" title={s.title}>{s.title}</div>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            try {
+                              const cfg = JSON.parse(s.survey_config || '{}');
+                              const theme = (cfg.theme as SurveyTheme) || 'indigo';
+                              return (
+                                <Tooltip content={`테마: ${THEMES[theme]?.label || theme}`} delay={200}>
+                                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block"
+                                    style={{ background: THEMES[theme]?.color || '#4f46e5' }} />
+                                </Tooltip>
+                              );
+                            } catch { return null; }
+                          })()}
+                          <div className="font-semibold text-slate-700 truncate max-w-[240px]" title={s.title}>{s.title}</div>
+                        </div>
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <span className="font-extrabold text-slate-800">{s.response_count ?? 0}</span>
@@ -500,6 +529,38 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
               <div>
                 <label className="block font-bold text-slate-600 mb-1.5">제목 *</label>
                 <Input size="sm" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="설문 제목" className="w-full" />
+              </div>
+
+              {/* 테마 선택 */}
+              <div>
+                <label className="block font-bold text-slate-600 mb-2">설문 테마</label>
+                <div className="flex gap-2 flex-wrap">
+                  {(Object.entries(THEMES) as [SurveyTheme, typeof THEMES[SurveyTheme]][]).map(([key, t]) => (
+                    <Tooltip key={key} content={t.label} delay={150}>
+                      <button
+                        type="button"
+                        onClick={() => setFormTheme(key)}
+                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${
+                          formTheme === key
+                            ? 'border-slate-700 shadow-md scale-105'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <span
+                          className="w-8 h-8 rounded-full shadow-sm flex items-center justify-center"
+                          style={{ background: t.color }}
+                        >
+                          {formTheme === key && (
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{t.label}</span>
+                      </button>
+                    </Tooltip>
+                  ))}
+                </div>
               </div>
 
               <div>
