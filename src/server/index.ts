@@ -2118,7 +2118,7 @@ body{background:linear-gradient(135deg,var(--bg-from),var(--bg-to));min-height:1
 h1{font-size:22px;font-weight:900;color:#1e293b;margin-bottom:12px;text-align:center}
 .intro-text,.outro-text{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
 .intro-text a,.outro-text a{color:var(--p);text-decoration:underline}
-.intro-banner{background:linear-gradient(135deg,var(--bg-from),var(--bg-to));border:1px solid color-mix(in srgb,var(--p) 20%,transparent);border-radius:16px;padding:18px 20px;margin-bottom:20px;text-align:center}
+.intro-banner{background:#fff;border-radius:24px;padding:32px 28px;box-shadow:0 20px 40px rgba(0,0,0,.06);margin-bottom:20px;text-align:center}
 .intro-banner .intro-title{font-size:20px;font-weight:900;color:#1e293b;margin-bottom:10px}
 .intro-banner .intro-body{font-size:13px;color:#475569;line-height:1.8;white-space:pre-wrap}
 .intro-banner .intro-body a{color:var(--p);text-decoration:underline}
