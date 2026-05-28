@@ -2280,10 +2280,12 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 function renderQuestions(){
   const container = document.getElementById('questions');
   container.innerHTML = '';
-  questions.forEach((q, idx) => {
+  let displayNum = 0;
+  questions.forEach((q) => {
     const block = document.createElement('div');
     block.className = 'q-block';
     block.dataset.qid = q.id;
+    if (q.type !== 'media') displayNum++;
     const reqHtml = q.required ? '<span class="req">*</span>' : '';
 
     // 미디어 임베드 (createElement로 삽입 — innerHTML보다 안정적)
@@ -2328,7 +2330,7 @@ function renderQuestions(){
       return;
     }
     // 일반 항목: innerHTML 먼저, 그 뒤 미디어 요소를 맨 앞에 삽입
-    block.innerHTML = '<div class="q-label">' + (idx+1) + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
+    block.innerHTML = '<div class="q-label">' + displayNum + '. ' + esc(q.label||'') + ' ' + reqHtml + '</div>'
       + descHtml
       + body;
     if (mediaEl) block.insertBefore(mediaEl, block.firstChild);

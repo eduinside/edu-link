@@ -408,12 +408,12 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
-                  <th className="text-left p-3 pl-5 whitespace-nowrap">슬러그</th>
-                  <th className="text-left p-3 whitespace-nowrap">제목</th>
-                  <th className="text-left p-3 whitespace-nowrap">응답수 / 한도</th>
-                  <th className="text-left p-3 whitespace-nowrap">종료일</th>
-                  <th className="text-left p-3 whitespace-nowrap">상태</th>
-                  <th className="text-right p-3 pr-4 whitespace-nowrap">작업</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">슬러그</th>
+                  <th className="text-left px-3 py-3 whitespace-nowrap">제목</th>
+                  <th className="text-left px-3 py-3 whitespace-nowrap">응답수 / 한도</th>
+                  <th className="text-left px-3 py-3 whitespace-nowrap">종료일</th>
+                  <th className="text-left px-3 py-3 whitespace-nowrap">상태</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">작업</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -422,11 +422,11 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                   const isCopied = copiedId === s.id;
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/60">
-                      <td className="p-3 pl-5">
+                      <td className="px-4 py-3">
                         <div className="font-mono font-bold text-slate-800 text-[11px]">/{s.base_slug || s.slug}</div>
                         {s.custom_slug && <div className="font-mono text-[10px] text-indigo-500 mt-0.5">/{s.custom_slug}</div>}
                       </td>
-                      <td className="p-3 max-w-xs">
+                      <td className="px-3 py-3 max-w-xs">
                         <div className="flex items-center gap-2">
                           {(() => {
                             try {
@@ -443,12 +443,12 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                           <div className="font-semibold text-slate-700 truncate max-w-[240px]" title={s.title}>{s.title}</div>
                         </div>
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className="font-extrabold text-slate-800">{s.response_count ?? 0}</span>
                         <span className="text-slate-400"> / {s.response_limit ?? '∞'}</span>
                       </td>
-                      <td className="p-3 whitespace-nowrap text-slate-400">{s.expires_at ? formatDate(s.expires_at) : '-'}</td>
-                      <td className="p-3">
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-400">{s.expires_at ? formatDate(s.expires_at) : '-'}</td>
+                      <td className="px-3 py-3">
                         <div className="flex flex-col gap-1">
                           <Chip size="sm" variant="flat" color={s.is_active === 1 ? 'success' : 'default'} className="px-1.5 h-4 text-[9px] font-bold">
                             {s.is_active === 1 ? '활성' : '비활성'}
@@ -456,7 +456,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                           {s.password && <Chip size="sm" variant="flat" color="warning" className="px-1.5 h-4 text-[9px] font-bold">🔒 보호</Chip>}
                         </div>
                       </td>
-                      <td className="p-3 pr-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <Tooltip content={isCopied ? '복사됨!' : '주소 복사'}>
                             <Button size="sm" variant="flat" color={isCopied ? 'success' : 'default'} isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
@@ -859,6 +859,7 @@ function answerToString(q: Question, v: any): string {
 function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelProps) {
   const { survey, responses } = data;
   const questions: Question[] = survey.survey_config.questions || [];
+  const answerableQuestions = questions.filter((q: Question) => q.type !== 'media');
   const total = responses.length;
 
   const aggregate = (q: Question) => {
@@ -950,7 +951,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                   <div className="text-[11px] text-blue-600 font-bold mt-1">총 응답</div>
                 </div>
                 <div className="bg-emerald-50 rounded-2xl p-4 text-center">
-                  <div className="text-2xl font-extrabold text-emerald-700">{questions.length}</div>
+                  <div className="text-2xl font-extrabold text-emerald-700">{answerableQuestions.length}</div>
                   <div className="text-[11px] text-emerald-600 font-bold mt-1">질문 수</div>
                 </div>
                 <div className="bg-purple-50 rounded-2xl p-4 text-center">
@@ -960,7 +961,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                   <div className="text-[11px] text-purple-600 font-bold mt-1">최근 응답</div>
                 </div>
               </div>
-              {questions.map((q, qi) => {
+              {answerableQuestions.map((q, qi) => {
                 const agg = aggregate(q);
                 return (
                   <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
@@ -991,7 +992,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
 
           {tab === 'byQuestion' && (
             <div className="space-y-4">
-              {questions.map((q, qi) => (
+              {answerableQuestions.map((q, qi) => (
                 <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
                     <div className="font-bold text-slate-800 text-sm">{qi + 1}. {q.label}</div>
@@ -1024,7 +1025,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                 <Button size="sm" variant="flat" isDisabled={idx >= total - 1} onClick={() => setIdx(Math.min(total - 1, idx + 1))}>다음 →</Button>
               </div>
               <div className="space-y-3">
-                {questions.map((q, qi) => {
+                {answerableQuestions.map((q, qi) => {
                   const v = current.answers[q.id];
                   const s = answerToString(q, v);
                   return (
