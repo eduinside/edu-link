@@ -2162,10 +2162,7 @@ input:focus,textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 
   <!-- 이미 응답한 브라우저 안내 -->
   <div id="alreadyScreen" class="already-card hidden">
     <h2>&#x2705; 이미 응답하셨습니다</h2>
-    <p>이 브라우저에서 이미 응답을 제출했습니다.<br>추가로 응답하려면 아래 버튼을 누르세요.</p>
-    <div class="outro-btns">
-      <button class="submit-btn" id="ignoreAlreadyBtn" style="width:auto;padding:12px 28px">추가 응답하기</button>
-    </div>
+    <p>이 브라우저에서 이미 응답을 제출하셨습니다.<br>동일한 브라우저에서는 중복 응답이 제한됩니다.</p>
   </div>
 
   <!-- 설문 폼 (인트로 + 질문 통합) -->
@@ -2242,10 +2239,6 @@ if (CONFIG.one_response_per_browser && localStorage.getItem(BROWSER_KEY)) {
   formScreen.classList.add('hidden');
   alreadyScreen.classList.remove('hidden');
 }
-document.getElementById('ignoreAlreadyBtn').addEventListener('click', () => {
-  alreadyScreen.classList.add('hidden');
-  formScreen.classList.remove('hidden');
-});
 
 // ── 제목 · 인트로 · 아웃트로 설정 ──────────────────────
 document.getElementById('formTitle').textContent = surveyTitle;
@@ -2412,6 +2405,9 @@ document.getElementById('submitBtn').addEventListener('click', async ()=>{
     if(data.success){
       if(CONFIG.one_response_per_browser) {
         try { localStorage.setItem(BROWSER_KEY, '1'); } catch(e){}
+        // 중복 응답 제한 설정 시 아웃트로의 "추가 응답하기" 숨김
+        const resubmitBtn = document.getElementById('resubmitBtn');
+        if(resubmitBtn) resubmitBtn.style.display = 'none';
       }
       formScreen.classList.add('hidden');
       outroScreen.classList.remove('hidden');
