@@ -749,7 +749,7 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
         <Button size="sm" variant="light" color="danger" isIconOnly className="w-6 h-6 min-w-0" onClick={onRemove}><Trash2 className="w-3 h-3" /></Button>
       </div>
 
-      <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2" />
+      <Input size="sm" placeholder="질문 라벨 *" value={q.label} onChange={e => onChange({ label: e.target.value })} className="mb-2 w-full" />
 
       {showDesc && (
         <div className="space-y-1.5 mt-1 mb-2 p-2 bg-white rounded-lg border border-slate-100">

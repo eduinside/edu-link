@@ -2103,7 +2103,7 @@ function getSurveyPageHtml(urlId: number, slug: string, configJson: string): str
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>설문 응답 · 에듀링크</title>
+<title>EduLink Survey</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
@@ -2118,6 +2118,10 @@ body{background:linear-gradient(135deg,var(--bg-from),var(--bg-to));min-height:1
 h1{font-size:22px;font-weight:900;color:#1e293b;margin-bottom:12px;text-align:center}
 .intro-text,.outro-text{font-size:14px;color:#475569;line-height:1.8;white-space:pre-wrap;text-align:center}
 .intro-text a,.outro-text a{color:var(--p);text-decoration:underline}
+.intro-banner{background:linear-gradient(135deg,var(--bg-from),var(--bg-to));border:1px solid color-mix(in srgb,var(--p) 20%,transparent);border-radius:16px;padding:18px 20px;margin-bottom:20px;text-align:center}
+.intro-banner .intro-title{font-size:20px;font-weight:900;color:#1e293b;margin-bottom:10px}
+.intro-banner .intro-body{font-size:13px;color:#475569;line-height:1.8;white-space:pre-wrap}
+.intro-banner .intro-body a{color:var(--p);text-decoration:underline}
 .q-block{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.04);border:1px solid #f1f5f9}
 .q-label{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:6px;display:flex;align-items:baseline;gap:6px}
 .q-desc{font-size:12px;color:#64748b;line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
@@ -2140,7 +2144,6 @@ input:focus,textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 
 .submit-btn{width:100%;padding:16px;background:var(--p);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px var(--ps);transition:all .2s;margin-top:8px}
 .submit-btn:hover{background:var(--pd);transform:translateY(-1px)}
 .submit-btn:disabled{background:#cbd5e1;cursor:not-allowed;transform:none}
-.start-btn{display:inline-block;margin-top:20px;padding:14px 32px;background:var(--p);color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px var(--ps)}
 .error{color:#ef4444;font-size:12px;margin-top:8px;display:none}
 .error.show{display:block}
 .hidden{display:none}
@@ -2154,25 +2157,24 @@ input:focus,textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 
 </head>
 <body>
 <div class="wrap">
-  <div class="logo"><img src="/edulink_logo.png" alt=""><span>에듀링크 설문</span></div>
+  <div class="logo"><img src="/edulink_logo.png" alt=""><span id="logoLabel">에듀링크 설문</span></div>
 
   <!-- 이미 응답한 브라우저 안내 -->
   <div id="alreadyScreen" class="already-card hidden">
-    <h2>✅ 이미 응답하셨습니다</h2>
+    <h2>&#x2705; 이미 응답하셨습니다</h2>
     <p>이 브라우저에서 이미 응답을 제출했습니다.<br>추가로 응답하려면 아래 버튼을 누르세요.</p>
     <div class="outro-btns">
       <button class="submit-btn" id="ignoreAlreadyBtn" style="width:auto;padding:12px 28px">추가 응답하기</button>
     </div>
   </div>
 
-  <div id="introScreen" class="card">
-    <h1 id="introTitle"></h1>
-    <div class="intro-text" id="introText"></div>
-    <div style="text-align:center"><button class="start-btn" id="startBtn">설문 시작 →</button></div>
-  </div>
-
-  <div id="formScreen" class="hidden">
-    <div class="card"><h1 id="formTitle"></h1></div>
+  <!-- 설문 폼 (인트로 + 질문 통합) -->
+  <div id="formScreen">
+    <!-- 인트로 배너 (제목 + 안내문) -->
+    <div class="intro-banner">
+      <div class="intro-title" id="formTitle"></div>
+      <div class="intro-body" id="introText"></div>
+    </div>
     <div id="questions"></div>
     <div class="card" style="padding:16px">
       <button class="submit-btn" id="submitBtn">응답 제출</button>
@@ -2181,7 +2183,7 @@ input:focus,textarea:focus{border-color:var(--p);background:#fff;box-shadow:0 0 
   </div>
 
   <div id="outroScreen" class="card hidden">
-    <h1>✅ 응답이 제출되었습니다</h1>
+    <h1>&#x2705; 응답이 제출되었습니다</h1>
     <div class="outro-text" id="outroText" style="margin-top:16px"></div>
     <div class="outro-btns">
       <button class="btn-secondary" id="resubmitBtn">추가 응답하기</button>
@@ -2196,11 +2198,14 @@ const CONFIG = ${configJson};
 const questions = CONFIG.questions || [];
 const BROWSER_KEY = 'survey_resp_' + SLUG;
 
-const introScreen = document.getElementById('introScreen');
 const formScreen  = document.getElementById('formScreen');
 const outroScreen = document.getElementById('outroScreen');
 const alreadyScreen = document.getElementById('alreadyScreen');
 const errorMsg    = document.getElementById('errorMsg');
+
+// ── 페이지 타이틀 동적 설정 (인코딩 안전) ────────────────
+const surveyTitle = CONFIG.title || '에듀링크 설문';
+document.title = surveyTitle + ' · 에듀링크';
 
 // ── URL 자동 링크화 ──────────────────────────────────────
 function linkify(text) {
@@ -2234,26 +2239,21 @@ function renderMedia(url) {
 
 // ── 브라우저 1회 제한 체크 ───────────────────────────────
 if (CONFIG.one_response_per_browser && localStorage.getItem(BROWSER_KEY)) {
-  introScreen.classList.add('hidden');
+  formScreen.classList.add('hidden');
   alreadyScreen.classList.remove('hidden');
 }
 document.getElementById('ignoreAlreadyBtn').addEventListener('click', () => {
   alreadyScreen.classList.add('hidden');
-  introScreen.classList.remove('hidden');
-});
-
-// ── intro/outro 텍스트 (URL 자동 링크) ──────────────────
-document.getElementById('introTitle').textContent = CONFIG.title || '설문 응답';
-document.getElementById('formTitle').textContent  = CONFIG.title || '설문 응답';
-document.getElementById('introText').innerHTML  = linkify(CONFIG.intro  || '아래 설문에 응답해 주세요.');
-document.getElementById('outroText').innerHTML  = linkify(CONFIG.outro  || '응답해 주셔서 감사합니다.');
-
-// ── 설문 시작 ────────────────────────────────────────────
-document.getElementById('startBtn').addEventListener('click', () => {
-  introScreen.classList.add('hidden');
   formScreen.classList.remove('hidden');
-  renderQuestions();
 });
+
+// ── 제목 · 인트로 · 아웃트로 설정 ──────────────────────
+document.getElementById('formTitle').textContent = surveyTitle;
+document.getElementById('introText').innerHTML = linkify(CONFIG.intro || '아래 설문에 응답해 주세요.');
+document.getElementById('outroText').innerHTML = linkify(CONFIG.outro || '응답해 주셔서 감사합니다.');
+
+// ── 질문 렌더링 즉시 실행 ────────────────────────────────
+renderQuestions();
 
 // ── 추가 응답 / 다시 작성하기 ───────────────────────────
 document.getElementById('resubmitBtn').addEventListener('click', () => {
@@ -2301,7 +2301,7 @@ function renderQuestions(){
         break;
       }
       case 'phone':
-        body = '<input type="tel" data-input placeholder="010-0000-0000" inputmode="numeric">'; break;
+        body = '<input type="tel" data-input placeholder="010-0000-0000" inputmode="numeric" autocomplete="tel">'; break;
       case 'email':
         body = '<input type="email" data-input placeholder="example@email.com">'; break;
       case 'address':
@@ -2340,8 +2340,17 @@ function renderQuestions(){
       const inp = block.querySelector('[data-input]');
       inp.addEventListener('input', e=>{
         let v = e.target.value.replace(/\\D/g,'').slice(0,11);
-        if(v.length >= 7) v = v.replace(/(\\d{3})(\\d{3,4})(\\d{0,4}).*/, '$1-$2-$3').replace(/-$/,'');
-        else if(v.length >= 4) v = v.replace(/(\\d{3})(\\d{0,4}).*/, '$1-$2');
+        if(v.length === 11) {
+          // 011자리: 000-0000-0000
+          v = v.replace(/(\\d{3})(\\d{4})(\\d{4})/, '$1-$2-$3');
+        } else if(v.length === 10) {
+          // 10자리: 000-000-0000
+          v = v.replace(/(\\d{3})(\\d{3})(\\d{4})/, '$1-$2-$3');
+        } else if(v.length >= 7) {
+          v = v.replace(/(\\d{3})(\\d{3,4})(\\d{0,4})/, '$1-$2-$3').replace(/-$/,'');
+        } else if(v.length >= 4) {
+          v = v.replace(/(\\d{3})(\\d{0,4})/, '$1-$2');
+        }
         e.target.value = v;
       });
     }
