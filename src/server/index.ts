@@ -1733,6 +1733,52 @@ app.post('/survey/:slug/submit', async (c) => {
     }
 });
 
+// robots.txt — ASSETS에서 직접 서빙
+app.get('/robots.txt', (c) => c.env.ASSETS.fetch(c.req.raw));
+
+// sitemap.xml — DB에서 관리자 공식 링크를 동적으로 포함
+app.get('/sitemap.xml', async (c) => {
+    const host = new URL(c.req.url).origin; // e.g. https://dgedu.link
+
+    // 관리자(user_id 1·2)가 등록한 공개 커스텀 단축링크 조회
+    let adminLinks: { custom_slug: string; title: string; updated_at: string }[] = [];
+    try {
+        const { results } = await c.env.DB.prepare(
+            `SELECT custom_slug, title, updated_at
+               FROM urls
+              WHERE user_id IN (1, 2)
+                AND kind     = 'link'
+                AND created_by = 'web'
+                AND custom_slug IS NOT NULL
+                AND is_active = 1
+                AND is_public = 1
+              ORDER BY updated_at DESC`
+        ).all<{ custom_slug: string; title: string; updated_at: string }>();
+        adminLinks = results;
+    } catch (e) {
+        console.error('[sitemap] DB query failed:', e);
+    }
+
+    const urlEntries = [
+        // 랜딩 페이지
+        `  <url>\n    <loc>${host}/</loc>\n    <changefreq>monthly</changefreq>\n    <priority>1.0</priority>\n  </url>`,
+        // 관리자 공식 링크
+        ...adminLinks.map(({ custom_slug, updated_at }) => {
+            const lastmod = updated_at ? updated_at.slice(0, 10) : '';
+            return `  <url>\n    <loc>${host}/${encodeURIComponent(custom_slug)}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ''}\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`;
+        }),
+    ].join('\n');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>`;
+
+    return new Response(xml, {
+        headers: {
+            'Content-Type': 'application/xml; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600',
+        },
+    });
+});
+
 // 9. /{slug} 리다이렉트 怨좎냽 由щ뵒?됱뀡
 app.get('/:slug', async (c) => {
     let slug = c.req.param('slug');
