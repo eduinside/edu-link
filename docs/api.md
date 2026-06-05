@@ -93,7 +93,8 @@
 { "success": false, "error": "closed" }
 ```
 
-> 제출 시 `urls.response_count += 1`, `survey_responses` 테이블에 행 추가, IP SHA-256 해시 저장.
+> 제출 시 `urls.response_count += 1`, `survey_responses` 테이블에 행 추가, IP SHA-256 해시 저장.  
+> `survey_config.notify_email = true`이면 설문 소유자의 계정 이메일로 응답 내용 알림 메일(Resend)을 발송합니다.
 
 ---
 
@@ -217,6 +218,7 @@
     "theme": "indigo",               // indigo | emerald | rose | amber | sky
     "one_response_per_browser": true, // 선택, 기본 false
     "inactive_message": "이 설문은 종료되었습니다.", // 선택
+    "notify_email": true,            // 선택, 기본 false — 응답 수신 시 소유자 이메일로 알림 발송
     "questions": [
       {
         "id": "q_0",

@@ -8,22 +8,8 @@
 }
 
 /* Custom styles & animations */
-@keyframes gradient-bg {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
 .gemini-gradient-bg {
-  background: linear-gradient(-45deg, #e0f2fe, #e0e7ff, #faf5ff, #ffffff);
-  background-size: 400% 400%;
-  animation: gradient-bg 15s ease infinite;
+  background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 40%, #faf5ff 70%, #ffffff 100%);
 }
 
 .glassmorphism {

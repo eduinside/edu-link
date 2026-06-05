@@ -9,6 +9,19 @@ import { rateLimitMiddleware } from './middleware/rateLimit';
 const app = new Hono<{ Bindings: Env }>();
 
 // ----------------------------------------------------
+// [글로벌 미들웨어] 스캐너 봇 차단 (WordPress/phpMyAdmin 탐색 프로브)
+// ----------------------------------------------------
+const SCANNER_PATH_RE = /^\/(wp-admin|wp-login\.php|wp-content|wp-includes|wp-json|wp-cron\.php|wp-config\.php|xmlrpc\.php|phpmyadmin|\.env|\.git)(\/|$|\?)/i;
+
+app.use('*', async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (SCANNER_PATH_RE.test(path)) {
+        return c.text('Not Found', 404);
+    }
+    return next();
+});
+
+// ----------------------------------------------------
 // [글로벌 미들웨어] CORS 설정 적용
 // ----------------------------------------------------
 app.use('/api/v1/*', cors({
@@ -1678,8 +1691,8 @@ app.post('/survey/:slug/submit', async (c) => {
     try { slug = decodeURIComponent(slug).normalize('NFC'); } catch { slug = slug.normalize('NFC'); }
     try {
         const row = await c.env.DB.prepare(
-            "SELECT id, password, expires_at, is_active, kind, survey_config, response_limit, response_count FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
-        ).bind(slug, slug, slug).first<{ id: number; password: string | null; expires_at: string | null; is_active: number; kind: string; survey_config: string; response_limit: number | null; response_count: number }>();
+            "SELECT id, user_id, title, password, expires_at, is_active, kind, survey_config, response_limit, response_count FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+        ).bind(slug, slug, slug).first<{ id: number; user_id: number; title: string; password: string | null; expires_at: string | null; is_active: number; kind: string; survey_config: string; response_limit: number | null; response_count: number }>();
         if (!row || row.kind !== 'survey' || row.is_active === 0) {
             return c.json({ success: false, error: '설문을 찾을 수 없습니다.' }, 404);
         }
@@ -1702,7 +1715,7 @@ app.post('/survey/:slug/submit', async (c) => {
             return c.json({ success: false, error: '응답 데이터가 올바르지 않습니다.' }, 400);
         }
 
-        const config = JSON.parse(row.survey_config) as { questions: Array<{ id: string; label: string; type: string; required?: boolean }> };
+        const config = JSON.parse(row.survey_config) as { questions: Array<{ id: string; label: string; type: string; required?: boolean }>; notify_email?: boolean };
         for (const q of (config.questions || [])) {
             if (q.type === 'media') continue;
             if (q.required) {
@@ -1726,6 +1739,73 @@ app.post('/survey/:slug/submit', async (c) => {
             "INSERT INTO survey_responses (url_id, answers_json, ip_hash, user_agent) VALUES (?, ?, ?, ?)"
         ).bind(row.id, JSON.stringify(answers), ipHash, ua).run();
         await c.env.DB.prepare("UPDATE urls SET response_count = response_count + 1 WHERE id = ?").bind(row.id).run();
+
+        if (config.notify_email) {
+            try {
+                const owner = await c.env.DB.prepare(
+                    "SELECT email, name FROM users WHERE id = ?"
+                ).bind(row.user_id).first<{ email: string; name: string }>();
+                const isProd = c.req.url.includes('dgedu.link');
+                if (owner && isProd && c.env.RESEND_API_KEY) {
+                    const newCount = (row.response_count || 0) + 1;
+                    const rowsHtml = config.questions
+                        .filter(q => q.type !== 'media')
+                        .map(q => {
+                            const ans = answers[q.id];
+                            let ansStr = '';
+                            if (Array.isArray(ans)) ansStr = ans.join(', ');
+                            else if (ans !== null && ans !== undefined && typeof ans === 'object') {
+                                ansStr = Object.entries(ans as Record<string, unknown>).filter(([, v]) => v).map(([k]) => k).join(', ');
+                            } else {
+                                ansStr = String(ans ?? '');
+                            }
+                            return `<tr>
+  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;font-weight:600;width:35%;vertical-align:top;">${q.label}</td>
+  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b;vertical-align:top;">${ansStr || '<span style="color:#94a3b8">-</span>'}</td>
+</tr>`;
+                        }).join('');
+
+                    const notifyHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:'Apple SD Gothic Neo',sans-serif;background:#f5f7fa;margin:0;padding:40px 0;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#2563eb,#4f46e5);padding:28px 36px;">
+      <h1 style="color:#fff;margin:0;font-size:20px;font-weight:900;letter-spacing:-0.5px;">에듀링크</h1>
+      <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:12px;">설문 응답 알림</p>
+    </div>
+    <div style="padding:28px 36px;">
+      <p style="color:#1e293b;font-size:15px;font-weight:700;margin:0 0 4px;">${owner.name || owner.email}님, 새 응답이 도착했습니다!</p>
+      <p style="color:#64748b;font-size:13px;margin:0 0 20px;">설문 <strong>${row.title}</strong>에 ${newCount}번째 응답이 제출되었습니다.</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        ${rowsHtml}
+      </table>
+    </div>
+    <div style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;">
+      <p style="color:#cbd5e1;font-size:11px;margin:0;text-align:center;">&copy; 2026 에듀링크 &middot; dgedu.link</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+                    await fetch('https://api.resend.com/emails', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            from: '에듀링크 <noreply@dgedu.link>',
+                            to: [owner.email],
+                            subject: `[에듀링크] "${row.title}" 새 응답 #${newCount}`,
+                            html: notifyHtml,
+                        }),
+                    });
+                }
+            } catch (e) {
+                console.error('[survey notify]', e);
+            }
+        }
 
         return c.json({ success: true });
     } catch (err: any) {

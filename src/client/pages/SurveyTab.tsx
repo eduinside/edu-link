@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, CardContent, Chip, Input, Tooltip } from '@heroui/react';
 import {
   FileText, Plus, Copy, ExternalLink, Trash2, Edit3, Check, BarChart3,
-  Download, QrCode, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Settings
+  Download, QrCode, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Settings, Mail
 } from 'lucide-react';
 
 type QuestionType = 'short' | 'long' | 'single' | 'multi' | 'rating' | 'phone' | 'email' | 'address' | 'media';
@@ -28,6 +28,7 @@ interface SurveyConfig {
   theme?: SurveyTheme;
   one_response_per_browser?: boolean;
   inactive_message?: string;
+  notify_email?: boolean;
 }
 
 const THEMES: Record<SurveyTheme, { label: string; color: string; bg: string; text: string }> = {
@@ -58,6 +59,7 @@ interface Props {
   setSuccessMsg: (m: string) => void;
   setError: (m: string) => void;
   setQrModalLink: (link: any) => void;
+  userEmail?: string;
 }
 
 const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
@@ -109,7 +111,7 @@ function hasAdvancedSettings(s: SurveyItem): boolean {
   } catch { return !!(s.custom_slug || s.password || s.expires_at || s.response_limit); }
 }
 
-export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrModalLink }: Props) {
+export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrModalLink, userEmail }: Props) {
   const [surveys, setSurveys] = useState<SurveyItem[]>([]);
   const [editing, setEditing] = useState<SurveyItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -132,6 +134,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
   const [formResponseLimit, setFormResponseLimit] = useState('');
   const [formOneResponsePerBrowser, setFormOneResponsePerBrowser] = useState(false);
   const [formInactiveMessage, setFormInactiveMessage] = useState('');
+  const [formNotifyEmail, setFormNotifyEmail] = useState(false);
 
   // Results inline panel
   const [resultsView, setResultsView] = useState<{ survey: any; responses: any[] } | null>(null);
@@ -175,6 +178,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     setFormResponseLimit('');
     setFormOneResponsePerBrowser(false);
     setFormInactiveMessage('');
+    setFormNotifyEmail(false);
   };
 
   const startCreate = (prefillTitle = '') => {
@@ -196,12 +200,14 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       setFormTheme((cfg.theme as SurveyTheme) || 'indigo');
       setFormOneResponsePerBrowser(!!cfg.one_response_per_browser);
       setFormInactiveMessage(cfg.inactive_message || '');
+      setFormNotifyEmail(!!cfg.notify_email);
     } catch {
       setFormTitle(s.title);
       setFormQuestions([]);
       setFormTheme('indigo');
       setFormOneResponsePerBrowser(false);
       setFormInactiveMessage('');
+      setFormNotifyEmail(false);
     }
     setFormCustomSlug(s.custom_slug || '');
     setFormPassword(s.password || '');
@@ -261,6 +267,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       theme: formTheme,
       one_response_per_browser: formOneResponsePerBrowser || undefined,
       inactive_message: formInactiveMessage.trim() || undefined,
+      notify_email: formNotifyEmail || undefined,
     };
     const expirationUtc = formExpiresAt
       ? new Date(formExpiresAt).toISOString().replace('T', ' ').split('.')[0]
@@ -590,6 +597,25 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                   <label htmlFor="formActive" className="font-bold text-slate-600">활성화</label>
                 </div>
               )}
+
+              <div className="flex items-start gap-2 p-2.5 bg-indigo-50 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="formNotifyEmail"
+                  checked={formNotifyEmail}
+                  onChange={e => setFormNotifyEmail(e.target.checked)}
+                  className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 flex-shrink-0"
+                />
+                <label htmlFor="formNotifyEmail" className="font-bold text-slate-600 leading-relaxed">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-indigo-500" />
+                    응답 수신 이메일 알림
+                  </span>
+                  <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
+                    새 응답이 제출될 때마다{userEmail ? ` ${userEmail}` : ' 계정 이메일'}로 알림을 발송합니다.
+                  </span>
+                </label>
+              </div>
 
               {/* 고급 설정 아코디언 */}
               <div className="border border-slate-200 rounded-xl overflow-hidden">

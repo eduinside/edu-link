@@ -2092,6 +2092,7 @@ export default function Dashboard() {
                 setSuccessMsg={setSuccessMsg}
                 setError={setError}
                 setQrModalLink={setQrModalLink}
+                userEmail={user?.email}
               />
             )
           )}
