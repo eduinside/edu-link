@@ -916,7 +916,7 @@ export default function Dashboard() {
                 <img 
                   src="/edulink_logo.png" 
                   alt="에듀링크 로고" 
-                  className="w-8 h-8 rounded-xl shadow-md border border-indigo-50/50 object-cover" 
+                  className="w-8 h-8 rounded-xl shadow-md border border-brand-50/50 object-cover" 
                 />
                 <span className="font-display font-black text-base text-slate-800">에듀링크</span>
               </div>
@@ -924,7 +924,7 @@ export default function Dashboard() {
               <img 
                 src="/edulink_logo.png" 
                 alt="에듀링크 로고" 
-                className="w-8 h-8 rounded-xl shadow-md border border-indigo-50/50 object-cover mx-auto cursor-pointer hover:scale-105 transition-transform" 
+                className="w-8 h-8 rounded-xl shadow-md border border-brand-50/50 object-cover mx-auto cursor-pointer hover:scale-105 transition-transform" 
                 onClick={() => setIsSidebarOpen(true)}
                 title="사이드바 열기"
               />
@@ -1052,13 +1052,13 @@ export default function Dashboard() {
         <div className="p-3 border-t border-slate-100 flex flex-col gap-2">
           {isSidebarOpen && user && (
             <div className="px-3 py-2 bg-slate-50 rounded-2xl flex items-center gap-2 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-xs text-indigo-700 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center font-bold text-xs text-brand-700 flex-shrink-0">
                 {user.name.charAt(0)}
               </div>
               <div className="flex-1 truncate">
                 <div className="flex items-center justify-between gap-1">
                   <p className="text-[11px] font-bold text-slate-800 truncate">{user.name}</p>
-                  <span className="text-[8px] bg-indigo-100 text-indigo-700 font-bold px-1.5 rounded-md flex-shrink-0">Lv.{user.level}</span>
+                  <span className="text-[8px] bg-brand-100 text-brand-700 font-bold px-1.5 rounded-md flex-shrink-0">Lv.{user.level}</span>
                 </div>
                 <p className="text-[9px] text-slate-400 truncate">{user.email}</p>
               </div>
@@ -1301,7 +1301,7 @@ export default function Dashboard() {
                           onClick={() => setLinkSourceFilter('web')}
                           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             linkSourceFilter === 'web'
-                              ? 'bg-white text-indigo-600 shadow-sm'
+                              ? 'bg-white text-brand-600 shadow-sm'
                               : 'text-slate-500 hover:text-slate-800'
                           }`}
                         >
@@ -1309,7 +1309,7 @@ export default function Dashboard() {
                           일반 링크
                           <span className={`ml-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
                             linkSourceFilter === 'web'
-                              ? 'bg-indigo-50 text-indigo-600'
+                              ? 'bg-brand-50 text-brand-600'
                               : 'bg-slate-200 text-slate-500'
                           }`}>
                             {links.filter(l => l.created_by !== 'api').length}
@@ -1322,7 +1322,7 @@ export default function Dashboard() {
                           onClick={() => setLinkSourceFilter('api')}
                           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             linkSourceFilter === 'api'
-                              ? 'bg-white text-indigo-600 shadow-sm'
+                              ? 'bg-white text-brand-600 shadow-sm'
                               : 'text-slate-500 hover:text-slate-800'
                           }`}
                         >
@@ -1330,7 +1330,7 @@ export default function Dashboard() {
                           API 생성 링크
                           <span className={`ml-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
                             linkSourceFilter === 'api'
-                              ? 'bg-indigo-50 text-indigo-600'
+                              ? 'bg-brand-50 text-brand-600'
                               : 'bg-slate-200 text-slate-500'
                           }`}>
                             {links.filter(l => l.created_by === 'api').length}
@@ -1381,7 +1381,7 @@ export default function Dashboard() {
                                         /{link.base_slug || link.slug}
                                       </div>
                                       {link.custom_slug && (
-                                        <div className="font-mono text-[10px] text-indigo-500 mt-0.5">
+                                        <div className="font-mono text-[10px] text-brand-500 mt-0.5">
                                           /{link.custom_slug}
                                         </div>
                                       )}
@@ -1546,7 +1546,7 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                 <div className="space-y-0.5">
                                   <h3 className="font-bold text-base text-slate-800">단축 링크 편집</h3>
-                                  <p className="text-[10px] text-indigo-600 font-bold font-display">
+                                  <p className="text-[10px] text-brand-600 font-bold font-display">
                                     dgedu.link/{editingLink.base_slug || editingLink.slug}
                                     {editingLink.custom_slug && <span className="text-slate-400 font-normal"> · /{editingLink.custom_slug}</span>}
                                   </p>
@@ -1581,7 +1581,7 @@ export default function Dashboard() {
                                           setSlugCheckMsg('');
                                         }
                                       }}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                      className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                     />
                                     <label htmlFor="useEditCustomSlug" className="font-bold text-slate-600 select-none">
                                       🔗 커스텀 슬러그 설정
@@ -1608,7 +1608,7 @@ export default function Dashboard() {
                                           type="button"
                                           onClick={() => checkSlugAvailability(editCustomSlugInput, editingLink.id)}
                                           disabled={!editCustomSlugInput.trim() || slugCheckState === 'checking'}
-                                          className="px-3 py-1 text-[11px] font-bold rounded-lg bg-indigo-600 text-white disabled:opacity-40 hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                                          className="px-3 py-1 text-[11px] font-bold rounded-lg bg-brand-600 text-white disabled:opacity-40 hover:bg-brand-700 transition-colors whitespace-nowrap"
                                         >
                                           {slugCheckState === 'checking' ? '확인 중…' : '중복 확인'}
                                         </button>
@@ -1671,7 +1671,7 @@ export default function Dashboard() {
                                       setEditExpiresMode(m);
                                       if (m === 'custom') setEditExpiresAt(editExpiresAt || getKSTDateTimeString(24*60*60*1000));
                                     }}
-                                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
                                   >
                                     <option value="none">없음</option>
                                     <option value="24h">24시간 이후</option>
@@ -1702,7 +1702,7 @@ export default function Dashboard() {
                                         setUseEditPassword(e.target.checked);
                                         if (!e.target.checked) setEditPassword('');
                                       }}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                      className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                     />
                                     <label htmlFor="useEditPassword" className="font-bold text-slate-600 select-none flex items-center gap-1">
                                       🔒 비밀번호 보호 설정
@@ -1733,7 +1733,7 @@ export default function Dashboard() {
                                       id="editActive"
                                       checked={editActive}
                                       onChange={(e) => setEditActive(e.target.checked)}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                      className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                     />
                                     <label htmlFor="editActive" className="font-bold text-slate-600 select-none">
                                       링크 활성화 상태 (체크 해제 시 접속 차단)
@@ -1746,7 +1746,7 @@ export default function Dashboard() {
                                       id="editPublic"
                                       checked={editPublic}
                                       onChange={(e) => setEditPublic(e.target.checked)}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                      className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                     />
                                     <label htmlFor="editPublic" className="font-bold text-slate-600 select-none">
                                       메인 화면(루트) 전체 목록에 공개하기
@@ -1799,7 +1799,7 @@ export default function Dashboard() {
                             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                               <div className="space-y-0.5">
                                 <h3 className="font-bold text-base text-slate-800">단축주소 생성</h3>
-                                <p className="text-[10px] text-indigo-600 font-bold font-display">세부 설정 후 생성합니다</p>
+                                <p className="text-[10px] text-brand-600 font-bold font-display">세부 설정 후 생성합니다</p>
                               </div>
                               <Chip size="sm" variant="flat" color="primary">새 링크</Chip>
                             </div>
@@ -1856,7 +1856,7 @@ export default function Dashboard() {
                                     id="useCustomSlug"
                                     checked={useCustomSlug}
                                     onChange={(e) => setUseCustomSlug(e.target.checked)}
-                                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                   />
                                   <label htmlFor="useCustomSlug" className="font-bold text-slate-600 select-none">
                                     커스텀 슬러그 직접 지정
@@ -1884,7 +1884,7 @@ export default function Dashboard() {
                                     setNewExpiresMode(m);
                                     if (m === 'custom') setNewExpiresAt(newExpiresAt || getKSTDateTimeString(24*60*60*1000));
                                   }}
-                                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
                                 >
                                   <option value="none">없음</option>
                                   <option value="24h">24시간 이후</option>
@@ -1916,7 +1916,7 @@ export default function Dashboard() {
                                       setUseNewPassword(e.target.checked);
                                       if (!e.target.checked) setNewPassword('');
                                     }}
-                                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                   />
                                   <label htmlFor="useNewPassword" className="font-bold text-slate-600 select-none flex items-center gap-1">
                                     🔒 비밀번호 보호 설정
@@ -1948,7 +1948,7 @@ export default function Dashboard() {
                                     id="newPublic"
                                     checked={newPublic}
                                     onChange={(e) => setNewPublic(e.target.checked)}
-                                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
                                   />
                                   <label htmlFor="newPublic" className="font-bold text-slate-600 select-none">
                                     메인 화면(루트) 전체 목록에 공개하기
@@ -1997,10 +1997,10 @@ export default function Dashboard() {
                             <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
                               <div className="space-y-0.5 min-w-0">
                                 <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
-                                  <TrendingUp className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                                  <TrendingUp className="w-4 h-4 text-brand-600 flex-shrink-0" />
                                   접속 통계
                                 </h3>
-                                <p className="text-[10px] text-indigo-600 font-bold font-mono truncate">
+                                <p className="text-[10px] text-brand-600 font-bold font-mono truncate">
                                   dgedu.link/{statsDrawerLink.base_slug || statsDrawerLink.slug}
                                   {statsDrawerLink.custom_slug && <span className="text-slate-400 font-normal"> · /{statsDrawerLink.custom_slug}</span>}
                                 </p>
@@ -2030,7 +2030,7 @@ export default function Dashboard() {
                                     href={statsDrawerLink.original_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                                    className="text-brand-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
                                   >
                                     {statsDrawerLink.original_url}
                                   </a>
@@ -2041,7 +2041,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
                                   <span className="text-slate-500 font-bold flex items-center gap-1.5">
-                                    <BarChart3 className="w-3.5 h-3.5 text-indigo-500" />
+                                    <BarChart3 className="w-3.5 h-3.5 text-brand-500" />
                                     누적 클릭
                                   </span>
                                   <span className="text-slate-800 font-extrabold text-lg">{statsDrawerLink.click_count ?? 0}<span className="text-xs font-normal text-slate-400 ml-1">회</span></span>
@@ -2053,7 +2053,7 @@ export default function Dashboard() {
                                 <h4 className="font-bold text-sm text-slate-800">최근 30일 일별 접속 현황</h4>
                                 {isLoadingStats ? (
                                   <div className="flex items-center justify-center py-14">
-                                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                    <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
                                   </div>
                                 ) : (
                                   <StatsBarChart dailyClicks={statsData?.daily_clicks || []} />
@@ -2120,7 +2120,7 @@ export default function Dashboard() {
                 <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm xl:sticky xl:top-8">
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <KeyRound className="w-4 h-4 text-indigo-600" />
+                      <KeyRound className="w-4 h-4 text-brand-600" />
                       <h4 className="font-bold text-sm text-slate-800">새 API Key 발급</h4>
                     </div>
 
@@ -2179,7 +2179,7 @@ export default function Dashboard() {
                                     </Chip>
                                   </div>
                                   <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                                    <span>키 식별: <code className="bg-slate-50 px-1 py-0.5 rounded font-mono font-bold text-indigo-600">{key.key_prefix}</code></span>
+                                    <span>키 식별: <code className="bg-slate-50 px-1 py-0.5 rounded font-mono font-bold text-brand-600">{key.key_prefix}</code></span>
                                     <span>발급일: {formatDate(key.created_at)}</span>
                                   </div>
                                 </div>
@@ -2265,7 +2265,7 @@ export default function Dashboard() {
               <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
                 <CardContent className="p-6 space-y-5 text-xs">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <User className="w-4 h-4 text-indigo-600" />
+                    <User className="w-4 h-4 text-brand-600" />
                     <h4 className="font-bold text-sm text-slate-800">개인정보 수정</h4>
                   </div>
 
@@ -2319,7 +2319,7 @@ export default function Dashboard() {
               <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm lg:col-span-2">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    <ShieldCheck className="w-4 h-4 text-brand-600" />
                     <h4 className="font-bold text-sm text-slate-800">회원등급 가이드</h4>
                   </div>
 
@@ -2329,7 +2329,7 @@ export default function Dashboard() {
                     </p>
 
                     <div className="space-y-3">
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 1 ? 'bg-indigo-50/30 border-indigo-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 1 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="default" className="h-5 text-[9px] font-bold">1단계</Chip>
@@ -2340,7 +2340,7 @@ export default function Dashboard() {
                         {user.level === 1 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 2 ? 'bg-indigo-50/30 border-indigo-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 2 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="primary" className="h-5 text-[9px] font-bold">2단계</Chip>
@@ -2351,7 +2351,7 @@ export default function Dashboard() {
                         {user.level === 2 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 3 ? 'bg-indigo-50/30 border-indigo-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 3 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="secondary" className="h-5 text-[9px] font-bold">3단계</Chip>
@@ -2362,7 +2362,7 @@ export default function Dashboard() {
                         {user.level === 3 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 4 ? 'bg-indigo-50/30 border-indigo-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 4 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="danger" className="h-5 text-[9px] font-bold">4단계</Chip>
@@ -2398,7 +2398,7 @@ export default function Dashboard() {
                             required
                             value={upgradeReqLevel}
                             onChange={(e) => setUpgradeReqLevel(Number(e.target.value))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-indigo-400 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors"
                           >
                             <option value={0} disabled>— 요청할 등급 선택 —</option>
                             {user.level < 2 && <option value={2}>2단계: 인증사용자 (링크 생성·관리)</option>}
@@ -2413,7 +2413,7 @@ export default function Dashboard() {
                             placeholder="승급이 필요한 이유, 소속 기관, 활용 목적 등을 구체적으로 작성해 주세요."
                             value={upgradeReqReason}
                             onChange={(e) => setUpgradeReqReason(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-indigo-400 transition-colors resize-none leading-relaxed"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors resize-none leading-relaxed"
                           />
                         </div>
                         <Button
@@ -2471,9 +2471,9 @@ export default function Dashboard() {
           {/* 활용방법 탭 */}
           {activeTab === 'guide' && (
             <div className="space-y-6 animate-fade-in max-w-3xl">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-3xl text-white space-y-2.5 shadow-lg shadow-indigo-100/50">
+              <div className="bg-gradient-to-r from-blue-600 to-brand-600 p-8 rounded-3xl text-white space-y-2.5 shadow-lg shadow-brand-100/50">
                 <h3 className="text-xl font-bold font-sans">에듀링크(edu-link) 활용방법</h3>
-                <p className="text-xs text-indigo-100 leading-relaxed">
+                <p className="text-xs text-brand-100 leading-relaxed">
                   단축주소·설문지 생성부터 API 연동까지, 에듀링크의 주요 기능을 한눈에 확인하세요.
                 </p>
               </div>
@@ -2481,7 +2481,7 @@ export default function Dashboard() {
               {/* 회원 등급 안내 */}
               <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-4 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">★</span>
+                  <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold">★</span>
                   회원 등급 안내
                 </h4>
                 <div className="overflow-x-auto">
@@ -2523,7 +2523,7 @@ export default function Dashboard() {
                       <tr className="text-slate-600">
                         <td className="px-3 py-2.5 font-semibold">
                           <span className="inline-flex items-center gap-1">
-                            <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">3</span>
+                            <span className="w-4 h-4 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-[10px] font-bold">3</span>
                             고급사용자
                           </span>
                         </td>
@@ -2548,36 +2548,36 @@ export default function Dashboard() {
                   </table>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  등급 상향은 대시보드 우측 하단의 <span className="font-semibold text-indigo-500">등급업 신청</span> 버튼을 통해 요청할 수 있습니다.
+                  등급 상향은 대시보드 우측 하단의 <span className="font-semibold text-brand-500">등급업 신청</span> 버튼을 통해 요청할 수 있습니다.
                 </p>
               </div>
 
               {/* 단축주소 기능 */}
               <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">🔗</span>
+                  <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold">🔗</span>
                   단축주소 기능
                 </h4>
                 <div className="space-y-4 text-xs text-slate-700">
-                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                  <div className="border-l-4 border-brand-400 pl-4 py-1 space-y-1">
                     <h5 className="font-bold text-slate-800">단축주소 생성</h5>
                     <p className="text-slate-500 leading-relaxed">
                       대시보드 메인 화면의 주소 입력란에 원본 URL을 입력 후 '단축주소 생성' 버튼을 클릭합니다. 6자리 랜덤 슬러그가 자동 부여되며, 원하는 키워드(한글 포함)를 직접 지정할 수도 있습니다. og:title / &lt;title&gt; 태그 기반으로 페이지 제목이 자동 추출됩니다.
                     </p>
                   </div>
-                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                  <div className="border-l-4 border-brand-400 pl-4 py-1 space-y-1">
                     <h5 className="font-bold text-slate-800">비밀번호 및 만료일</h5>
                     <p className="text-slate-500 leading-relaxed">
                       6자리 숫자 PIN으로 링크를 보호하거나, 특정 일시 이후 자동 비활성화되는 만료일을 설정할 수 있습니다.
                     </p>
                   </div>
-                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                  <div className="border-l-4 border-brand-400 pl-4 py-1 space-y-1">
                     <h5 className="font-bold text-slate-800">접속 통계 및 QR 코드</h5>
                     <p className="text-slate-500 leading-relaxed">
                       링크별 일별 클릭 수를 30일 바 차트로 확인할 수 있으며, QR 코드 뷰어에서 이미지 다운로드·공유도 지원합니다.
                     </p>
                   </div>
-                  <div className="border-l-4 border-indigo-400 pl-4 py-1 space-y-1">
+                  <div className="border-l-4 border-brand-400 pl-4 py-1 space-y-1">
                     <h5 className="font-bold text-slate-800">공개 목록 노출</h5>
                     <p className="text-slate-500 leading-relaxed">
                       링크를 '공개'로 설정하면 에듀링크 메인 페이지의 최근 링크 목록에 표시됩니다. '비공개'로 설정하면 URL을 아는 사람만 접속할 수 있습니다.
@@ -2590,7 +2590,7 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">📋</span>
-                  설문지 기능 <span className="text-[10px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
+                  설문지 기능 <span className="text-[10px] bg-brand-50 text-brand-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
                 </h4>
                 <div className="space-y-4 text-xs text-slate-700">
                   <div className="border-l-4 border-purple-400 pl-4 py-1 space-y-1">
@@ -2630,7 +2630,7 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">⚡</span>
-                  개발자 도구 (API 연동) <span className="text-[10px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
+                  개발자 도구 (API 연동) <span className="text-[10px] bg-brand-50 text-brand-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
                 </h4>
                 <div className="space-y-4 text-xs text-slate-700">
                   <div className="border-l-4 border-green-400 pl-4 py-1 space-y-1">
@@ -2677,7 +2677,7 @@ export default function Dashboard() {
                         key={notice.id} 
                         className={`border transition-all duration-300 rounded-2xl cursor-pointer shadow-sm
                           ${notice.is_pinned ? 'bg-amber-50/20 border-amber-100' : 'bg-white border-slate-100'}
-                          ${isExpanded ? 'ring-1 ring-indigo-200 border-indigo-200' : ''}
+                          ${isExpanded ? 'ring-1 ring-brand-200 border-brand-200' : ''}
                         `}
                         onClick={() => setExpandedNoticeId(isExpanded ? null : notice.id)}
                       >
@@ -2770,7 +2770,7 @@ export default function Dashboard() {
                   {/* 통계 카드 4종 */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: '전체 회원', value: adminUsers.length, sub: '명', color: 'bg-indigo-50 border-indigo-100', textColor: 'text-indigo-600' },
+                      { label: '전체 회원', value: adminUsers.length, sub: '명', color: 'bg-brand-50 border-brand-100', textColor: 'text-brand-600' },
                       { label: '인증사용자 이상', value: adminUsers.filter(u => u.level >= 2).length, sub: '명', color: 'bg-blue-50 border-blue-100', textColor: 'text-blue-600' },
                       { label: '승급 대기', value: adminUpgradeRequests.filter(r => r.status === 'pending').length, sub: '건', color: 'bg-amber-50 border-amber-100', textColor: 'text-amber-600' },
                       { label: '공지사항', value: adminNotices.length, sub: '건', color: 'bg-rose-50 border-rose-100', textColor: 'text-rose-600' },
@@ -2867,7 +2867,7 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-indigo-500" />
+                        <User className="w-4 h-4 text-brand-500" />
                         <h4 className="font-bold text-sm text-slate-800">사용자 권한 등급 관리</h4>
                       </div>
                       <span className="text-xs text-slate-400">총 {adminUsers.length}명</span>
@@ -2892,7 +2892,7 @@ export default function Dashboard() {
                               return (
                                 <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                                   <td className="p-3.5 font-mono font-bold text-slate-400">{u.id}</td>
-                                  <td className="p-3.5 font-bold">{u.name}{isSelf && <span className="ml-1 text-[9px] text-indigo-600 font-bold">(본인)</span>}</td>
+                                  <td className="p-3.5 font-bold">{u.name}{isSelf && <span className="ml-1 text-[9px] text-brand-600 font-bold">(본인)</span>}</td>
                                   <td className="p-3.5 text-slate-500">{u.affiliation || <span className="text-slate-300">—</span>}</td>
                                   <td className="p-3.5 font-mono text-[10px]">{u.email}</td>
                                   <td className="p-3.5 text-slate-400">{formatDate(u.created_at || null)}</td>
@@ -2905,7 +2905,7 @@ export default function Dashboard() {
                                     {isSelf ? (
                                       <span className="text-[10px] text-slate-300 font-bold">본인 조정 불가</span>
                                     ) : (
-                                      <select value={u.level} onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))} className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-indigo-400">
+                                      <select value={u.level} onChange={(e) => handleUpdateUserLevel(u.id, Number(e.target.value))} className="bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 py-1.5 px-2 outline-none cursor-pointer focus:bg-white focus:border-brand-400">
                                         <option value={1}>1-일반회원</option>
                                         <option value={2}>2-인증사용자</option>
                                         <option value={3}>3-고급사용자</option>
@@ -2966,7 +2966,7 @@ export default function Dashboard() {
                             placeholder="내용을 자세히 입력하세요..."
                             value={editingNotice ? editNoticeContent : newNoticeContent}
                             onChange={(e) => editingNotice ? setEditNoticeContent(e.target.value) : setNewNoticeContent(e.target.value)}
-                            className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none rounded-xl p-3 text-xs text-slate-800 transition-all resize-none leading-relaxed"
+                            className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl p-3 text-xs text-slate-800 transition-all resize-none leading-relaxed"
                           />
                         </div>
                         <div className="flex items-center gap-2">
@@ -3006,7 +3006,7 @@ export default function Dashboard() {
                     ) : (
                       <div className="space-y-2">
                         {adminNotices.map((n) => (
-                          <Card key={n.id} className={`border rounded-2xl shadow-sm transition-all ${editingNotice?.id === n.id ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-100 bg-white'}`}>
+                          <Card key={n.id} className={`border rounded-2xl shadow-sm transition-all ${editingNotice?.id === n.id ? 'border-brand-300 bg-brand-50/20' : 'border-slate-100 bg-white'}`}>
                             <CardContent className="p-4 text-xs">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0 space-y-1.5">
@@ -3063,7 +3063,7 @@ export default function Dashboard() {
                   <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
                     <CardContent className="p-6 space-y-4 text-xs">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                        <Globe className="w-4 h-4 text-indigo-500" />
+                        <Globe className="w-4 h-4 text-brand-500" />
                         <div>
                           <h4 className="font-bold text-sm text-slate-800">Zero Trust 허용 도메인</h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">2단계 자동 승급 이메일 도메인 관리</p>
@@ -3138,7 +3138,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-3xl p-2 bg-white animate-fade-in">
             <CardContent className="p-6 flex flex-col gap-4 text-xs">
-              <div className="flex items-center gap-2 text-indigo-700 text-sm font-bold border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-brand-700 text-sm font-bold border-b border-slate-100 pb-3">
                 <ShieldCheck className="w-5 h-5 text-emerald-500" />
                 <span>API Key가 성공적으로 생성되었습니다</span>
               </div>
@@ -3240,7 +3240,7 @@ function StatsBarChart({ dailyClicks }: { dailyClicks: { date: string; clicks: n
                 width={Math.max(barW, 2)}
                 height={barH}
                 rx={1.5}
-                fill={d.clicks > 0 ? '#6366f1' : '#e2e8f0'}
+                fill={d.clicks > 0 ? '#3692ff' : '#e2e8f0'}
                 opacity={d.clicks > 0 ? 0.82 : 0.6}
               />
               {showLabel && (
@@ -3333,10 +3333,10 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
               <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
                 <div className="space-y-0.5 min-w-0">
                   <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
-                    <QrCode className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                    <QrCode className="w-4 h-4 text-brand-600 flex-shrink-0" />
                     QR 코드
                   </h3>
-                  <p className="text-[10px] text-indigo-600 font-bold font-mono truncate">
+                  <p className="text-[10px] text-brand-600 font-bold font-mono truncate">
                     dgedu.link/{qrSlug}
                     {link.custom_slug && <span className="text-slate-400 font-normal"> · /{link.custom_slug}</span>}
                   </p>
@@ -3365,7 +3365,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                 {/* 단축주소 표시 */}
                 <div className="w-full text-center space-y-1">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">단축주소 (원본 슬러그)</p>
-                  <code className="text-sm font-mono font-bold text-indigo-600 break-all">{shortUrl}</code>
+                  <code className="text-sm font-mono font-bold text-brand-600 break-all">{shortUrl}</code>
                 </div>
 
                 {/* 복사 + 다운로드 버튼 */}
@@ -3407,7 +3407,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                         href={link.original_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-indigo-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                        className="text-brand-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
                       >
                         {link.original_url}
                       </a>

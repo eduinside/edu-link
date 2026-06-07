@@ -3,13 +3,52 @@
 @import "@heroui/styles";
 
 @theme {
-  --font-sans: 'Noto Sans KR', 'Inter', sans-serif;
-  --font-display: 'Noto Sans KR', 'Outfit', sans-serif;
+  /* Typography — Pretendard (school-portal R2 design tokens) */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-display: "Pretendard Variable", Pretendard, -apple-system,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+
+  /* Brand scale — Codeit blue (#3692ff). Drop-in replacement for the old indigo brand. */
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #e7f1ff;
+  --color-brand-200: #c7e0ff;
+  --color-brand-300: #9ccaff;
+  --color-brand-400: #5fa8ff;
+  --color-brand-500: #3692ff;
+  --color-brand-600: #1f7af0;
+  --color-brand-700: #1763d0;
+  --color-brand-800: #184fa6;
+  --color-brand-900: #1a4382;
+
+  /* Primary alias → bg-/text-/shadow-/ring-primary utilities resolve to the brand blue */
+  --color-primary: #1f7af0;
+
+  /* Neutral aliases — Codeit ink / paper / line */
+  --color-ink: #1f2937;
+  --color-ink-soft: #56617a;
+  --color-ink-faint: #9aa4b5;
+  --color-paper: #f3f5f9;
+  --color-line: #e2e6ee;
+}
+
+/*
+ * HeroUI v3 accent override.
+ * color="primary" components map to --accent (.button--primary { --button-bg: var(--accent) }),
+ * and --focus / --accent-soft derive from it — so overriding --accent here rebrands every
+ * HeroUI primary surface + focus ring to Codeit blue. Unlayered :root beats HeroUI's @layer base.
+ */
+:root,
+[data-theme="light"],
+[data-theme="default"] {
+  --accent: #1f7af0;          /* brand-600 — primary base */
+  --accent-foreground: #ffffff;
+  --accent-hover: #1763d0;    /* brand-700 — hover */
 }
 
 /* Custom styles & animations */
 .gemini-gradient-bg {
-  background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 40%, #faf5ff 70%, #ffffff 100%);
+  background: linear-gradient(135deg, #e0f2fe 0%, #e7f1ff 40%, #faf5ff 70%, #ffffff 100%);
 }
 
 .glassmorphism {

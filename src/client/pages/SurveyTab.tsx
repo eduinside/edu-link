@@ -431,7 +431,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                     <tr key={s.id} className="hover:bg-slate-50/60">
                       <td className="px-4 py-3">
                         <div className="font-mono font-bold text-slate-800 text-[11px]">/{s.base_slug || s.slug}</div>
-                        {s.custom_slug && <div className="font-mono text-[10px] text-indigo-500 mt-0.5">/{s.custom_slug}</div>}
+                        {s.custom_slug && <div className="font-mono text-[10px] text-brand-500 mt-0.5">/{s.custom_slug}</div>}
                       </td>
                       <td className="px-3 py-3 max-w-xs">
                         <div className="flex items-center gap-2">
@@ -598,17 +598,17 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                 </div>
               )}
 
-              <div className="flex items-start gap-2 p-2.5 bg-indigo-50 rounded-xl">
+              <div className="flex items-start gap-2 p-2.5 bg-brand-50 rounded-xl">
                 <input
                   type="checkbox"
                   id="formNotifyEmail"
                   checked={formNotifyEmail}
                   onChange={e => setFormNotifyEmail(e.target.checked)}
-                  className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 flex-shrink-0"
+                  className="mt-0.5 rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5 flex-shrink-0"
                 />
                 <label htmlFor="formNotifyEmail" className="font-bold text-slate-600 leading-relaxed">
                   <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-indigo-500" />
+                    <Mail className="w-3.5 h-3.5 text-brand-500" />
                     응답 수신 이메일 알림
                   </span>
                   <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
@@ -628,7 +628,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                     <Settings className="w-3.5 h-3.5 text-slate-400" />
                     고급 설정
                     {(formCustomSlug || formPassword || formExpiresAt || formResponseLimit || formOneResponsePerBrowser || formInactiveMessage) && (
-                      <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold">설정됨</span>
+                      <span className="text-[9px] bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full font-bold">설정됨</span>
                     )}
                   </span>
                   {formShowAdvanced
@@ -689,7 +689,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                     <div className="flex items-start gap-2 p-2.5 bg-blue-50 rounded-xl">
                       <input type="checkbox" id="formOnePerBrowser" checked={formOneResponsePerBrowser}
                         onChange={e => setFormOneResponsePerBrowser(e.target.checked)}
-                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 flex-shrink-0" />
+                        className="mt-0.5 rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5 flex-shrink-0" />
                       <label htmlFor="formOnePerBrowser" className="font-bold text-slate-600 leading-relaxed">
                         브라우저 기준 중복 응답 제한
                         <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
@@ -707,8 +707,8 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                   <h4 className="font-bold text-slate-700">질문 ({formQuestions.length}개)</h4>
                   <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer select-none">
                     <input type="checkbox" checked={nextRequired} onChange={e => setNextRequired(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
-                    추가할 문항을 <span className={nextRequired ? 'text-indigo-600' : 'text-slate-400'}>필수</span>로
+                      className="rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5" />
+                    추가할 문항을 <span className={nextRequired ? 'text-brand-600' : 'text-slate-400'}>필수</span>로
                   </label>
                 </div>
 
@@ -781,13 +781,13 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
   return (
     <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] font-bold text-indigo-600">Q{idx + 1}</span>
+        <span className="text-[10px] font-bold text-brand-600">Q{idx + 1}</span>
         <Chip size="sm" variant="flat" className="text-[9px] h-4 px-1.5">{QUESTION_TYPE_LABEL[q.type]}</Chip>
         <div className="flex-1" />
         <Tooltip content="문항 안내문 입력" delay={200}>
           <button type="button"
             onClick={() => setShowDesc(!showDesc)}
-            className={`text-[9px] font-bold px-2 py-1 rounded-lg transition-colors ${showDesc ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+            className={`text-[9px] font-bold px-2 py-1 rounded-lg transition-colors ${showDesc ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
             {showDesc ? '안내 숨기기' : '+ 안내문'}
           </button>
         </Tooltip>
@@ -801,7 +801,7 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
         <div className="space-y-1.5">
           <input
             type="url"
-            className="w-full border-2 border-indigo-200 rounded-lg p-2.5 text-[11px] bg-white focus:border-indigo-400 outline-none"
+            className="w-full border-2 border-brand-200 rounded-lg p-2.5 text-[11px] bg-white focus:border-brand-400 outline-none"
             placeholder="🎬 YouTube·이미지·동영상 URL을 입력하세요 *"
             value={q.media_url || ''}
             onChange={e => onChange({ media_url: e.target.value })}
@@ -954,7 +954,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                 onClick={() => setTab(t.k as any)}
                 className={`px-4 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors ${
                   tab === t.k
-                    ? 'text-indigo-600 border-indigo-600 bg-indigo-50/50'
+                    ? 'text-brand-600 border-brand-600 bg-brand-50/50'
                     : 'text-slate-500 border-transparent hover:text-slate-700'
                 }`}
               >
@@ -999,7 +999,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                     {agg.kind === 'rating' && (
                       <div>
                         <div className="text-[11px] text-slate-500 mb-2">
-                          평균 <span className="font-extrabold text-indigo-600 text-sm">{agg.avg.toFixed(2)}</span> / {agg.scale}
+                          평균 <span className="font-extrabold text-brand-600 text-sm">{agg.avg.toFixed(2)}</span> / {agg.scale}
                         </div>
                         <ChoiceBars
                           counts={Object.fromEntries(Object.entries(agg.counts).map(([k,v])=>[`${k}점`,v]))}
@@ -1058,7 +1058,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                     <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
                       <div className="text-[11px] text-slate-400 font-bold mb-1">{qi + 1}. {QUESTION_TYPE_LABEL[q.type]}</div>
                       <div className="font-semibold text-slate-700 text-sm mb-2">{q.label}</div>
-                      <div className={`text-sm ${s ? 'text-indigo-700 font-medium' : 'text-slate-300 italic'}`}>
+                      <div className={`text-sm ${s ? 'text-brand-700 font-medium' : 'text-slate-300 italic'}`}>
                         {s || '(무응답)'}
                       </div>
                     </div>
@@ -1085,7 +1085,7 @@ function ChoiceBars({ counts, total }: { counts: Record<string, number>; total: 
           <div key={label} className="flex items-center gap-3 text-xs">
             <div className="w-24 truncate text-slate-600 font-medium" title={label}>{label}</div>
             <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
-              <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${w}%` }} />
+              <div className="bg-brand-500 h-full rounded-full transition-all" style={{ width: `${w}%` }} />
             </div>
             <div className="w-20 text-right text-slate-700 font-bold">
               {n}<span className="text-slate-400 font-normal"> ({pct}%)</span>
