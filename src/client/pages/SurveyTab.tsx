@@ -343,25 +343,25 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     <>
       {/* 상단 통계 카드 */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+        <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
           <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-            <div className="bg-blue-50 p-2.5 rounded-2xl text-blue-600"><FileText className="w-5 h-5" /></div>
+            <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600"><FileText className="w-5 h-5" /></div>
             <h3 className="text-2xl font-extrabold text-slate-800">{surveys.length}개</h3>
             <p className="text-[11px] text-slate-400 font-bold">생성된 설문</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+        <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
           <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-            <div className="bg-emerald-50 p-2.5 rounded-2xl text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
+            <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
             <h3 className="text-2xl font-extrabold text-slate-800">
               {surveys.reduce((s, x) => s + (x.response_count || 0), 0)}회
             </h3>
             <p className="text-[11px] text-slate-400 font-bold">총 응답 수</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+        <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
           <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-            <div className="bg-purple-50 p-2.5 rounded-2xl text-purple-600"><FileText className="w-5 h-5" /></div>
+            <div className="bg-purple-50 p-2.5 rounded-xl text-purple-600"><FileText className="w-5 h-5" /></div>
             <h3 className="text-2xl font-extrabold text-slate-800">
               {surveys.filter(s => s.is_active === 1).length}개
             </h3>
@@ -371,7 +371,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
       </div>
 
       {/* 빠른 생성 입력바 */}
-      <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden mb-6">
+      <Card className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden mb-6">
         <CardContent className="p-4 sm:p-5">
           <form
             onSubmit={(e) => { e.preventDefault(); if (!quickTitle.trim()) return; startCreate(quickTitle.trim()); setQuickTitle(''); }}
@@ -391,7 +391,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
               <Button
                 type="submit"
                 color="primary"
-                className="rounded-2xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
+                className="rounded-xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
                 startContent={<Plus className="w-4 h-4" />}
               >
                 설문 만들기
@@ -403,14 +403,14 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
 
       {/* 설문 목록 */}
       {surveys.length === 0 ? (
-        <Card className="bg-white border border-slate-100 rounded-3xl py-16 shadow-sm">
+        <Card className="bg-white border border-slate-100 rounded-xl py-16 shadow-sm">
           <CardContent className="text-center flex flex-col items-center gap-2">
             <FileText className="w-12 h-12 text-slate-200" />
             <p className="text-xs text-slate-400 font-medium">아직 생성된 설문이 없습니다.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -550,7 +550,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                       <button
                         type="button"
                         onClick={() => setFormTheme(key)}
-                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${
+                        className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
                           formTheme === key
                             ? 'border-slate-700 shadow-md scale-105'
                             : 'border-slate-200 hover:border-slate-300'
@@ -578,7 +578,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                   설문 안내
                   <span className="text-slate-400 font-normal ml-1">(URL 입력 시 자동 링크)</span>
                 </label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={3}
+                <textarea className="w-full border border-slate-200 rounded-lg p-2 text-xs resize-y" rows={3}
                   value={formIntro} onChange={e => setFormIntro(e.target.value)} />
               </div>
 
@@ -587,18 +587,18 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                   종료 안내
                   <span className="text-slate-400 font-normal ml-1">(URL 입력 시 자동 링크)</span>
                 </label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
+                <textarea className="w-full border border-slate-200 rounded-lg p-2 text-xs resize-y" rows={2}
                   value={formOutro} onChange={e => setFormOutro(e.target.value)} />
               </div>
 
               {editing && (
-                <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl">
+                <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
                   <input type="checkbox" id="formActive" checked={formActive} onChange={e => setFormActive(e.target.checked)} />
                   <label htmlFor="formActive" className="font-bold text-slate-600">활성화</label>
                 </div>
               )}
 
-              <div className="flex items-start gap-2 p-2.5 bg-brand-50 rounded-xl">
+              <div className="flex items-start gap-2 p-2.5 bg-brand-50 rounded-lg">
                 <input
                   type="checkbox"
                   id="formNotifyEmail"
@@ -618,7 +618,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
               </div>
 
               {/* 고급 설정 아코디언 */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setFormShowAdvanced(!formShowAdvanced)}
@@ -661,7 +661,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                         응답 비활성화 시 안내 문구
                         <span className="text-slate-400 font-normal ml-1">(설문 종료·비활성 시 표시)</span>
                       </label>
-                      <textarea className="w-full border border-slate-200 rounded-xl p-2 text-xs resize-y" rows={2}
+                      <textarea className="w-full border border-slate-200 rounded-lg p-2 text-xs resize-y" rows={2}
                         placeholder="예: 이 설문은 종료되었습니다. 문의: 000-0000-0000"
                         value={formInactiveMessage} onChange={e => setFormInactiveMessage(e.target.value)} />
                     </div>
@@ -677,7 +677,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                       </div>
                       <div>
                         <label className="block font-bold text-slate-600 mb-1">종료일 (선택)</label>
-                        <input type="datetime-local" className="w-full border border-slate-200 rounded-xl p-2 text-xs"
+                        <input type="datetime-local" className="w-full border border-slate-200 rounded-lg p-2 text-xs"
                           value={formExpiresAt} onChange={e => setFormExpiresAt(e.target.value)} />
                       </div>
                       <div>
@@ -686,7 +686,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2 p-2.5 bg-blue-50 rounded-xl">
+                    <div className="flex items-start gap-2 p-2.5 bg-blue-50 rounded-lg">
                       <input type="checkbox" id="formOnePerBrowser" checked={formOneResponsePerBrowser}
                         onChange={e => setFormOneResponsePerBrowser(e.target.checked)}
                         className="mt-0.5 rounded text-brand-600 focus:ring-brand-500 w-3.5 h-3.5 flex-shrink-0" />
@@ -739,8 +739,8 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
             </div>
 
             <div className="p-4 border-t border-slate-100 flex gap-2 flex-shrink-0">
-              <Button variant="flat" className="flex-1 rounded-xl" onClick={closeDrawer}>취소</Button>
-              <Button color="primary" className="flex-1 rounded-xl font-bold" onClick={handleSave} isLoading={isSaving}>
+              <Button variant="flat" className="flex-1 rounded-lg" onClick={closeDrawer}>취소</Button>
+              <Button color="primary" className="flex-1 rounded-lg font-bold" onClick={handleSave} isLoading={isSaving}>
                 {editing ? '저장' : '생성'}
               </Button>
             </div>
@@ -779,7 +779,7 @@ function QuestionEditor({ q, idx, total, onChange, onRemove, onMove }: QuestionE
   const [showDesc, setShowDesc] = useState(!!q.description);
 
   return (
-    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
+    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/40">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[10px] font-bold text-brand-600">Q{idx + 1}</span>
         <Chip size="sm" variant="flat" className="text-[9px] h-4 px-1.5">{QUESTION_TYPE_LABEL[q.type]}</Chip>
@@ -925,7 +925,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
   const current = responses[idx];
 
   return (
-    <div id="survey-results-panel" className="mt-6 bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+    <div id="survey-results-panel" className="mt-6 bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
       <div className="p-5 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h3 className="font-bold text-base text-slate-800">{survey.title} — 응답 결과</h3>
@@ -972,15 +972,15 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
           {tab === 'summary' && (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                <div className="bg-blue-50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-extrabold text-blue-700">{total}</div>
                   <div className="text-[11px] text-blue-600 font-bold mt-1">총 응답</div>
                 </div>
-                <div className="bg-emerald-50 rounded-2xl p-4 text-center">
+                <div className="bg-emerald-50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-extrabold text-emerald-700">{answerableQuestions.length}</div>
                   <div className="text-[11px] text-emerald-600 font-bold mt-1">질문 수</div>
                 </div>
-                <div className="bg-purple-50 rounded-2xl p-4 text-center">
+                <div className="bg-purple-50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-extrabold text-purple-700">
                     {total > 0 ? formatDate(responses[0].submitted_at).split(' ')[0] : '-'}
                   </div>
@@ -990,7 +990,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
               {answerableQuestions.map((q, qi) => {
                 const agg = aggregate(q);
                 return (
-                  <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
+                  <div key={q.id} className="border border-slate-100 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="font-bold text-slate-800 text-sm">{qi + 1}. {q.label}</div>
                       <span className="text-[10px] text-slate-400 font-bold">응답 {agg.answered}건</span>
@@ -1019,7 +1019,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
           {tab === 'byQuestion' && (
             <div className="space-y-4">
               {answerableQuestions.map((q, qi) => (
-                <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
+                <div key={q.id} className="border border-slate-100 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
                     <div className="font-bold text-slate-800 text-sm">{qi + 1}. {q.label}</div>
                     <Chip size="sm" variant="flat" className="text-[10px] h-5 px-2">{QUESTION_TYPE_LABEL[q.type]}</Chip>
@@ -1042,7 +1042,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
 
           {tab === 'individual' && current && (
             <div>
-              <div className="flex items-center justify-between mb-4 bg-slate-50 rounded-2xl p-3">
+              <div className="flex items-center justify-between mb-4 bg-slate-50 rounded-xl p-3">
                 <Button size="sm" variant="flat" isDisabled={idx <= 0} onClick={() => setIdx(Math.max(0, idx - 1))}>← 이전</Button>
                 <div className="text-center">
                   <div className="text-sm font-bold text-slate-800">응답 #{idx + 1} / {total}</div>
@@ -1055,7 +1055,7 @@ function ResultsPanel({ data, tab, setTab, idx, setIdx, onClose }: ResultsPanelP
                   const v = current.answers[q.id];
                   const s = answerToString(q, v);
                   return (
-                    <div key={q.id} className="border border-slate-100 rounded-2xl p-4">
+                    <div key={q.id} className="border border-slate-100 rounded-xl p-4">
                       <div className="text-[11px] text-slate-400 font-bold mb-1">{qi + 1}. {QUESTION_TYPE_LABEL[q.type]}</div>
                       <div className="font-semibold text-slate-700 text-sm mb-2">{q.label}</div>
                       <div className={`text-sm ${s ? 'text-brand-700 font-medium' : 'text-slate-300 italic'}`}>

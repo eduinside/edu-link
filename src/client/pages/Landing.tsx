@@ -351,7 +351,7 @@ export default function Landing() {
           <img 
             src="/edulink_logo.png" 
             alt="에듀링크 로고" 
-            className="w-8 h-8 rounded-xl shadow-md border border-brand-50/50 object-cover" 
+            className="w-8 h-8 rounded-lg shadow-md border border-brand-50/50 object-cover" 
           />
           <span className="font-display font-black text-xl tracking-tight bg-gradient-to-r from-blue-600 to-brand-600 bg-clip-text text-transparent">
             에듀링크
@@ -415,7 +415,7 @@ export default function Landing() {
 
           {/* Gemini 스타일 대화형 입력 바 (텍스트 크기 확대) */}
           <form onSubmit={handleShorten} className="w-full">
-            <div className="glassmorphism p-2 rounded-3xl shadow-xl flex flex-col gap-2 transition-all duration-300 focus-within:shadow-brand-100/55 focus-within:border-brand-200">
+            <div className="glassmorphism p-2 rounded-xl shadow-xl flex flex-col gap-2 transition-all duration-300 focus-within:shadow-brand-100/55 focus-within:border-brand-200">
               
               {/* 상단 입력 라인 (텍스트 크기 text-lg로 확대) */}
               <div className="flex items-center gap-3.5 px-3 py-1.5">
@@ -442,7 +442,7 @@ export default function Landing() {
                     placeholder="커스텀 슬러그 (4~20자 영숫자/한글/하이픈)"
                     value={customSlug}
                     onChange={(e) => setCustomSlug(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:bg-white transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:bg-white transition-all"
                   />
                 </div>
               )}
@@ -450,7 +450,7 @@ export default function Landing() {
               {/* 하단 컨트롤 바 */}
               <div className="flex items-center justify-between border-t border-slate-100/60 pt-2 px-2">
                 {/* 칩/토글 형태의 세미 세그먼티드 컨트롤 */}
-                <div className="flex items-center gap-1.5 p-0.5 bg-slate-100/80 rounded-xl">
+                <div className="flex items-center gap-1.5 p-0.5 bg-slate-100/80 rounded-lg">
                   <button
                     type="button"
                     onClick={() => setSlugType('random')}
@@ -495,7 +495,7 @@ export default function Landing() {
 
           {/* 에러 노출 */}
           {error && (
-            <div className="mt-4 p-3 rounded-2xl bg-danger-50 border border-danger-100 text-xs text-danger-600 flex items-center gap-2 w-full max-w-2xl">
+            <div className="mt-4 p-3 rounded-xl bg-danger-50 border border-danger-100 text-xs text-danger-600 flex items-center gap-2 w-full max-w-2xl">
               <Info className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -503,7 +503,7 @@ export default function Landing() {
 
           {/* 생성 결과 카드 (텍스트 크기 확대) */}
           {result && (
-            <Card className="w-full max-w-xl mt-8 border border-emerald-100 shadow-lg bg-emerald-50/20 backdrop-blur-md overflow-hidden rounded-3xl animate-fade-in">
+            <Card className="w-full max-w-xl mt-8 border border-emerald-100 shadow-lg bg-emerald-50/20 backdrop-blur-md overflow-hidden rounded-xl animate-fade-in">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold mb-3">
                   <ShieldCheck className="w-4 h-4" />
@@ -512,7 +512,7 @@ export default function Landing() {
 
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-slate-400 font-semibold">변환된 짧은 주소</span>
-                  <div className="flex items-center justify-between bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                  <div className="flex items-center justify-between bg-white border border-slate-100 p-4 rounded-xl shadow-sm">
                     {/* 결과 텍스트 크기를 text-2xl font-black으로 대폭 상향 */}
                     <a 
                       href={result.short_url} 
@@ -529,7 +529,7 @@ export default function Landing() {
                       variant={copied ? 'flat' : 'light'}
                       onClick={handleCopy}
                       isIconOnly
-                      className="rounded-xl flex-shrink-0 ml-2 w-10 h-10 min-w-0"
+                      className="rounded-lg flex-shrink-0 ml-2 w-10 h-10 min-w-0"
                     >
                       {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                     </Button>
@@ -552,14 +552,14 @@ export default function Landing() {
           <div className="lg:col-span-2 flex flex-col gap-4">
             {/* 헤더 + 탭 */}
             <div className="flex items-center gap-2">
-              <div className="bg-brand-50 p-2 rounded-xl text-brand-600">
+              <div className="bg-brand-50 p-2 rounded-lg text-brand-600">
                 <Share2 className="w-4 h-4" />
               </div>
               <h3 className="text-base font-bold text-slate-800">공유된 페이지 목록</h3>
             </div>
 
             {/* 탭 스위처 */}
-            <div className="flex items-center gap-1 p-1 bg-slate-100/70 rounded-xl w-fit">
+            <div className="flex items-center gap-1 p-1 bg-slate-100/70 rounded-lg w-fit">
               {(['recent', 'popular'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -583,7 +583,7 @@ export default function Landing() {
 
               if (list.length === 0) {
                 return (
-                  <Card className="bg-white/40 border border-slate-200/30 shadow-none rounded-3xl py-12">
+                  <Card className="bg-white/40 border border-slate-200/30 shadow-none rounded-xl py-12">
                     <CardContent className="text-center flex flex-col items-center gap-2">
                       <Globe className="w-10 h-10 text-slate-300" />
                       <span className="text-xs text-slate-400 font-medium">아직 공개로 공유된 단축주소가 없습니다.</span>
@@ -602,7 +602,7 @@ export default function Landing() {
                     return (
                       <Card
                         key={`${link.slug}-${activeLinksTab}`}
-                        className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-brand-100 transition-all duration-200 rounded-2xl group overflow-hidden cursor-pointer"
+                        className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-brand-100 transition-all duration-200 rounded-xl group overflow-hidden cursor-pointer"
                         onClick={() => window.open(shortUrl, '_blank')}
                       >
                         <CardContent className="p-4">
@@ -659,7 +659,7 @@ export default function Landing() {
                     <button
                       type="button"
                       onClick={() => setVisibleCount((v) => v + 10)}
-                      className="w-full py-2.5 text-xs font-bold text-brand-600 bg-white/60 hover:bg-white border border-slate-100 hover:border-brand-100 rounded-2xl transition-all duration-200"
+                      className="w-full py-2.5 text-xs font-bold text-brand-600 bg-white/60 hover:bg-white border border-slate-100 hover:border-brand-100 rounded-xl transition-all duration-200"
                     >
                       더보기 ({list.length - visibleCount}개 남음)
                     </button>
@@ -672,7 +672,7 @@ export default function Landing() {
           {/* 우측 1개 컬럼: 공지사항 공간 */}
           <div className="flex flex-col gap-6">
             <div className="flex items-center gap-2">
-              <div className="bg-purple-50 p-2 rounded-xl text-purple-600">
+              <div className="bg-purple-50 p-2 rounded-lg text-purple-600">
                 <Megaphone className="w-4 h-4" />
               </div>
               <h3 className="text-base font-bold text-slate-800 font-sans">에듀링크 알림판</h3>
@@ -685,7 +685,7 @@ export default function Landing() {
                   <Card 
                     key={notice.id} 
                     id={`notice-card-${notice.id}`}
-                    className={`border transition-all duration-300 rounded-2xl cursor-pointer shadow-sm
+                    className={`border transition-all duration-300 rounded-xl cursor-pointer shadow-sm
                       ${notice.is_pinned ? 'bg-amber-50/20 border-amber-100' : 'bg-white border-slate-100'}
                       ${isExpanded ? 'ring-1 ring-brand-200 border-brand-200' : ''}
                     `}
@@ -748,9 +748,9 @@ export default function Landing() {
       {/* 🔐 로그인 요구 안내 모달 */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-sm w-full border border-slate-200/40 shadow-2xl rounded-3xl p-2 bg-white animate-fade-in">
+          <Card className="max-w-sm w-full border border-slate-200/40 shadow-2xl rounded-xl p-2 bg-white animate-fade-in">
             <CardContent className="p-6 text-center flex flex-col items-center gap-4">
-              <div className="bg-amber-50 p-4 rounded-2xl text-amber-500">
+              <div className="bg-amber-50 p-4 rounded-xl text-amber-500">
                 <Lock className="w-10 h-10" />
               </div>
               
@@ -766,7 +766,7 @@ export default function Landing() {
                   size="sm"
                   variant="flat"
                   color="default"
-                  className="flex-1 rounded-xl font-bold"
+                  className="flex-1 rounded-lg font-bold"
                   onClick={() => setShowLoginModal(false)}
                 >
                   닫기
@@ -774,7 +774,7 @@ export default function Landing() {
                 <Button
                   size="sm"
                   color="primary"
-                  className="flex-1 rounded-xl font-bold shadow-md shadow-primary/10"
+                  className="flex-1 rounded-lg font-bold shadow-md shadow-primary/10"
                   startContent={<LogIn className="w-4 h-4" />}
                   onClick={() => {
                     setShowLoginModal(false);
@@ -792,7 +792,7 @@ export default function Landing() {
       {/* 🔐 통합 로그인 모달 (카카오 + 이메일 OTP) */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-3xl overflow-hidden bg-white animate-fade-in">
+          <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-xl overflow-hidden bg-white animate-fade-in">
             <div className="bg-brand-600 px-6 py-5 text-white flex items-center gap-3">
               <LogIn className="w-5 h-5" />
               <div>
@@ -803,7 +803,7 @@ export default function Landing() {
 
             <CardContent className="p-6 space-y-4">
               {authError && (
-                <div className="p-3 bg-danger-50 border border-danger-100 rounded-xl text-[10px] text-danger-600 font-bold">
+                <div className="p-3 bg-danger-50 border border-danger-100 rounded-lg text-[10px] text-danger-600 font-bold">
                   {authError}
                 </div>
               )}
@@ -824,7 +824,7 @@ export default function Landing() {
                         setExistingUserName('');
                       }}
                       onBlur={() => checkEmailExists(loginEmail)}
-                      className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                      className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-lg px-3.5 py-2 text-xs text-slate-800 transition-all"
                     />
                     {isCheckingEmail && (
                       <p className="text-[9px] text-slate-400">이메일 확인 중...</p>
@@ -854,7 +854,7 @@ export default function Landing() {
                           placeholder="홍길동"
                           value={loginName}
                           onChange={(e) => setLoginName(e.target.value)}
-                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-lg px-3.5 py-2 text-xs text-slate-800 transition-all"
                           autoFocus
                         />
                       </div>
@@ -866,7 +866,7 @@ export default function Landing() {
                           placeholder="대구광역시교육청 / 대구○○초등학교"
                           value={loginAffiliation}
                           onChange={(e) => setLoginAffiliation(e.target.value)}
-                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl px-3.5 py-2 text-xs text-slate-800 transition-all"
+                          className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-lg px-3.5 py-2 text-xs text-slate-800 transition-all"
                         />
                       </div>
                     </div>
@@ -875,7 +875,7 @@ export default function Landing() {
                   <Button
                     type="submit"
                     color="primary"
-                    className="w-full rounded-xl font-bold py-5 text-xs shadow-md shadow-primary/20"
+                    className="w-full rounded-lg font-bold py-5 text-xs shadow-md shadow-primary/20"
                     isLoading={authLoading}
                   >
                     OTP 코드 전송
@@ -883,7 +883,7 @@ export default function Landing() {
                 </form>
               ) : (
                 <form onSubmit={handleVerifyOtp} className="space-y-3.5">
-                  <div className="space-y-2 text-center bg-brand-50/50 border border-brand-100 p-4 rounded-2xl">
+                  <div className="space-y-2 text-center bg-brand-50/50 border border-brand-100 p-4 rounded-xl">
                     <p className="text-[11px] text-brand-700 font-bold">
                       {loginEmail} 주소로 인증코드가 발송되었습니다.
                     </p>
@@ -891,7 +891,7 @@ export default function Landing() {
                       인증용 6자리 OTP 코드를 입력해 주세요. (5분 내 유효)
                     </p>
                     {debugOtp && (
-                      <div className="mt-2 bg-amber-100 border border-amber-200 p-2 rounded-xl">
+                      <div className="mt-2 bg-amber-100 border border-amber-200 p-2 rounded-lg">
                         <span className="text-[10px] text-amber-800 font-bold">
                           🧪 모의 테스트 인증코드: <code className="bg-white px-1.5 py-0.5 rounded font-mono font-black">{debugOtp}</code>
                         </span>
@@ -908,7 +908,7 @@ export default function Landing() {
                       placeholder="000000"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="w-full text-center tracking-widest font-mono font-bold text-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl px-3.5 py-2 text-slate-800 transition-all"
+                      className="w-full text-center tracking-widest font-mono font-bold text-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-lg px-3.5 py-2 text-slate-800 transition-all"
                       autoFocus
                     />
                   </div>
@@ -918,7 +918,7 @@ export default function Landing() {
                       type="button"
                       variant="flat"
                       color="default"
-                      className="rounded-xl font-bold text-xs"
+                      className="rounded-lg font-bold text-xs"
                       onClick={() => { setOtpSent(false); setOtpCode(''); setAuthError(''); }}
                     >
                       이메일 변경
@@ -926,7 +926,7 @@ export default function Landing() {
                     <Button
                       type="submit"
                       color="primary"
-                      className="flex-1 rounded-xl font-bold text-xs shadow-md shadow-primary/20"
+                      className="flex-1 rounded-lg font-bold text-xs shadow-md shadow-primary/20"
                       isLoading={authLoading}
                     >
                       인증 완료 및 로그인
@@ -941,7 +941,7 @@ export default function Landing() {
                 size="sm"
                 variant="flat"
                 color="default"
-                className="rounded-xl font-bold"
+                className="rounded-lg font-bold"
                 onClick={() => {
                   setShowAuthModal(false);
                   setOtpSent(false);

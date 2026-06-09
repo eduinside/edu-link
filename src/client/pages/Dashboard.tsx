@@ -1070,11 +1070,11 @@ export default function Dashboard() {
                   navigate('/');
                 }
               }}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              aria-label="로그아웃"
               title="현재 세션을 종료하고 로그아웃합니다"
             >
-              <LogOut className="size-4" />
-              <span className="hidden sm:inline">로그아웃</span>
+              <LogOut className="size-4.5" />
             </button>
           </div>
         </header>
@@ -1084,7 +1084,7 @@ export default function Dashboard() {
           {activeTab === 'links' && (
             <>
               {user && user.level < 2 && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-3 mb-6 animate-fade-in">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-3 mb-6 animate-fade-in">
                   <ShieldAlert className="w-5 h-5 flex-shrink-0 text-amber-600 mt-0.5" />
                   <div>
                     <h4 className="font-bold">단축주소 생성 권한이 제한되어 있습니다.</h4>
@@ -1098,9 +1098,9 @@ export default function Dashboard() {
 
               {/* 통계 카드 — 가로 3열 */}
               <div className="grid grid-cols-3 gap-4">
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                   <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-                    <div className="bg-blue-50 p-2.5 rounded-2xl text-blue-600">
+                    <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600">
                       <Link2 className="w-5 h-5" />
                     </div>
                     <h3 className="text-2xl font-extrabold text-slate-800 font-display">{links.length}개</h3>
@@ -1108,9 +1108,9 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                   <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-                    <div className="bg-emerald-50 p-2.5 rounded-2xl text-emerald-600">
+                    <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600">
                       <BarChart3 className="w-5 h-5" />
                     </div>
                     <h3 className="text-2xl font-extrabold text-slate-800 font-display">{totalClicks}회</h3>
@@ -1118,9 +1118,9 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                   <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-                    <div className="bg-purple-50 p-2.5 rounded-2xl text-purple-600">
+                    <div className="bg-purple-50 p-2.5 rounded-xl text-purple-600">
                       <Globe className="w-5 h-5" />
                     </div>
                     <h3 className="text-2xl font-extrabold text-slate-800 font-display">
@@ -1135,7 +1135,7 @@ export default function Dashboard() {
               <div className="space-y-6">
                   
                   {/* 간이 주소 입력바 */}
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                  <Card className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
                     <CardContent className="p-4 sm:p-5">
                       <form 
                         onSubmit={(e) => {
@@ -1166,7 +1166,7 @@ export default function Dashboard() {
                           <Button
                             type="submit"
                             color={user && user.level < 2 ? 'default' : 'primary'}
-                            className="rounded-2xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
+                            className="rounded-xl font-bold px-6 h-10 flex-shrink-0 shadow-md shadow-primary/10"
                             disabled={user && user.level < 2}
                           >
                             단축주소 생성
@@ -1180,7 +1180,7 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <h4 className="font-bold text-sm text-slate-800">단축 링크 목록</h4>
-                      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/40">
+                      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/40">
                         <Tooltip content="대시보드에서 직접 생성한 단축주소" delay={200}>
                         <button
                           type="button"
@@ -1227,7 +1227,7 @@ export default function Dashboard() {
                     </div>
 
                     {filteredLinks.length === 0 ? (
-                      <Card className="bg-white border border-slate-100 rounded-3xl py-16 shadow-sm">
+                      <Card className="bg-white border border-slate-100 rounded-xl py-16 shadow-sm">
                         <CardContent className="text-center flex flex-col items-center gap-2">
                           <Link2 className="w-12 h-12 text-slate-200" />
                           <p className="text-xs text-slate-400 font-medium">
@@ -1239,7 +1239,7 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                     ) : (
-                      <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                      <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs border-collapse">
                             <thead>
@@ -1442,7 +1442,7 @@ export default function Dashboard() {
  
                               <form onSubmit={handleUpdateLink} id="editForm" className="space-y-4 text-xs">
                                 {/* 슬러그 섹션 */}
-                                <div className="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="space-y-2 p-3 rounded-lg bg-slate-50 border border-slate-100">
                                   {/* 기본 슬러그 (불변) */}
                                   <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">기본 슬러그</span>
@@ -1646,7 +1646,7 @@ export default function Dashboard() {
                               <Button
                                 variant="flat"
                                 color="default"
-                                className="flex-1 rounded-xl font-bold"
+                                className="flex-1 rounded-lg font-bold"
                                 onClick={() => setEditingLink(null)}
                               >
                                 취소
@@ -1655,7 +1655,7 @@ export default function Dashboard() {
                                 type="submit"
                                 form="editForm"
                                 color="primary"
-                                className="flex-1 rounded-xl font-bold shadow-md shadow-primary/10"
+                                className="flex-1 rounded-lg font-bold shadow-md shadow-primary/10"
                                 isLoading={isSaving}
                               >
                                 변경사항 저장
@@ -1849,7 +1849,7 @@ export default function Dashboard() {
                             <Button
                               variant="flat"
                               color="default"
-                              className="flex-1 rounded-xl font-bold"
+                              className="flex-1 rounded-lg font-bold"
                               onClick={() => setIsCreateDrawerOpen(false)}
                             >
                               취소
@@ -1858,7 +1858,7 @@ export default function Dashboard() {
                               type="submit"
                               form="createForm"
                               color="primary"
-                              className="flex-1 rounded-xl font-bold shadow-md shadow-primary/10"
+                              className="flex-1 rounded-lg font-bold shadow-md shadow-primary/10"
                               isLoading={isCreating}
                             >
                               단축주소 생성
@@ -1903,7 +1903,7 @@ export default function Dashboard() {
                             {/* 컨텐츠 */}
                             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                               {/* 기본 정보 */}
-                              <div className="bg-slate-50 rounded-2xl p-4 space-y-3 text-xs">
+                              <div className="bg-slate-50 rounded-xl p-4 space-y-3 text-xs">
                                 <div className="flex items-start justify-between gap-3">
                                   <span className="text-slate-400 font-bold flex-shrink-0">제목</span>
                                   <span className="text-slate-800 font-semibold text-right break-words max-w-[240px]">
@@ -1959,9 +1959,9 @@ export default function Dashboard() {
           {/* 설문 관리 탭 */}
           {activeTab === 'surveys' && (
             user && user.level < 3 ? (
-              <Card className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+              <Card className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
                 <CardContent className="text-center flex flex-col items-center gap-4 py-8">
-                  <div className="bg-amber-50 p-4 rounded-2xl text-amber-500">
+                  <div className="bg-amber-50 p-4 rounded-xl text-amber-500">
                     <ShieldAlert className="w-10 h-10" />
                   </div>
                   <div className="space-y-1.5 max-w-md mx-auto">
@@ -1986,9 +1986,9 @@ export default function Dashboard() {
           {/* API Keys 탭 */}
           {activeTab === 'apikeys' && (
             user && user.level < 3 ? (
-              <Card className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+              <Card className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
                 <CardContent className="text-center flex flex-col items-center gap-4 py-8">
-                  <div className="bg-amber-50 p-4 rounded-2xl text-amber-500">
+                  <div className="bg-amber-50 p-4 rounded-xl text-amber-500">
                     <ShieldAlert className="w-10 h-10" />
                   </div>
                   <div className="space-y-1.5 max-w-md mx-auto">
@@ -2003,7 +2003,7 @@ export default function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
                 
-                <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm xl:sticky xl:top-8">
+                <Card className="bg-white border border-slate-100 rounded-xl shadow-sm xl:sticky xl:top-8">
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                       <KeyRound className="w-4 h-4 text-brand-600" />
@@ -2030,7 +2030,7 @@ export default function Dashboard() {
                       <Button
                         type="submit"
                         color="primary"
-                        className="w-full rounded-xl font-bold mt-2 shadow-md shadow-primary/20"
+                        className="w-full rounded-lg font-bold mt-2 shadow-md shadow-primary/20"
                         isLoading={isGeneratingKey}
                       >
                         키 발급하기
@@ -2045,7 +2045,7 @@ export default function Dashboard() {
                     <h4 className="font-bold text-sm text-slate-800">내 API Keys</h4>
 
                     {apiKeys.length === 0 ? (
-                      <Card className="bg-white border border-slate-100 rounded-3xl py-12 shadow-sm">
+                      <Card className="bg-white border border-slate-100 rounded-xl py-12 shadow-sm">
                         <CardContent className="text-center flex flex-col items-center gap-2">
                           <KeyRound className="w-10 h-10 text-slate-200" />
                           <p className="text-xs text-slate-400 font-medium">아직 발급받은 API 키가 존재하지 않습니다.</p>
@@ -2055,7 +2055,7 @@ export default function Dashboard() {
                       <div className="space-y-3">
                         {apiKeys.map((key) => {
                           return (
-                            <Card key={key.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                            <Card key={key.id} className="bg-white border border-slate-100 rounded-xl shadow-sm">
                               <CardContent className="p-4 flex items-center justify-between gap-4 text-xs">
                                 <div className="space-y-1 flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
@@ -2097,7 +2097,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <Card className="bg-slate-900 border border-slate-800 text-slate-300 rounded-3xl shadow-lg">
+                  <Card className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl shadow-lg">
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
                         <Terminal className="w-4 h-4 text-emerald-400" />
@@ -2116,13 +2116,13 @@ export default function Dashboard() {
                           </div>
                           
                           <p className="text-[10px] text-slate-400">Headers:</p>
-                          <pre className="bg-slate-950 p-3 rounded-2xl font-mono text-[10px] text-emerald-400 overflow-x-auto">
+                          <pre className="bg-slate-950 p-3 rounded-xl font-mono text-[10px] text-emerald-400 overflow-x-auto">
   {`Content-Type: application/json
   x-api-key: edulink_your_api_key_here`}
                           </pre>
 
                           <p className="text-[10px] text-slate-400">Request Body (JSON):</p>
-                          <pre className="bg-slate-950 p-3 rounded-2xl font-mono text-[10px] text-blue-400 overflow-x-auto">
+                          <pre className="bg-slate-950 p-3 rounded-xl font-mono text-[10px] text-blue-400 overflow-x-auto">
   {`{
     "original_url": "https://school.go.kr/notice/123",
     "slug": "notice-123" (선택, 4~20자 영숫자/한글/하이픈),
@@ -2148,7 +2148,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-fade-in">
               
               {/* 성함 변경 카드 */}
-              <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+              <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                 <CardContent className="p-6 space-y-5 text-xs">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <User className="w-4 h-4 text-brand-600" />
@@ -2192,7 +2192,7 @@ export default function Dashboard() {
                     <Button
                       type="submit"
                       color="primary"
-                      className="w-full rounded-xl font-bold mt-2 shadow-md shadow-primary/10"
+                      className="w-full rounded-lg font-bold mt-2 shadow-md shadow-primary/10"
                       isLoading={isUpdatingProfile}
                     >
                       변경사항 저장
@@ -2202,7 +2202,7 @@ export default function Dashboard() {
               </Card>
 
               {/* 등급 정보 상세 테이블 카드 */}
-              <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm lg:col-span-2">
+              <Card className="bg-white border border-slate-100 rounded-xl shadow-sm lg:col-span-2">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <ShieldCheck className="w-4 h-4 text-brand-600" />
@@ -2215,7 +2215,7 @@ export default function Dashboard() {
                     </p>
 
                     <div className="space-y-3">
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 1 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${user.level === 1 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="default" className="h-5 text-[9px] font-bold">1단계</Chip>
@@ -2226,7 +2226,7 @@ export default function Dashboard() {
                         {user.level === 1 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 2 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${user.level === 2 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="primary" className="h-5 text-[9px] font-bold">2단계</Chip>
@@ -2237,7 +2237,7 @@ export default function Dashboard() {
                         {user.level === 2 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 3 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${user.level === 3 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="secondary" className="h-5 text-[9px] font-bold">3단계</Chip>
@@ -2248,7 +2248,7 @@ export default function Dashboard() {
                         {user.level === 3 && <Chip size="sm" color="primary" variant="solid" className="font-black text-[9px]">내 등급</Chip>}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${user.level === 4 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
+                      <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${user.level === 4 ? 'bg-brand-50/30 border-brand-100 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                             <Chip size="sm" variant="flat" color="danger" className="h-5 text-[9px] font-bold">4단계</Chip>
@@ -2268,7 +2268,7 @@ export default function Dashboard() {
               {user.level <= 2 && (
                 <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* 요청 제출 폼 */}
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                  <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                     <CardContent className="p-6 space-y-5 text-xs">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                         <ShieldAlert className="w-4 h-4 text-amber-500" />
@@ -2284,7 +2284,7 @@ export default function Dashboard() {
                             required
                             value={upgradeReqLevel}
                             onChange={(e) => setUpgradeReqLevel(Number(e.target.value))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors"
                           >
                             <option value={0} disabled>— 요청할 등급 선택 —</option>
                             {user.level < 2 && <option value={2}>2단계: 인증사용자 (링크 생성·관리)</option>}
@@ -2299,14 +2299,14 @@ export default function Dashboard() {
                             placeholder="승급이 필요한 이유, 소속 기관, 활용 목적 등을 구체적으로 작성해 주세요."
                             value={upgradeReqReason}
                             onChange={(e) => setUpgradeReqReason(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors resize-none leading-relaxed"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 py-2.5 px-3 outline-none focus:bg-white focus:border-brand-400 transition-colors resize-none leading-relaxed"
                           />
                         </div>
                         <Button
                           type="submit"
                           color="warning"
                           variant="flat"
-                          className="w-full rounded-xl font-bold mt-1"
+                          className="w-full rounded-lg font-bold mt-1"
                           isLoading={isSubmittingUpgrade}
                           isDisabled={!upgradeReqLevel || !upgradeReqReason.trim()}
                         >
@@ -2317,7 +2317,7 @@ export default function Dashboard() {
                   </Card>
 
                   {/* 내 요청 현황 */}
-                  <Card className="bg-white border border-slate-100 rounded-3xl shadow-sm">
+                  <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                     <CardContent className="p-6 space-y-4 text-xs">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                         <Info className="w-4 h-4 text-slate-400" />
@@ -2328,7 +2328,7 @@ export default function Dashboard() {
                       ) : (
                         <div className="space-y-3">
                           {upgradeRequests.map((r) => (
-                            <div key={r.id} className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-2">
+                            <div key={r.id} className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-slate-700">{r.requested_level}단계 승급 요청</span>
                                 <Chip
@@ -2357,7 +2357,7 @@ export default function Dashboard() {
           {/* 활용방법 탭 */}
           {activeTab === 'guide' && (
             <div className="space-y-6 animate-fade-in max-w-3xl">
-              <div className="bg-gradient-to-r from-blue-600 to-brand-600 p-8 rounded-3xl text-white space-y-2.5 shadow-lg shadow-brand-100/50">
+              <div className="bg-gradient-to-r from-blue-600 to-brand-600 p-8 rounded-xl text-white space-y-2.5 shadow-lg shadow-brand-100/50">
                 <h3 className="text-xl font-bold font-sans">에듀링크(edu-link) 활용방법</h3>
                 <p className="text-xs text-brand-100 leading-relaxed">
                   단축주소·설문지 생성부터 API 연동까지, 에듀링크의 주요 기능을 한눈에 확인하세요.
@@ -2365,7 +2365,7 @@ export default function Dashboard() {
               </div>
 
               {/* 회원 등급 안내 */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-4 shadow-sm">
+              <div className="bg-white border border-slate-100 rounded-xl p-8 space-y-4 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold">★</span>
                   회원 등급 안내
@@ -2439,7 +2439,7 @@ export default function Dashboard() {
               </div>
 
               {/* 단축주소 기능 */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+              <div className="bg-white border border-slate-100 rounded-xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold">🔗</span>
                   단축주소 기능
@@ -2473,7 +2473,7 @@ export default function Dashboard() {
               </div>
 
               {/* 설문지 기능 */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+              <div className="bg-white border border-slate-100 rounded-xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">📋</span>
                   설문지 기능 <span className="text-[10px] bg-brand-50 text-brand-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
@@ -2513,7 +2513,7 @@ export default function Dashboard() {
               </div>
 
               {/* API 연동 */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-8 space-y-5 shadow-sm">
+              <div className="bg-white border border-slate-100 rounded-xl p-8 space-y-5 shadow-sm">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">⚡</span>
                   개발자 도구 (API 연동) <span className="text-[10px] bg-brand-50 text-brand-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
@@ -2548,7 +2548,7 @@ export default function Dashboard() {
               </div>
 
               {dashboardNotices.length === 0 ? (
-                <Card className="bg-white border border-slate-100 rounded-3xl py-16 shadow-sm">
+                <Card className="bg-white border border-slate-100 rounded-xl py-16 shadow-sm">
                   <CardContent className="text-center flex flex-col items-center gap-2">
                     <Megaphone className="w-12 h-12 text-slate-200" />
                     <p className="text-xs text-slate-400 font-medium">등록된 공지사항이 아직 존재하지 않습니다.</p>
@@ -2561,7 +2561,7 @@ export default function Dashboard() {
                     return (
                       <Card 
                         key={notice.id} 
-                        className={`border transition-all duration-300 rounded-2xl cursor-pointer shadow-sm
+                        className={`border transition-all duration-300 rounded-xl cursor-pointer shadow-sm
                           ${notice.is_pinned ? 'bg-amber-50/20 border-amber-100' : 'bg-white border-slate-100'}
                           ${isExpanded ? 'ring-1 ring-brand-200 border-brand-200' : ''}
                         `}
@@ -2624,7 +2624,7 @@ export default function Dashboard() {
             <div className="space-y-6 animate-fade-in">
 
               {/* 관리자 서브탭 헤더 */}
-              <div className="flex items-center gap-1 bg-slate-100/70 p-1 rounded-2xl w-fit">
+              <div className="flex items-center gap-1 bg-slate-100/70 p-1 rounded-xl w-fit">
                 {([
                   { key: 'overview', label: '통계 및 회원', icon: <BarChart3 className="w-3.5 h-3.5" /> },
                   { key: 'notices',  label: '공지사항',     icon: <Megaphone  className="w-3.5 h-3.5" /> },
@@ -2633,7 +2633,7 @@ export default function Dashboard() {
                   <button
                     key={t.key}
                     onClick={() => setAdminSubTab(t.key)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200
                       ${adminSubTab === t.key
                         ? 'bg-white text-slate-800 shadow-sm'
                         : 'text-slate-500 hover:text-slate-700'}`}
@@ -2661,7 +2661,7 @@ export default function Dashboard() {
                       { label: '승급 대기', value: adminUpgradeRequests.filter(r => r.status === 'pending').length, sub: '건', color: 'bg-amber-50 border-amber-100', textColor: 'text-amber-600' },
                       { label: '공지사항', value: adminNotices.length, sub: '건', color: 'bg-rose-50 border-rose-100', textColor: 'text-rose-600' },
                     ].map((stat) => (
-                      <Card key={stat.label} className={`border ${stat.color} rounded-2xl shadow-sm`}>
+                      <Card key={stat.label} className={`border ${stat.color} rounded-xl shadow-sm`}>
                         <CardContent className="p-5 space-y-1">
                           <p className="text-[11px] font-bold text-slate-500">{stat.label}</p>
                           <p className={`text-2xl font-black ${stat.textColor}`}>{stat.value}<span className="text-sm font-bold ml-1">{stat.sub}</span></p>
@@ -2687,11 +2687,11 @@ export default function Dashboard() {
                       </Button>
                     </div>
                     {adminUpgradeRequests.length === 0 ? (
-                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                      <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                         <CardContent className="p-8 text-center text-xs text-slate-400">제출된 승급 요청이 없습니다.</CardContent>
                       </Card>
                     ) : (
-                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                      <Card className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
                         <div className="overflow-x-auto w-full">
                           <table className="w-full border-collapse text-left text-xs">
                             <thead>
@@ -2758,7 +2758,7 @@ export default function Dashboard() {
                       </div>
                       <span className="text-xs text-slate-400">총 {adminUsers.length}명</span>
                     </div>
-                    <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    <Card className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
                       <div className="overflow-x-auto w-full">
                         <table className="w-full border-collapse text-left text-xs">
                           <thead>
@@ -2816,7 +2816,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
                   {/* 작성 / 수정 폼 */}
-                  <Card className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm lg:sticky lg:top-8">
+                  <Card className="lg:col-span-2 bg-white border border-slate-100 rounded-xl shadow-sm lg:sticky lg:top-8">
                     <CardContent className="p-6 space-y-4 text-xs">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
@@ -2852,7 +2852,7 @@ export default function Dashboard() {
                             placeholder="내용을 자세히 입력하세요..."
                             value={editingNotice ? editNoticeContent : newNoticeContent}
                             onChange={(e) => editingNotice ? setEditNoticeContent(e.target.value) : setNewNoticeContent(e.target.value)}
-                            className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-xl p-3 text-xs text-slate-800 transition-all resize-none leading-relaxed"
+                            className="w-full border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 outline-none rounded-lg p-3 text-xs text-slate-800 transition-all resize-none leading-relaxed"
                           />
                         </div>
                         <div className="flex items-center gap-2">
@@ -2871,7 +2871,7 @@ export default function Dashboard() {
                           type="submit"
                           color={editingNotice ? 'primary' : 'danger'}
                           isLoading={isSavingNotice}
-                          className="w-full rounded-xl font-bold shadow-md text-white"
+                          className="w-full rounded-lg font-bold shadow-md text-white"
                         >
                           {editingNotice ? '수정 저장' : '공지사항 등록'}
                         </Button>
@@ -2886,13 +2886,13 @@ export default function Dashboard() {
                       <span className="text-xs text-slate-400">총 {adminNotices.length}건</span>
                     </div>
                     {adminNotices.length === 0 ? (
-                      <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                      <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                         <CardContent className="p-10 text-center text-xs text-slate-400">등록된 공지사항이 없습니다.</CardContent>
                       </Card>
                     ) : (
                       <div className="space-y-2">
                         {adminNotices.map((n) => (
-                          <Card key={n.id} className={`border rounded-2xl shadow-sm transition-all ${editingNotice?.id === n.id ? 'border-brand-300 bg-brand-50/20' : 'border-slate-100 bg-white'}`}>
+                          <Card key={n.id} className={`border rounded-xl shadow-sm transition-all ${editingNotice?.id === n.id ? 'border-brand-300 bg-brand-50/20' : 'border-slate-100 bg-white'}`}>
                             <CardContent className="p-4 text-xs">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0 space-y-1.5">
@@ -2946,7 +2946,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
                   {/* Zero Trust 허용 도메인 */}
-                  <Card className="bg-white border border-slate-100 rounded-2xl shadow-sm">
+                  <Card className="bg-white border border-slate-100 rounded-xl shadow-sm">
                     <CardContent className="p-6 space-y-4 text-xs">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                         <Globe className="w-4 h-4 text-brand-500" />
@@ -2960,7 +2960,7 @@ export default function Dashboard() {
                           <label className="font-bold text-slate-600">이메일 도메인</label>
                           <Input size="sm" required placeholder="예: dge.go.kr" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className="w-full" />
                         </div>
-                        <Button type="submit" color="primary" variant="flat" className="w-full rounded-xl font-bold">도메인 등록</Button>
+                        <Button type="submit" color="primary" variant="flat" className="w-full rounded-lg font-bold">도메인 등록</Button>
                       </form>
                       <div className="pt-3 border-t border-slate-100 space-y-2">
                         <label className="font-bold text-slate-500">현재 허용 도메인 ({adminDomains.length}개)</label>
@@ -2968,7 +2968,7 @@ export default function Dashboard() {
                           {adminDomains.length === 0 ? (
                             <p className="text-slate-300 text-center py-3">등록된 도메인이 없습니다.</p>
                           ) : adminDomains.map((d) => (
-                            <div key={d.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl">
+                            <div key={d.id} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg">
                               <span className="font-mono font-bold text-slate-700">{d.domain}</span>
                               <Tooltip content="도메인 삭제" delay={200}>
                                 <Button size="sm" variant="light" color="danger" isIconOnly className="w-5 h-5 min-w-0 p-0 rounded-md" onClick={() => handleDeleteDomain(d.id)}>
@@ -2983,9 +2983,9 @@ export default function Dashboard() {
                   </Card>
 
                   {/* 향후 설정 확장 영역 */}
-                  <Card className="bg-white border border-dashed border-slate-200 rounded-2xl shadow-sm">
+                  <Card className="bg-white border border-dashed border-slate-200 rounded-xl shadow-sm">
                     <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[200px]">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
                         <Settings className="w-5 h-5 text-slate-300" />
                       </div>
                       <div>
@@ -2995,9 +2995,9 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-white border border-dashed border-slate-200 rounded-2xl shadow-sm">
+                  <Card className="bg-white border border-dashed border-slate-200 rounded-xl shadow-sm">
                     <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[200px]">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
                         <Terminal className="w-5 h-5 text-slate-300" />
                       </div>
                       <div>
@@ -3022,7 +3022,7 @@ export default function Dashboard() {
       {/* 🗝 발급 키 1회 노출 모달 */}
       {showKeyResultModal && generatedKeyResult && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-3xl p-2 bg-white animate-fade-in">
+          <Card className="max-w-md w-full border border-slate-200/40 shadow-2xl rounded-xl p-2 bg-white animate-fade-in">
             <CardContent className="p-6 flex flex-col gap-4 text-xs">
               <div className="flex items-center gap-2 text-brand-700 text-sm font-bold border-b border-slate-100 pb-3">
                 <ShieldCheck className="w-5 h-5 text-emerald-500" />
@@ -3033,7 +3033,7 @@ export default function Dashboard() {
                 보안상의 사유로 아래의 API Key는 **이 화면을 닫으면 다시 조회할 수 없습니다**. 지금 즉시 복사하여 안전한 곳에 저장해 주시기 바랍니다.
               </p>
 
-              <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-2xl flex items-center justify-between font-mono font-bold text-slate-800 break-all select-all">
+              <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl flex items-center justify-between font-mono font-bold text-slate-800 break-all select-all">
                 <span>{generatedKeyResult}</span>
                 <Tooltip content={keyResultCopied ? '복사됨!' : 'API Key 클립보드에 복사'} delay={200}>
                   <Button
@@ -3051,7 +3051,7 @@ export default function Dashboard() {
 
               <Button
                 color="primary"
-                className="w-full rounded-xl font-bold shadow-md shadow-primary/20"
+                className="w-full rounded-lg font-bold shadow-md shadow-primary/20"
                 onClick={() => {
                   setShowKeyResultModal(false);
                   setGeneratedKeyResult(null);
@@ -3239,7 +3239,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
               {/* 컨텐츠 */}
               <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-6">
                 {/* QR 이미지 */}
-                <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 shadow-sm">
+                <div className="bg-white border-2 border-slate-100 rounded-xl p-4 shadow-sm">
                   <img
                     ref={imgRef}
                     src={`/qr/${qrSlug}`}
@@ -3260,7 +3260,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                     size="sm"
                     variant={copied ? 'solid' : 'flat'}
                     color={copied ? 'success' : 'default'}
-                    className={`flex-1 rounded-xl font-bold text-xs transition-all duration-300 ${copied ? 'scale-[1.02]' : ''}`}
+                    className={`flex-1 rounded-lg font-bold text-xs transition-all duration-300 ${copied ? 'scale-[1.02]' : ''}`}
                     startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     onClick={handleCopy}
                   >
@@ -3269,7 +3269,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                   <Button
                     size="sm"
                     color="primary"
-                    className="flex-1 rounded-xl font-bold text-xs"
+                    className="flex-1 rounded-lg font-bold text-xs"
                     onClick={handleDownload}
                     isLoading={downloading}
                   >
@@ -3278,7 +3278,7 @@ function QrDrawer({ link, onClose }: { link: LinkItem | null; onClose: () => voi
                 </div>
 
                 {/* 링크 기본 정보 */}
-                <div className="w-full bg-slate-50 rounded-2xl p-4 space-y-3 text-xs">
+                <div className="w-full bg-slate-50 rounded-xl p-4 space-y-3 text-xs">
                   {link.title && (
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-slate-400 font-bold flex-shrink-0">제목</span>

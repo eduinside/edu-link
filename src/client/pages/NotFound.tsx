@@ -44,9 +44,9 @@ export default function NotFound() {
 
   return (
     <div className="gemini-gradient-bg min-h-screen flex items-center justify-center p-4">
-      <Card className="max-w-md w-full border border-slate-200/40 shadow-xl glassmorphism rounded-3xl p-4">
+      <Card className="max-w-md w-full border border-slate-200/40 shadow-xl glassmorphism rounded-xl p-4">
         <CardContent className="text-center flex flex-col items-center py-8">
-          <div className="bg-danger-50 p-4 rounded-2xl text-danger-500 mb-4">
+          <div className="bg-danger-50 p-4 rounded-xl text-danger-500 mb-4">
             <Link2Off className="w-12 h-12" />
           </div>
 
@@ -65,7 +65,7 @@ export default function NotFound() {
               size="sm"
               variant="flat"
               color="default"
-              className="flex-1 rounded-xl font-medium"
+              className="flex-1 rounded-lg font-medium"
               startContent={<ArrowLeft className="w-4 h-4" />}
               onClick={() => navigate(-1)}
             >
@@ -74,7 +74,7 @@ export default function NotFound() {
             <Button
               size="sm"
               color="primary"
-              className="flex-1 rounded-xl font-medium shadow-md shadow-primary/10"
+              className="flex-1 rounded-lg font-medium shadow-md shadow-primary/10"
               startContent={<Home className="w-4 h-4" />}
               onClick={() => navigate('/')}
             >
