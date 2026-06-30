@@ -5,7 +5,8 @@ import { SignJWT } from 'jose';
 import { generateRandomSlug, isValidCustomSlug } from './utils/slug';
 import { authMiddleware, adminMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rateLimit';
-import { registerSiteRoutes } from './routes/sites';
+import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes } from './routes/sites';
+import { renderSiteById, lookupSiteBySlug } from './routes/siteRender';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -1281,8 +1282,10 @@ api.delete('/keys/:id', async (c) => {
     }
 });
 
-// 에듀링크 페이지: 사이트 라우트 등록 (authMiddleware 적용된 api 인스턴스에 부착)
+// 에듀링크 페이지: 사이트/페이지/섹션 라우트 등록 (authMiddleware 적용된 api 인스턴스에 부착)
 registerSiteRoutes(api);
+registerPageRoutes(api);
+registerSectionRoutes(api);
 
 app.route("/api", api);
 
@@ -1892,17 +1895,21 @@ app.get('/:slug', async (c) => {
 
         // 1. KV 캐시 확인 (만료/비밀번호 없는 활성 링크만 캐싱됨)
         let destination = await c.env.URL_CACHE.get(slug);
-        let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind?: string; survey_config?: string | null; response_limit?: number | null; response_count?: number } | null = null;
+        let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind?: string; survey_config?: string | null; response_limit?: number | null; response_count?: number; site_id?: number | null } | null = null;
 
         if (!destination) {
             // 2. D1 DB 조회 (base_slug, custom_slug, slug 모두 검색)
             urlRecord = await c.env.DB.prepare(
-                "SELECT id, original_url, is_active, expires_at, password, kind, survey_config, response_limit, response_count FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
+                "SELECT id, original_url, is_active, expires_at, password, kind, survey_config, response_limit, response_count, site_id FROM urls WHERE base_slug = ? OR custom_slug = ? OR slug = ?"
             )
             .bind(slug, slug, slug)
-            .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind: string; survey_config: string | null; response_limit: number | null; response_count: number }>();
+            .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind: string; survey_config: string | null; response_limit: number | null; response_count: number; site_id: number | null }>();
 
             if (urlRecord) {
+                // 에듀링크 페이지(사이트) — 홈 렌더
+                if (urlRecord.kind === 'site' && urlRecord.site_id) {
+                    return await renderSiteById(c, urlRecord.site_id, []);
+                }
                 // 비활성 링크 처리
                 if (urlRecord.is_active === 0) {
                     if (urlRecord.kind === 'survey') {
@@ -2017,6 +2024,28 @@ app.get('/:slug', async (c) => {
 
     return c.env.ASSETS.fetch(c.req.raw);
 });
+
+// 9.5 에듀링크 페이지 하위 경로 (dgedu.link/{slug}/{depth1}[/{depth2}])
+async function handleSiteSubPage(c: any, segs: string[]) {
+    let slug = c.req.param('slug');
+    try { slug = decodeURIComponent(slug).normalize('NFC'); } catch { slug = slug.normalize('NFC'); }
+
+    // 예약 슬러그(앱 라우트)는 SPA로
+    try {
+        const { results } = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
+        if (new Set(results.map((r: { slug: string }) => r.slug.toLowerCase())).has(slug.toLowerCase())) {
+            return c.env.ASSETS.fetch(c.req.raw);
+        }
+    } catch { /* noop */ }
+
+    const info = await lookupSiteBySlug(c, slug);
+    if (!info) return c.env.ASSETS.fetch(c.req.raw); // 사이트가 아니면 SPA fallback
+    const decoded = segs.map(s => { try { return decodeURIComponent(s).normalize('NFC'); } catch { return s.normalize('NFC'); } });
+    return await renderSiteById(c, info.siteId, decoded);
+}
+
+app.get('/:slug/:p1', (c) => handleSiteSubPage(c, [c.req.param('p1')]));
+app.get('/:slug/:p1/:p2', (c) => handleSiteSubPage(c, [c.req.param('p1'), c.req.param('p2')]));
 
 // 10. SPA ?대갚 ?쒕튃
 app.all('*', (c) => {

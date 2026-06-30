@@ -108,11 +108,18 @@ CREATE INDEX IF NOT EXISTS idx_site_sections_pg  ON site_sections(page_id, sort)
 
 > 테이블명을 `pages`/`sections`이 아닌 **`site_pages`/`site_sections`**로 잡은 이유: 단일 D1 공유 DB라 일반명은 향후 충돌 위험. byeduin 네임스페이스 컨벤션에 맞춤.
 
-### 2.3 3depth 규칙 (문서 §4.3 유지)
+### 2.3 depth ↔ URL 세그먼트 규칙 (구현 확정)
 
-- `depth ∈ {0,1,2}`. 페이지 생성·이동 시 `parent.depth + 1 <= 2` 서버 검증, 위반 422.
-- 사이트 홈: `sites.home_page_id` → NULL이면 `parent_id IS NULL` 중 `sort` 최소 페이지.
-- 닭-달걀 문제: 사이트 생성 시 `home_page_id=NULL`로 만들고, 첫 페이지 생성 트랜잭션 끝에 `home_page_id` 설정.
+사용자 주소 형태는 `/{siteSlug}/{depth1}/{depth2}` — **경로 세그먼트 최대 2개**. 경로는 페이지의 조상 슬러그 체인이다. 따라서 내부 0-인덱스 depth와 세그먼트 수는 다음과 같이 매핑된다:
+
+| 내부 depth (0-index) | URL | 사용자 표기 |
+|---|---|---|
+| 0 (최상위, `parent_id IS NULL`) | `/{slug}/{a}` (1세그먼트) · 홈이면 `/{slug}` (bare) | subpage-depth1 |
+| 1 (자식) | `/{slug}/{a}/{b}` (2세그먼트) | subpage-depth2 |
+
+- 따라서 **내부 `MAX_DEPTH = 1`** (0,1만 허용). 생성·이동 시 `parent.depth + 1 <= 1` 검증, 위반 422. 이동 시 **하위 트리 높이까지** 합산해 한도 검증(`newDepth + subtreeHeight <= 1`), 사이클(자기/후손을 상위로) 방지.
+- 사이트 홈: `sites.home_page_id` → NULL이면 `parent_id IS NULL` 중 `sort` 최소 페이지. 홈은 bare `/{slug}`로도 노출.
+- 닭-달걀: 사이트 생성 시 `home_page_id=NULL`, 첫 페이지 생성 시 자동 지정. 홈 삭제 시 남은 최상위 첫 페이지로 재지정.
 
 ---
 
