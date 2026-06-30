@@ -5,6 +5,7 @@ import { SignJWT } from 'jose';
 import { generateRandomSlug, isValidCustomSlug } from './utils/slug';
 import { authMiddleware, adminMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rateLimit';
+import { registerSiteRoutes } from './routes/sites';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -1279,6 +1280,9 @@ api.delete('/keys/:id', async (c) => {
         return c.json({ success: false, error: err.message }, 500);
     }
 });
+
+// 에듀링크 페이지: 사이트 라우트 등록 (authMiddleware 적용된 api 인스턴스에 부착)
+registerSiteRoutes(api);
 
 app.route("/api", api);
 
