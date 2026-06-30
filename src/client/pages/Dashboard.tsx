@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SurveyTab from './SurveyTab';
+import PagesTab from './PagesTab';
 import { FileText } from 'lucide-react';
 
 interface LinkItem {
@@ -128,7 +129,7 @@ export default function Dashboard() {
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'links' | 'surveys' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'surveys' | 'pages' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
   const [linkSourceFilter, setLinkSourceFilter] = useState<'web' | 'api'>('web');
   
   // 새 단축 링크 상태
@@ -314,7 +315,7 @@ export default function Dashboard() {
         if (data.user.level < 2) {
           // 1단계 일반회원은 단축주소 생성이 불가하므로 개인정보관리 탭을 보여줍니다.
           setActiveTab('profile');
-        } else if (data.user.level < 3 && (activeTab === 'apikeys' || activeTab === 'surveys')) {
+        } else if (data.user.level < 3 && (activeTab === 'apikeys' || activeTab === 'surveys' || activeTab === 'pages')) {
           setActiveTab('links');
         } else if (data.user.level < 4 && activeTab === 'admin') {
           setActiveTab('links');
@@ -929,6 +930,7 @@ export default function Dashboard() {
           {[
             { key: 'links', label: '단축주소 관리', Icon: LayoutDashboard, show: !!user && user.level >= 2, danger: false, onClick: () => setActiveTab('links') },
             { key: 'surveys', label: '설문 관리', Icon: FileText, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('surveys') },
+            { key: 'pages', label: '페이지 관리', Icon: Globe, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('pages') },
             { key: 'apikeys', label: '개발자 도구', Icon: Terminal, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('apikeys') },
             { key: 'profile', label: '개인정보관리', Icon: User, show: true, danger: false, onClick: () => { setActiveTab('profile'); if (user) { setNewProfileName(user.name); setNewProfileAffiliation(user.affiliation || ''); } } },
             { key: 'guide', label: '활용방법', Icon: BookOpen, show: true, danger: false, onClick: () => setActiveTab('guide') },
@@ -990,6 +992,7 @@ export default function Dashboard() {
           <h1 className="text-base font-semibold text-slate-900">
             {activeTab === 'links' && '단축주소 관리'}
             {activeTab === 'surveys' && '설문 관리'}
+            {activeTab === 'pages' && '페이지 관리'}
             {activeTab === 'apikeys' && '개발자 도구 (API Keys)'}
             {activeTab === 'profile' && '개인정보관리'}
             {activeTab === 'guide' && '에듀링크 활용방법'}
@@ -1979,6 +1982,31 @@ export default function Dashboard() {
                 setError={setError}
                 setQrModalLink={setQrModalLink}
                 userEmail={user?.email}
+              />
+            )
+          )}
+
+          {/* 페이지 관리 탭 */}
+          {activeTab === 'pages' && (
+            user && user.level < 3 ? (
+              <Card className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
+                <CardContent className="text-center flex flex-col items-center gap-4 py-8">
+                  <div className="bg-amber-50 p-4 rounded-xl text-amber-500">
+                    <ShieldAlert className="w-10 h-10" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <h3 className="font-bold text-base text-slate-800">페이지 기능 권한이 제한되어 있습니다</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      페이지(사이트) 생성·관리는 <strong>(3)단계 고급사용자</strong> 등급 이상부터 사용 가능합니다.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <PagesTab
+                getHeaders={getHeaders}
+                setSuccessMsg={setSuccessMsg}
+                setError={setError}
               />
             )
           )}
