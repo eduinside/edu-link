@@ -163,7 +163,7 @@ export function registerSiteRoutes(api: ApiApp) {
         const id = c.req.param('id');
         try {
             const body = await c.req.json();
-            const { title, custom_slug, is_public, home_page_id } = body;
+            const { title, custom_slug, is_public, home_page_id, theme } = body;
 
             const site = await c.env.DB.prepare(
                 "SELECT s.id, s.url_id, u.base_slug, u.custom_slug FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ? AND s.user_id = ?"
@@ -209,6 +209,7 @@ export function registerSiteRoutes(api: ApiApp) {
                 await c.env.DB.prepare("UPDATE urls SET title = ? WHERE id = ?").bind(String(title).trim(), site.url_id).run();
             }
             if (is_public !== undefined) { sets.push('is_public = ?'); binds.push(is_public ? 1 : 0); }
+            if (theme !== undefined) { sets.push('theme = ?'); binds.push(JSON.stringify(normalizeTheme(theme))); }
             if (home_page_id !== undefined) {
                 // 소유 사이트의 페이지인지 검증
                 if (home_page_id !== null) {
@@ -508,14 +509,43 @@ export function registerPageRoutes(api: ApiApp) {
             return c.json({ success: false, error: err.message }, 500);
         }
     });
+
+    // POST /api/pages/reorder — 형제 페이지 정렬 { order: [id, ...] }
+    api.post('/pages/reorder', async (c) => {
+        const user = c.get('user');
+        if (user.level < SITE_MIN_LEVEL) return c.json({ success: false, error: '권한이 필요합니다.' }, 403);
+        try {
+            const body = await c.req.json();
+            const order = Array.isArray(body.order) ? body.order : null;
+            if (!order || !order.length) return c.json({ success: false, error: 'order 배열이 필요합니다.' }, 400);
+            // 모두 같은 사용자 소유 페이지인지 확인
+            let siteId: number | null = null;
+            for (const pid of order) {
+                const p = await ownedPage(c, pid, user.id) as any;
+                if (!p) return c.json({ success: false, error: '페이지를 찾을 수 없거나 권한이 없습니다.' }, 404);
+                siteId = p.site_id;
+            }
+            await c.env.DB.batch(order.map((pid: number, idx: number) =>
+                c.env.DB.prepare("UPDATE site_pages SET sort = ? WHERE id = ?").bind(idx, pid)
+            ));
+            if (siteId) await bumpRev(c, siteId);
+            return c.json({ success: true });
+        } catch (err: any) {
+            return c.json({ success: false, error: err.message }, 500);
+        }
+    });
 }
 
 // ─────────────────────────────────────────────────────────────
 // Step 4: 섹션 CRUD (text / youtube)
 // ─────────────────────────────────────────────────────────────
 
-const ALLOWED_SECTION_TYPES = ['text', 'youtube'];
+const ALLOWED_SECTION_TYPES = ['text', 'youtube', 'heading', 'divider', 'link', 'image'];
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+function isHttpUrl(u: string): boolean {
+    try { const x = new URL(String(u)); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; }
+}
 
 function parseYouTube(input: string): { videoId: string } | null {
     const v = String(input).trim();
@@ -553,7 +583,61 @@ function normalizeSectionContent(type: string, raw: any): any {
         const title = typeof raw?.title === 'string' ? raw.title.slice(0, 200) : '';
         return { videoId: p.videoId, title, start };
     }
+    if (type === 'heading') {
+        const text = (typeof raw?.text === 'string' ? raw.text : '').slice(0, 300).trim();
+        if (!text) throw new Error('제목 텍스트가 필요합니다.');
+        const level = raw?.level === 3 || raw?.level === '3' ? 3 : 2;
+        return { text, level };
+    }
+    if (type === 'divider') {
+        return {};
+    }
+    if (type === 'link') {
+        const label = (typeof raw?.label === 'string' ? raw.label : '').slice(0, 200).trim();
+        const url = String(raw?.url ?? '').trim();
+        if (!label) throw new Error('버튼/링크 라벨이 필요합니다.');
+        if (!isHttpUrl(url)) throw new Error('http/https 주소만 사용할 수 있습니다.');
+        const style = raw?.style === 'link' ? 'link' : 'button';
+        const newTab = raw?.newTab !== false;
+        return { label, url, style, newTab };
+    }
+    if (type === 'image') {
+        // 자체 R2 프록시 경로(/media/...)만 허용 — 외부 핫링크 차단
+        const url = String(raw?.url ?? '').trim();
+        if (!/^\/media\/[A-Za-z0-9/_.-]+$/.test(url)) throw new Error('업로드한 이미지만 사용할 수 있습니다.');
+        const alt = (typeof raw?.alt === 'string' ? raw.alt : '').slice(0, 300);
+        const caption = (typeof raw?.caption === 'string' ? raw.caption : '').slice(0, 300);
+        const width = ['full', 'wide', 'normal'].includes(raw?.width) ? raw.width : 'normal';
+        return { url, alt, caption, width };
+    }
     throw new Error('지원하지 않는 섹션 타입입니다.');
+}
+
+// 사이트 테마 검증·정규화
+const HEX_RE = /^#[0-9A-Fa-f]{3,8}$/;
+function normalizeTheme(raw: any): any {
+    const t = raw && typeof raw === 'object' ? raw : {};
+    const colors: any = {};
+    const cIn = t.colors && typeof t.colors === 'object' ? t.colors : {};
+    for (const k of ['primary', 'bg', 'text', 'muted', 'accent']) {
+        if (typeof cIn[k] === 'string' && HEX_RE.test(cIn[k].trim())) colors[k] = cIn[k].trim();
+    }
+    const fIn = t.font && typeof t.font === 'object' ? t.font : {};
+    const font: any = {};
+    if (typeof fIn.family === 'string') font.family = fIn.family.slice(0, 80);
+    // 구글폰트는 fonts.googleapis.com 도메인만 허용
+    if (typeof fIn.googleFontUrl === 'string' && fIn.googleFontUrl.trim()) {
+        try {
+            const u = new URL(fIn.googleFontUrl.trim());
+            if (u.protocol === 'https:' && u.hostname === 'fonts.googleapis.com') font.googleFontUrl = u.toString();
+        } catch { /* ignore invalid */ }
+    }
+    const hIn = t.header && typeof t.header === 'object' ? t.header : {};
+    const header: any = {};
+    if (typeof hIn.title === 'string') header.title = hIn.title.slice(0, 120);
+    header.showTitle = hIn.showTitle !== false;
+    header.navPosition = hIn.navPosition === 'side' ? 'side' : 'top';
+    return { colors, font, header };
 }
 
 export function registerSectionRoutes(api: ApiApp) {
@@ -652,6 +736,45 @@ export function registerSectionRoutes(api: ApiApp) {
             ));
             await bumpRev(c, page.site_id);
             return c.json({ success: true });
+        } catch (err: any) {
+            return c.json({ success: false, error: err.message }, 500);
+        }
+    });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Step 10: 미디어 업로드 (R2)
+// ─────────────────────────────────────────────────────────────
+
+const MIME_EXT: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+};
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5MB
+
+export function registerMediaRoutes(api: ApiApp) {
+    // POST /api/sites/:id/media — 이미지 업로드 → R2 → 프록시 URL 반환
+    api.post('/sites/:id/media', async (c) => {
+        const user = c.get('user');
+        if (user.level < SITE_MIN_LEVEL) return c.json({ success: false, error: '권한이 필요합니다.' }, 403);
+        const siteId = c.req.param('id');
+        try {
+            if (!c.env.MEDIA) return c.json({ success: false, error: '미디어 저장소가 설정되지 않았습니다.' }, 500);
+            const site = await ownedSite(c, siteId, user.id);
+            if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
+
+            const form = await c.req.formData();
+            const file = form.get('file');
+            if (!file || typeof file === 'string') return c.json({ success: false, error: '파일이 필요합니다.' }, 400);
+
+            const type = (file as File).type;
+            const ext = MIME_EXT[type];
+            if (!ext) return c.json({ success: false, error: 'jpg/png/webp/gif 이미지만 업로드할 수 있습니다.' }, 400);
+            if ((file as File).size > MAX_MEDIA_BYTES) return c.json({ success: false, error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
+
+            const key = `sites/${siteId}/${crypto.randomUUID()}.${ext}`;
+            await c.env.MEDIA.put(key, (file as File).stream(), { httpMetadata: { contentType: type } });
+
+            return c.json({ success: true, url: `/media/${key}` });
         } catch (err: any) {
             return c.json({ success: false, error: err.message }, 500);
         }

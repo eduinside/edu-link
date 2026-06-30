@@ -276,10 +276,12 @@ slug 정규화(NFC) → reserved_slugs 체크(SPA 보호) → KV/D1 조회(base/
 
 > Step 1→5(백엔드)와 6→8(프론트)은 의존만 지키면 순서 유연. 토큰 여유에 따라 Step 단위로 분할 진행.
 
-### 후순위 페이즈 (이번 범위 밖)
-- **Step 9 — 스타일/테마**: 색상 토큰 + 구글폰트(도메인검증) + 헤더/내비(top|side), heading/divider/link 섹션, 페이지 reorder UI.
-- **Step 10 — 미디어/R2**: 버킷·바인딩 세팅(§6) + image 섹션·업로드 API.
-- **Step 11 — 캐시/정교화**: `site:{slug}:{rev}:{path}` KV 캐시 + 엣지케이스(404/권한)·정화 강화.
+### 후순위 페이즈 — ✅ 완료
+- **Step 9 — 스타일/테마**: 색상 토큰 + 구글폰트(fonts.googleapis.com 도메인검증) + 헤더/내비(top|side), heading/divider/link 섹션, 페이지 reorder. 대시보드에 디자인 패널·섹션 추가 버튼·페이지 정렬 UI.
+- **Step 10 — 미디어/R2**: `wrangler.jsonc` MEDIA 바인딩 + 업로드 API(`POST /api/sites/:id/media`, 5MB·MIME 화이트리스트·키 무작위화) + `/media/*` R2 프록시 서빙 + image 섹션(자체 /media URL만 허용). **운영 배포 전 R2 버킷 생성 필요**: `wrangler r2 bucket create edulink-pages-media`.
+- **Step 11 — 캐시/정교화**: `site:{slug}:{rev}:{path}` KV 캐시(렌더 결과, 1일 TTL 안전망) + rev 증가로 자연 무효화. is_public=0/삭제는 캐시 이전 단계에서 404.
+
+> 배포 시 운영 D1 마이그레이션: `wrangler d1 execute edu-link-db --remote --file=migrations/0010_add_pages_feature.sql`
 
 ---
 

@@ -26,6 +26,12 @@
 			"database_id": "e5fa6f54-6063-48f9-9cf3-0517381dd005"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "edulink-pages-media"
+		}
+	],
 	"observability": {
 		"enabled": true
 	},

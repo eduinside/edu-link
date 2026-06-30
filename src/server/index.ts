@@ -5,7 +5,7 @@ import { SignJWT } from 'jose';
 import { generateRandomSlug, isValidCustomSlug } from './utils/slug';
 import { authMiddleware, adminMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rateLimit';
-import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes } from './routes/sites';
+import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes, registerMediaRoutes } from './routes/sites';
 import { renderSiteById, lookupSiteBySlug } from './routes/siteRender';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -1286,6 +1286,7 @@ api.delete('/keys/:id', async (c) => {
 registerSiteRoutes(api);
 registerPageRoutes(api);
 registerSectionRoutes(api);
+registerMediaRoutes(api);
 
 app.route("/api", api);
 
@@ -2025,6 +2026,19 @@ app.get('/:slug', async (c) => {
     return c.env.ASSETS.fetch(c.req.raw);
 });
 
+// 9.4 미디어 서빙 (R2 프록시) — 업로드된 이미지 공개 제공
+app.get('/media/*', async (c) => {
+    const key = c.req.path.replace(/^\/media\//, '');
+    if (!key || !c.env.MEDIA) return c.notFound();
+    const obj = await c.env.MEDIA.get(key);
+    if (!obj) return c.notFound();
+    const headers = new Headers();
+    obj.writeHttpMetadata(headers);
+    headers.set('etag', obj.httpEtag);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    return new Response(obj.body, { headers });
+});
+
 // 9.5 에듀링크 페이지 하위 경로 (dgedu.link/{slug}/{depth1}[/{depth2}])
 async function handleSiteSubPage(c: any, segs: string[]) {
     let slug = c.req.param('slug');
@@ -2032,8 +2046,8 @@ async function handleSiteSubPage(c: any, segs: string[]) {
 
     // 예약 슬러그(앱 라우트)는 SPA로
     try {
-        const { results } = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all<{ slug: string }>();
-        if (new Set(results.map((r: { slug: string }) => r.slug.toLowerCase())).has(slug.toLowerCase())) {
+        const { results } = await c.env.DB.prepare("SELECT slug FROM reserved_slugs").all();
+        if (new Set((results as Array<{ slug: string }>).map((r) => r.slug.toLowerCase())).has(slug.toLowerCase())) {
             return c.env.ASSETS.fetch(c.req.raw);
         }
     } catch { /* noop */ }
