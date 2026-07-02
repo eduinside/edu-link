@@ -102,16 +102,36 @@ function renderSection(type: string, content: any): string {
     return '';
 }
 
-// 페이지 트리 → 상단 내비 (최상위 + 1뎁스 정도만 단순 노출)
-function renderNav(pages: Array<any>, siteSlug: string, currentId: number): string {
-    const roots = pages.filter(p => p.parent_id === null).sort((a, b) => a.sort - b.sort);
-    if (roots.length <= 1) return '';
-    const items = roots.map(p => {
-        const href = `/${encodeURIComponent(siteSlug)}/${encodeURIComponent(p.slug)}`;
-        const active = p.id === currentId ? ' class="active"' : '';
-        return `<a href="${href}"${active}>${escapeHtml(p.title)}</a>`;
+// 페이지 트리 → 내비 (드롭다운/아코디언 + 모바일 햄버거). 정적 HTML이라 CSS-only 상호작용.
+function renderNav(pages: Array<any>, siteSlug: string, currentPage: any): string {
+    const roots = pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort);
+    const kids = (id: number) => pages.filter(p => p.parent_id === id).sort((a, b) => a.sort - b.sort);
+    const hasChildren = pages.length > roots.length;
+    if (roots.length <= 1 && !hasChildren) return '';
+    const currentRootId = currentPage.parent_id == null ? currentPage.id : currentPage.parent_id;
+    const link = (p: any) => `/${encodeURIComponent(siteSlug)}/${encodeURIComponent(p.slug)}`;
+    const aClass = (p: any) => p.id === currentPage.id ? ' class="active"' : '';
+
+    const items = roots.map(root => {
+        const ch = kids(root.id);
+        const rootActive = root.id === currentRootId;
+        const sub = ch.length
+            ? `<ul class="nav-sub">${ch.map(c => `<li><a href="${link(c)}"${aClass(c)}>${escapeHtml(c.title)}</a></li>`).join('')}</ul>`
+            : '';
+        const caret = ch.length ? '<span class="nav-caret">▾</span>' : '';
+        return `<li class="nav-li${rootActive ? ' active' : ''}${ch.length ? ' has-sub' : ''}"><a href="${link(root)}"${aClass(root)}>${escapeHtml(root.title)}${caret}</a>${sub}</li>`;
     }).join('');
-    return `<nav class="site-nav">${items}</nav>`;
+
+    return `<input type="checkbox" id="nav-toggle" class="nav-toggle-cb"><label for="nav-toggle" class="nav-toggle" aria-label="메뉴 열기">☰</label><nav class="site-nav"><ul class="nav-list">${items}</ul></nav>`;
+}
+
+// 하위(depth1) 페이지의 경로 안내
+function renderBreadcrumb(page: any, pages: Array<any>, siteSlug: string): string {
+    if (page.parent_id == null) return '';
+    const parent = pages.find(p => p.id === page.parent_id);
+    if (!parent) return '';
+    const base = `/${encodeURIComponent(siteSlug)}`;
+    return `<nav class="crumb"><a href="${base}">홈</a><span>›</span><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(parent.title)}</a><span>›</span><b>${escapeHtml(page.title)}</b></nav>`;
 }
 
 function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navSide: boolean; headerTitle: string; showTitle: boolean } {
@@ -168,12 +188,22 @@ ${t.googleFontLink}
   .site-header { background:var(--c-bg); border-bottom:1px solid var(--c-border); padding:18px 20px; ${t.navSide ? 'width:220px; min-height:100vh; border-right:1px solid var(--c-border); border-bottom:none; flex-shrink:0;' : ''} }
   .site-header h1 { margin:0; font-size:1.25rem; }
   .site-header h1 a { color:var(--c-text); text-decoration:none; }
-  .site-nav { margin-top:${t.navSide ? '18px' : '10px'}; display:flex; gap:14px; flex-wrap:wrap; ${t.navSide ? 'flex-direction:column;' : ''} }
-  .site-nav a { color:var(--c-muted); text-decoration:none; font-size:.95rem; }
-  .site-nav a.active, .site-nav a:hover { color:var(--c-primary); font-weight:600; }
-  .content { flex:1; }
+  .site-nav { margin-top:${t.navSide ? '18px' : '10px'}; }
+  .nav-list { list-style:none; margin:0; padding:0; display:flex; gap:4px; flex-wrap:wrap; ${t.navSide ? 'flex-direction:column;' : ''} }
+  .nav-li { position:relative; }
+  .nav-li > a { display:inline-flex; align-items:center; gap:4px; color:var(--c-muted); text-decoration:none; font-size:.95rem; padding:6px 10px; border-radius:8px; }
+  .nav-li.active > a, .nav-li > a.active, .nav-li > a:hover { color:var(--c-primary); font-weight:600; background:rgba(0,0,0,.03); }
+  .nav-caret { font-size:.65em; ${t.navSide ? 'display:none;' : ''} }
+  .nav-sub { list-style:none; margin:0; padding:${t.navSide ? '2px 0 4px 14px' : '6px'}; ${t.navSide ? '' : 'position:absolute; top:100%; left:0; min-width:170px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08); display:none; z-index:20;'} }
+  ${t.navSide ? '' : '.nav-li.has-sub:hover .nav-sub, .nav-li.has-sub:focus-within .nav-sub { display:block; }'}
+  .nav-sub li a { display:block; padding:7px 10px; color:var(--c-text); text-decoration:none; font-size:.9rem; border-radius:6px; }
+  .nav-sub li a:hover, .nav-sub li a.active { background:rgba(0,0,0,.04); color:var(--c-primary); font-weight:600; }
+  .nav-toggle, .nav-toggle-cb { display:none; }
+  .content { flex:1; min-width:0; }
   main { max-width:760px; margin:0 auto; padding:32px 20px 80px; }
   main > .page-title { font-size:1.75rem; margin:0 0 24px; }
+  .crumb { font-size:.8rem; color:var(--c-muted); margin:0 0 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .crumb a { color:var(--c-muted); text-decoration:none; } .crumb a:hover { color:var(--c-primary); } .crumb b { color:var(--c-text); }
   .sec { margin:0 0 24px; }
   .sec-text p { margin:0 0 12px; }
   .sec-text a { color:var(--c-primary); }
@@ -191,17 +221,28 @@ ${t.googleFontLink}
   .yt { position:relative; width:100%; padding-top:56.25%; border-radius:12px; overflow:hidden; background:#000; }
   .yt iframe { position:absolute; inset:0; width:100%; height:100%; }
   footer { text-align:center; color:var(--c-muted); font-size:.8rem; padding:24px; }
-  @media (max-width:640px){ .layout{display:block;} .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);} .site-nav{flex-direction:row;} }
+  @media (max-width:640px){
+    .layout{display:block;}
+    .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+    .site-header h1{flex:1;}
+    .nav-toggle{display:inline-flex;cursor:pointer;font-size:1.3rem;line-height:1;padding:4px 10px;border:1px solid var(--c-border);border-radius:8px;color:var(--c-text);user-select:none;}
+    .site-nav{display:none;flex-basis:100%;margin-top:6px;}
+    .nav-toggle-cb:checked ~ .site-nav{display:block;}
+    .nav-list{flex-direction:column;gap:2px;}
+    .nav-caret{display:none;}
+    .nav-sub{position:static;display:block;border:none;box-shadow:none;padding:2px 0 4px 14px;min-width:0;background:transparent;}
+  }
 </style>
 </head>
 <body>
   <div class="layout">
     <header class="site-header">
       ${t.showTitle ? `<h1><a href="/${encodeURIComponent(siteSlug)}">${escapeHtml(headerTitle)}</a></h1>` : ''}
-      ${renderNav(pages, siteSlug, page.id)}
+      ${renderNav(pages, siteSlug, page)}
     </header>
     <div class="content">
       <main>
+        ${renderBreadcrumb(page, pages, siteSlug)}
         <h2 class="page-title">${escapeHtml(page.title)}</h2>
         ${sectionsHtml || '<p style="color:var(--c-muted)">아직 콘텐츠가 없습니다.</p>'}
       </main>
