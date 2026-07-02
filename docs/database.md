@@ -32,9 +32,9 @@ CREATE TABLE users (
 
 ---
 
-### `urls` — 단축 URL / 설문지
+### `urls` — 단축 URL / 설문지 / 페이지
 
-단축주소와 설문지를 단일 테이블로 관리합니다. `kind` 컬럼으로 종류를 구분합니다.
+단축주소·설문지·페이지(사이트)를 단일 테이블로 관리합니다. `kind` 컬럼으로 종류를 구분하며, 세 종류 모두 동일한 슬러그 풀·예약어·소유권 검증을 공유합니다.
 
 ```sql
 CREATE TABLE urls (
@@ -52,10 +52,11 @@ CREATE TABLE urls (
     click_count    INTEGER NOT NULL DEFAULT 0,
     expires_at     TEXT,                       -- UTC datetime, NULL=영구
     password       TEXT,                       -- 6자리 숫자 PIN, NULL=없음
-    kind           TEXT NOT NULL DEFAULT 'link', -- 'link' 또는 'survey'
+    kind           TEXT NOT NULL DEFAULT 'link', -- 'link' | 'survey' | 'site'
     survey_config  TEXT,                       -- 설문 메타 JSON (kind='survey'일 때만 사용)
     response_limit INTEGER,                    -- 최대 응답 수, NULL=무제한
     response_count INTEGER NOT NULL DEFAULT 0, -- 누적 응답 수
+    site_id        INTEGER,                    -- 페이지 사이트 역참조 (kind='site'일 때 sites.id)
     created_at     TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -128,6 +129,87 @@ CREATE TABLE survey_responses (
   - 만족도: 숫자
   - 주소: `{ "zonecode": "...", "address": "...", "detail": "..." }` 객체
 - 응답 제출 시 `urls.response_count += 1`로 원자적 업데이트
+
+---
+
+## 페이지 (EduLink Pages) 테이블
+
+`kind='site'`인 `urls` 행 1개가 사이트 1개를 소유하며, 아래 3개 테이블로 페이지 트리·콘텐츠·게시 스냅샷을 관리합니다. (마이그레이션 `0010`, `0011`)
+
+### `sites` — 사이트
+
+```sql
+CREATE TABLE sites (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL,            -- 소유자 (users.id)
+    url_id        INTEGER NOT NULL,            -- 슬러그 보유 urls 행 (kind='site')
+    title         TEXT    NOT NULL,
+    theme         TEXT    NOT NULL DEFAULT '{}', -- 테마 JSON (colors/font/header)
+    home_page_id  INTEGER,                     -- bare /{slug} 진입 시 표시할 페이지
+    is_public     INTEGER NOT NULL DEFAULT 1,  -- 0=게시 중단(공개 차단)
+    rev           INTEGER NOT NULL DEFAULT 0,  -- 초안 리비전 (편집 시 +1)
+    published_rev INTEGER NOT NULL DEFAULT 0,  -- 0=미게시. rev>published_rev면 '게시 필요'
+    published_at  TEXT,                        -- 최근 게시 시각
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (url_id)  REFERENCES urls(id)  ON DELETE CASCADE
+);
+```
+
+- 공개 조회수는 `urls.click_count`(사이트 행)에 집계됩니다.
+
+### `site_pages` — 페이지 트리 (depth ≤ 1)
+
+```sql
+CREATE TABLE site_pages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id    INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    parent_id  INTEGER REFERENCES site_pages(id) ON DELETE CASCADE, -- NULL=최상위
+    slug       TEXT    NOT NULL,               -- 형제 내 유일
+    title      TEXT    NOT NULL,
+    depth      INTEGER NOT NULL DEFAULT 0,     -- 0(최상위) | 1(자식)
+    sort       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (site_id, parent_id, slug)
+);
+```
+
+- URL 경로 = 조상 슬러그 체인. 최상위 `= /{siteSlug}/{slug}`, 자식 `= /{siteSlug}/{상위}/{자식}`. 홈 페이지는 bare `/{siteSlug}`로도 노출.
+- 내부 `MAX_DEPTH=1`(0·1만 허용) → 경로 세그먼트 최대 2개.
+
+### `site_sections` — 콘텐츠 섹션
+
+```sql
+CREATE TABLE site_sections (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_id    INTEGER NOT NULL REFERENCES site_pages(id) ON DELETE CASCADE,
+    type       TEXT    NOT NULL,               -- text|heading|image|youtube|link|embed|divider
+    content    TEXT    NOT NULL DEFAULT '{}',  -- 타입별 JSON
+    sort       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+- 이미지(`image`)는 R2 프록시 경로(`/media/sites/{siteId}/{uuid}.ext`)만 허용. 섹션 삭제·교체·사이트 삭제 시 해당 R2 객체도 정리.
+- 임베드(`embed`)는 저장 원본을 렌더 시 `<script>`·이벤트핸들러 제거 후 표시(iframe 허용).
+
+### `site_snapshots` — 게시 스냅샷 (공개의 유일한 소스)
+
+```sql
+CREATE TABLE site_snapshots (
+    site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    path    TEXT    NOT NULL,   -- ''(홈) | '{a}' | '{a}/{b}'
+    html    TEXT    NOT NULL,   -- 게시 시점 렌더된 완성 HTML
+    rev     INTEGER NOT NULL,
+    PRIMARY KEY (site_id, path)
+);
+```
+
+- **게시(`POST /api/sites/:id/publish`)** 시 전 경로를 렌더해 스냅샷을 교체하고 `published_rev=rev`로 갱신. KV `pub:{slug}:{path}`에도 적재.
+- **공개 서빙**은 KV → D1 스냅샷 순으로 조회(D1 렌더 왕복 없음). 미게시/비공개/미스는 404 안내.
+- 편집(초안)은 공개에 영향을 주지 않으며, `GET /api/sites/:id/preview`로 소유자만 실시간 미리보기.
 
 ---
 
@@ -231,10 +313,17 @@ CREATE TABLE notices (
 ```sql
 CREATE INDEX idx_urls_slug         ON urls(slug);
 CREATE INDEX idx_urls_user_id      ON urls(user_id);
+CREATE INDEX idx_urls_site_id      ON urls(site_id);
 CREATE INDEX idx_click_logs_url_id ON click_logs(url_id);
 CREATE INDEX idx_click_logs_created_at ON click_logs(created_at);
 CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
 CREATE INDEX idx_survey_responses_url_id ON survey_responses(url_id);
+-- 페이지
+CREATE INDEX idx_sites_owner        ON sites(user_id);
+CREATE INDEX idx_site_pages_site    ON site_pages(site_id);
+CREATE INDEX idx_site_pages_parent  ON site_pages(site_id, parent_id, sort);
+CREATE INDEX idx_site_sections_pg   ON site_sections(page_id, sort);
+CREATE INDEX idx_site_snapshots_site ON site_snapshots(site_id);
 ```
 
 ---
@@ -252,6 +341,8 @@ CREATE INDEX idx_survey_responses_url_id ON survey_responses(url_id);
 | `0007_add_affiliation_to_users.sql` | users.affiliation 컬럼 추가 |
 | `0008_add_created_by_to_urls.sql` | urls.created_by 컬럼 추가 |
 | `0009_add_survey_to_urls.sql` | urls.kind, urls.survey_config, urls.response_limit, urls.response_count 컬럼 추가; survey_responses 테이블 생성 |
+| `0010_add_pages_feature.sql` | urls.site_id 추가; sites·site_pages·site_sections 테이블·인덱스 생성 (EduLink Pages) |
+| `0011_publish_model.sql` | sites.published_rev·published_at 추가; site_snapshots(게시 스냅샷) 테이블 생성 |
 
 ### 새 마이그레이션 실행
 
@@ -261,4 +352,10 @@ npx wrangler d1 migrations apply edu-link-db
 
 # 원격(프로덕션)
 npx wrangler d1 migrations apply edu-link-db --remote
+
+# 개별 파일 직접 실행(마이그레이션 추적 밖에서 적용할 때)
+npx wrangler d1 execute edu-link-db --remote --file=migrations/0011_publish_model.sql
 ```
+
+> **페이지 이미지용 R2 버킷**은 마이그레이션과 별개로 1회 생성 필요:
+> `npx wrangler r2 bucket create edulink-pages-media` (바인딩명 `MEDIA`, `wrangler.jsonc` 참조)

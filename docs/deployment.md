@@ -7,6 +7,7 @@
 | Cloudflare Worker | `edu-link` | — |
 | D1 Database | `edu-link-db` | `e5fa6f54-6063-48f9-9cf3-0517381dd005` |
 | KV Namespace | `URL_CACHE` | `8acabbbf2c7c43eaaf876f0c27cc2bd1` |
+| R2 Bucket | `edulink-pages-media` (바인딩 `MEDIA`) | — |
 | 프로덕션 도메인 | `dgedu.link` | — |
 | Worker 기본 URL | `edu-link.parkjh85.workers.dev` | — |
 | GA4 측정 ID | `G-T9GZNBEXJ0` | — |
@@ -98,6 +99,23 @@ npx wrangler d1 export edu-link-db --remote --output=backup_$(date +%Y%m%d).sql
 
 ---
 
+## R2 (페이지 이미지) 관리
+
+페이지 기능의 이미지 업로드는 R2 버킷 `edulink-pages-media`(바인딩 `MEDIA`)를 사용합니다. `wrangler.jsonc`의 `r2_buckets`에 등록되어 있으며, **버킷 자체는 1회 생성이 필요**합니다.
+
+```bash
+# 버킷 생성 (최초 1회)
+npx wrangler r2 bucket create edulink-pages-media
+
+# 객체 목록/삭제 (특정 사이트 미디어)
+npx wrangler r2 object list edulink-pages-media --prefix "sites/12/"
+```
+
+- 공개 서빙은 Worker의 `/media/*` 프록시가 담당(별도 public bucket/커스텀 도메인 불필요).
+- 이미지 섹션 삭제·교체, 사이트 삭제 시 해당 객체가 자동 정리됨.
+
+---
+
 ## KV 관리
 
 ```bash
@@ -155,7 +173,9 @@ Cloudflare 대시보드 → Workers & Pages → edu-link → Deployments 탭에�
 - [ ] `npx wrangler secret put RESEND_API_KEY`
 - [ ] `npx wrangler secret put JWT_SECRET`
 - [ ] D1 초기 스키마 적용: `npx wrangler d1 execute edu-link-db --remote --file=src/server/db/schema.sql`
-- [ ] 초기 마이그레이션 순서대로 실행 (0001 → 0006)
+- [ ] 초기 마이그레이션 순서대로 실행 (0001 → 0011)
 - [ ] `users` 테이블에 `affiliation` 컬럼 추가: `ALTER TABLE users ADD COLUMN affiliation TEXT NOT NULL DEFAULT ''`
+- [ ] **페이지 기능**: R2 버킷 생성 `npx wrangler r2 bucket create edulink-pages-media`
+- [ ] **페이지 기능**: 마이그레이션 0010·0011 적용(사이트/스냅샷 테이블)
 - [ ] 초기 최고관리자 등급 수동 설정: `UPDATE users SET level = 4 WHERE email = 'admin@example.com'`
 - [ ] 도메인 DNS 설정 (dgedu.link → Worker 라우팅)

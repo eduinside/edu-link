@@ -10,10 +10,10 @@ Cloudflare Edge (글로벌 PoP)
       │
       ├─ run_worker_first: true ──▶ Workers Runtime (src/server/index.ts)
       │                                     │
-      │                              ┌──────┼──────┐
-      │                              ▼      ▼      ▼
-      │                             D1    KV    Resend
-      │                           (SQLite) (캐시)  (메일)
+      │                            ┌────┬───┼───┬────┐
+      │                            ▼    ▼   ▼   ▼    ▼
+      │                           D1   KV   R2 Resend …
+      │                        (SQLite)(캐시)(이미지)(메일)
       │
       └─ 정적 자산 ──▶ Cloudflare Assets (dist/client/)
                          React SPA (React Router)
@@ -32,21 +32,27 @@ wrangler.jsonc의 핵심 설정. 이 옵션 없이는 Cloudflare가 모든 요�
 edu-link/
 ├── src/
 │   ├── server/
-│   │   ├── index.ts              # Hono 앱 — 모든 API 라우트 및 리다이렉트 핸들러
+│   │   ├── index.ts              # Hono 앱 — 모든 API 라우트 및 리다이렉트/페이지 서빙
 │   │   ├── env.d.ts              # Cloudflare 바인딩 타입 정의
 │   │   ├── db/
 │   │   │   └── schema.sql        # D1 전체 스키마 (정규화)
 │   │   ├── middleware/
 │   │   │   ├── auth.ts           # JWT + Cloudflare Access + 모의권한 미들웨어
 │   │   │   └── rateLimit.ts      # KV 기반 고정 윈도우 Rate Limiter
+│   │   ├── routes/
+│   │   │   ├── sites.ts          # 페이지: 사이트/페이지/섹션/미디어/게시 API
+│   │   │   └── siteRender.ts     # 페이지: 공개 렌더·게시 스냅샷·초안 미리보기
 │   │   └── utils/
 │   │       └── slug.ts           # 슬러그 생성/검증 유틸
 │   └── client/
 │       ├── main.tsx              # React 진입점
-│       ├── App.tsx               # React Router 라우팅 설정
+│       ├── App.tsx               # React Router (탭별 /dashboard/:tab + 편집기 lazy)
 │       └── pages/
 │           ├── Landing.tsx       # 메인 페이지 (단축주소 생성 + 공개 링크 목록)
-│           ├── Dashboard.tsx     # 사용자 대시보드 (링크 관리 + 통계)
+│           ├── Dashboard.tsx     # 사용자 대시보드 (링크·설문·페이지 관리 + 통계)
+│           ├── SurveyTab.tsx     # 설문 관리 탭
+│           ├── PagesTab.tsx      # 페이지 관리 탭 (요약카드·표·QR 드로워)
+│           ├── SiteEditor.tsx    # 페이지 전용 편집기 (/dashboard/sites/:id, lazy)
 │           └── NotFound.tsx      # 404 + 슬러그 full-reload 처리
 ├── migrations/                   # D1 마이그레이션 SQL 파일
 ├── docs/                         # 개발 문서 (이 폴더)
@@ -136,6 +142,24 @@ edu-link/
         └─ KV 캐싱 (만료/비밀번호 없는 경우)
 ```
 
+### 5. 페이지: 게시 & 공개 서빙
+
+```
+편집(초안)                        게시(POST /api/sites/:id/publish)
+  D1 site_pages/site_sections  →  전 경로 렌더 → site_snapshots 교체
+  rev += 1 (공개 영향 없음)         published_rev = rev, KV pub:{slug}:{path} 적재
+       │                                  │
+  GET /api/sites/:id/preview        공개 GET /{slug}[/{p1}[/{p2}]]
+  (소유자, D1 실시간 렌더)           ├─ KV pub:{slug}:{path} HIT ─▶ HTML (D1 0회)
+                                    ├─ MISS → D1 site_snapshots (is_public=1)
+                                    │         → HTML + KV 재적재(waitUntil)
+                                    └─ 미게시/비공개/미스 → 404 안내
+                                    + click_count++, Cache-Control 60s
+```
+
+- 편집은 `rev`만 올리고 공개(스냅샷)는 불변 → `rev > published_rev`면 편집기에 "게시 필요" 표시.
+- 이미지는 `POST /api/sites/:id/media`로 R2 업로드 후 `/media/*`(Worker 프록시)로 서빙. 섹션·사이트 삭제 시 R2 객체 정리.
+
 ---
 
 ## 슬러그 이중 구조
@@ -155,6 +179,8 @@ edu-link/
 | 레이어 | 대상 | TTL |
 |---|---|---|
 | KV (`URL_CACHE`) | 만료·비밀번호 없는 활성 링크 URL | 영구 (링크 삭제/수정 시 즉시 무효화) |
+| KV (`URL_CACHE`) | 페이지 게시 스냅샷 `pub:{slug}:{path}` | 7일 (게시/미공개/삭제 시 갱신·삭제) |
+| R2 (`MEDIA`) | 페이지 업로드 이미지 `/media/*` | public, max-age=1y, immutable |
 | KV | OTP 코드 | 300초 (5분) |
 | KV | Rate Limit 카운터 | windowSec × 2 |
 | CF Assets | 정적 파일 (JS/CSS) | Vite 해시명으로 장기 캐시 |

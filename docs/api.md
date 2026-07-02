@@ -263,6 +263,46 @@ UTF-8 BOM CSV 파일 다운로드. 첫 행은 `제출일시, 질문1, 질문2, .
 
 ---
 
+### 페이지 / EduLink Pages (고급사용자, level ≥ 3 필요)
+
+모든 편집 라우트는 세션 인증 + `level ≥ 3` + 대상 사이트 소유권(`user_id`)을 서버에서 재확인합니다.
+
+**사이트**
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/sites` | 내 사이트 목록 (click_count·page_count·게시 상태 포함) |
+| POST | `/api/sites` | 사이트 생성 (base_slug 자동발급, 선택 custom_slug) |
+| GET | `/api/sites/:id` | 사이트 상세 (테마 + 페이지 트리) |
+| PATCH | `/api/sites/:id` | title / custom_slug(주소변경) / is_public / home_page_id / theme |
+| DELETE | `/api/sites/:id` | 사이트 삭제 (페이지·섹션·스냅샷·urls·R2·KV 회수) |
+| POST | `/api/sites/:id/publish` | 게시 — 전 경로 렌더 → 스냅샷 교체 + `published_rev` 갱신 |
+| GET | `/api/sites/:id/preview?path=&theme=` | 소유자 초안 실시간 미리보기(HTML, no-store) |
+| POST | `/api/sites/:id/media` | 이미지 업로드(multipart) → R2 → `/media/...` URL 반환 |
+
+**페이지**
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/sites/:id/pages` | 페이지 생성 (title·slug·parent_id, depth ≤ 1 검증) |
+| GET | `/api/pages/:id` | 페이지 + 섹션 |
+| PATCH | `/api/pages/:id` | title / slug / 이동(parent_id) |
+| DELETE | `/api/pages/:id` | 페이지 + 하위·섹션 삭제 |
+| POST | `/api/pages/reorder` | 형제 페이지 정렬 `{ order: [id, ...] }` |
+
+**섹션**
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/pages/:id/sections` | 섹션 추가 (type: text·heading·image·youtube·link·embed·divider) |
+| PATCH | `/api/sections/:id` | 섹션 content 수정 |
+| DELETE | `/api/sections/:id` | 섹션 삭제 (image면 R2 객체도 삭제) |
+| POST | `/api/sections/reorder` | 페이지 내 섹션 정렬 `{ page_id, order: [id, ...] }` |
+
+> 공개 페이지는 별도 인증 없이 `GET /{siteSlug}[/{상위}[/{하위}]]`로 게시 스냅샷을 서빙합니다(§리다이렉트 참조).
+
+---
+
 ## 관리자 API (level = 4 필요)
 
 | 메서드 | 경로 | 설명 |
@@ -337,13 +377,16 @@ Worker가 api.qrserver.com에서 PNG를 프록시하여 반환. `Cache-Control: 
 
 ---
 
-## 리다이렉트 / 설문 진입
+## 리다이렉트 / 설문 진입 / 페이지 서빙
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/:slug` | 단축주소 리다이렉트(307) 또는 설문 페이지 반환 |
+| GET | `/:slug` | 단축주소 리다이렉트(307) · 설문 · 페이지 홈 — `kind`로 분기 |
+| GET | `/:slug/:p1` · `/:slug/:p1/:p2` | 페이지 하위 경로 (게시 스냅샷) |
+| GET | `/media/*` | 페이지 이미지 R2 프록시(불변 캐시) |
 
 - `kind = 'link'` — 비밀번호 없으면 307 리다이렉트, 있으면 PIN 입력 HTML 반환.
 - `kind = 'survey'` — 비밀번호 없으면 설문 HTML 반환, 있으면 PIN 검증 후 설문 표시. URL은 변하지 않음.
+- `kind = 'site'` — 게시 스냅샷 서빙(KV `pub:{slug}:{path}` → D1 `site_snapshots`). 응답 헤더 `Cache-Control: public, max-age=60, stale-while-revalidate=600`, 조회수 집계. 미게시·비공개·경로 미스는 404 안내.
 - 만료 또는 비활성화된 항목은 종료 안내 HTML 반환 (커스텀 메시지 지원).
 - 응답 한도 초과 설문은 마감 안내 HTML 반환.
