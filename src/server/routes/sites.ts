@@ -293,6 +293,14 @@ export function registerSiteRoutes(api: ApiApp) {
             // 게시 KV 키 정리 (스냅샷 경로 기준) — 삭제 전에 수행
             await deletePubKeys(c, id, site.custom_slug || site.base_slug);
 
+            // R2 미디어 전량 삭제 (sites/{id}/ 프리픽스)
+            if (c.env.MEDIA) {
+                try {
+                    const listed = await c.env.MEDIA.list({ prefix: `sites/${id}/` });
+                    for (const obj of listed.objects) { try { await c.env.MEDIA.delete(obj.key); } catch { /* noop */ } }
+                } catch { /* noop */ }
+            }
+
             // FK CASCADE 의존하지 않고 명시적으로 하위부터 삭제 (D1 안전)
             await c.env.DB.batch([
                 c.env.DB.prepare("DELETE FROM site_snapshots WHERE site_id = ?").bind(id),
@@ -590,8 +598,18 @@ export function registerPageRoutes(api: ApiApp) {
 // Step 4: 섹션 CRUD (text / youtube)
 // ─────────────────────────────────────────────────────────────
 
-const ALLOWED_SECTION_TYPES = ['text', 'youtube', 'heading', 'divider', 'link', 'image'];
+const ALLOWED_SECTION_TYPES = ['text', 'youtube', 'heading', 'divider', 'link', 'image', 'embed'];
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+// /media/sites/{id}/{uuid}.ext → R2 key sites/{id}/{uuid}.ext (아니면 null)
+function mediaKeyFromUrl(url: any): string | null {
+    const s = String(url ?? '');
+    return /^\/media\/[A-Za-z0-9/_.-]+$/.test(s) ? s.replace(/^\/media\//, '') : null;
+}
+async function deleteMediaByUrl(c: any, url: any): Promise<void> {
+    const key = mediaKeyFromUrl(url);
+    if (key && c.env.MEDIA) { try { await c.env.MEDIA.delete(key); } catch { /* noop */ } }
+}
 
 function isHttpUrl(u: string): boolean {
     try { const x = new URL(String(u)); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; }
@@ -626,6 +644,7 @@ function normalizeSectionContent(type: string, raw: any): any {
     }
     if (type === 'youtube') {
         const input = String(raw?.url ?? raw?.videoId ?? '').trim();
+        if (!input) return { videoId: '', title: '', start: 0 }; // 추가 직후 빈 상태 허용
         const p = parseYouTube(input);
         if (!p) throw new Error('유효한 유튜브 주소 또는 영상 ID가 아닙니다.');
         const startNum = Number(raw?.start);
@@ -637,16 +656,21 @@ function normalizeSectionContent(type: string, raw: any): any {
         const text = (typeof raw?.text === 'string' ? raw.text : '').slice(0, 300).trim();
         if (!text) throw new Error('제목 텍스트가 필요합니다.');
         const level = raw?.level === 3 || raw?.level === '3' ? 3 : 2;
-        return { text, level };
+        const bg = raw?.bg === true;
+        return { text, level, bg };
     }
     if (type === 'divider') {
         return {};
     }
+    if (type === 'embed') {
+        const html = (typeof raw?.html === 'string' ? raw.html : '').slice(0, 20000);
+        return { html };
+    }
     if (type === 'link') {
-        const label = (typeof raw?.label === 'string' ? raw.label : '').slice(0, 200).trim();
+        const label = (typeof raw?.label === 'string' ? raw.label : '').slice(0, 200).trim() || '버튼';
         const url = String(raw?.url ?? '').trim();
-        if (!label) throw new Error('버튼/링크 라벨이 필요합니다.');
-        if (!isHttpUrl(url)) throw new Error('http/https 주소만 사용할 수 있습니다.');
+        // 주소는 선택 — 있으면 http/https만. 비어 있으면 렌더 시 표시되지 않음.
+        if (url && !isHttpUrl(url)) throw new Error('버튼 주소는 http/https로 시작해야 합니다.');
         const style = raw?.style === 'link' ? 'link' : 'button';
         const newTab = raw?.newTab !== false;
         return { label, url, style, newTab };
@@ -744,6 +768,14 @@ export function registerSectionRoutes(api: ApiApp) {
             try { content = normalizeSectionContent(sec.type, body.content ?? body); }
             catch (e: any) { return c.json({ success: false, error: e.message }, 400); }
 
+            // 이미지 교체 시 이전 R2 객체 삭제
+            if (sec.type === 'image') {
+                const old = await c.env.DB.prepare("SELECT content FROM site_sections WHERE id = ?").bind(sec.id).first<{ content: string }>();
+                let oldUrl: string | undefined;
+                try { oldUrl = JSON.parse(old?.content || '{}').url; } catch { /* noop */ }
+                if (oldUrl && oldUrl !== content.url) await deleteMediaByUrl(c, oldUrl);
+            }
+
             await c.env.DB.prepare("UPDATE site_sections SET content = ? WHERE id = ?")
                 .bind(JSON.stringify(content), sec.id).run();
             await bumpRev(c, sec.site_id);
@@ -760,6 +792,13 @@ export function registerSectionRoutes(api: ApiApp) {
         try {
             const sec = await ownedSection(c, c.req.param('id'), user.id) as any;
             if (!sec) return c.json({ success: false, error: '섹션을 찾을 수 없거나 권한이 없습니다.' }, 404);
+            // 이미지 섹션이면 R2 객체도 삭제
+            if (sec.type === 'image') {
+                const row = await c.env.DB.prepare("SELECT content FROM site_sections WHERE id = ?").bind(sec.id).first<{ content: string }>();
+                let url: string | undefined;
+                try { url = JSON.parse(row?.content || '{}').url; } catch { /* noop */ }
+                if (url) await deleteMediaByUrl(c, url);
+            }
             await c.env.DB.prepare("DELETE FROM site_sections WHERE id = ?").bind(sec.id).run();
             await bumpRev(c, sec.site_id);
             return c.json({ success: true });

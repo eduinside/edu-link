@@ -9,7 +9,7 @@ import { Button, Chip, Input, Tooltip } from '@heroui/react';
 import {
   ChevronLeft, Plus, Trash2, Edit3, Check, X, Home, FileText, MonitorPlay,
   Heading, Image as ImageIcon, Link as LinkIcon, Minus, ArrowUp, ArrowDown,
-  Palette, Rocket, ExternalLink, Copy, Loader2, Monitor, Smartphone, CornerDownRight, RefreshCw,
+  Palette, Rocket, ExternalLink, Copy, Loader2, Monitor, Smartphone, CornerDownRight, RefreshCw, Code,
 } from 'lucide-react';
 
 interface SiteDetail {
@@ -340,7 +340,6 @@ export default function SiteEditor() {
         <button className="text-xs text-slate-500 hover:text-blue-600 inline-flex items-center gap-1 px-2" onClick={copyPublicLink}>/{publicSlug} <Copy className="w-3 h-3" /></button>
         <Tooltip content="주소 변경"><Button isIconOnly size="sm" variant="light" onClick={() => setAddressModal(true)}><Edit3 className="w-4 h-4" /></Button></Tooltip>
         <Tooltip content="공개 페이지"><Button isIconOnly size="sm" variant="light" onClick={() => window.open(`/${publicSlug}`, '_blank')}><ExternalLink className="w-4 h-4" /></Button></Tooltip>
-        <Button size="sm" variant={showDesign ? 'solid' : 'flat'} color="secondary" onClick={() => setShowDesign(true)} startContent={<Palette className="w-3.5 h-3.5" />}>디자인</Button>
         {needPublish
           ? <Chip size="sm" variant="flat" color="warning">{site.published_rev === 0 ? '미게시' : '게시 필요'}</Chip>
           : <Chip size="sm" variant="flat" color="success">게시됨</Chip>}
@@ -350,29 +349,34 @@ export default function SiteEditor() {
 
       {/* 본문 3패널 */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
-        {/* 페이지 트리 */}
-        <aside className="border-r border-slate-200 bg-white overflow-y-auto p-2.5">
-          <div className="flex items-center justify-between mb-1.5 px-1">
-            <span className="text-xs font-bold text-slate-500">페이지</span>
-            <Button size="sm" variant="flat" color="primary" onClick={() => setPageModal({ mode: 'create', parentId: null })} startContent={<Plus className="w-3.5 h-3.5" />}>추가</Button>
-          </div>
-          {rootPages.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">페이지를 추가하세요.</p>}
-          {rootPages.map((root, ri) => (
-            <div key={root.id}>
-              <TreeRow page={root} isHome={site.home_page_id === root.id} active={selectedPageId === root.id}
-                canChild={childrenOf(root.id).length < 99}
-                onSelect={() => selectPage(root.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: root.parent_id, page: root })}
-                onDelete={() => setConfirmDel({ kind: 'page', id: root.id, label: root.title })} onHome={() => setHome(root)}
-                onAddChild={() => setPageModal({ mode: 'create', parentId: root.id })}
-                onUp={ri > 0 ? () => movePage(root, -1) : undefined} onDown={ri < rootPages.length - 1 ? () => movePage(root, 1) : undefined} />
-              {childrenOf(root.id).map((ch, ci, arr) => (
-                <TreeRow key={ch.id} page={ch} child isHome={site.home_page_id === ch.id} active={selectedPageId === ch.id}
-                  onSelect={() => selectPage(ch.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: ch.parent_id, page: ch })}
-                  onDelete={() => setConfirmDel({ kind: 'page', id: ch.id, label: ch.title })} onHome={() => setHome(ch)}
-                  onUp={ci > 0 ? () => movePage(ch, -1) : undefined} onDown={ci < arr.length - 1 ? () => movePage(ch, 1) : undefined} />
-              ))}
+        {/* 페이지 트리 + 디자인(하단) */}
+        <aside className="border-r border-slate-200 bg-white flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto p-2.5">
+            <div className="flex items-center justify-between mb-1.5 px-1">
+              <span className="text-xs font-bold text-slate-500">페이지</span>
+              <Button size="sm" variant="flat" color="primary" onClick={() => setPageModal({ mode: 'create', parentId: null })} startContent={<Plus className="w-3.5 h-3.5" />}>추가</Button>
             </div>
-          ))}
+            {rootPages.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">페이지를 추가하세요.</p>}
+            {rootPages.map((root, ri) => (
+              <div key={root.id}>
+                <TreeRow page={root} isHome={site.home_page_id === root.id} active={selectedPageId === root.id}
+                  canChild={childrenOf(root.id).length < 99}
+                  onSelect={() => selectPage(root.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: root.parent_id, page: root })}
+                  onDelete={() => setConfirmDel({ kind: 'page', id: root.id, label: root.title })} onHome={() => setHome(root)}
+                  onAddChild={() => setPageModal({ mode: 'create', parentId: root.id })}
+                  onUp={ri > 0 ? () => movePage(root, -1) : undefined} onDown={ri < rootPages.length - 1 ? () => movePage(root, 1) : undefined} />
+                {childrenOf(root.id).map((ch, ci, arr) => (
+                  <TreeRow key={ch.id} page={ch} child isHome={site.home_page_id === ch.id} active={selectedPageId === ch.id}
+                    onSelect={() => selectPage(ch.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: ch.parent_id, page: ch })}
+                    onDelete={() => setConfirmDel({ kind: 'page', id: ch.id, label: ch.title })} onHome={() => setHome(ch)}
+                    onUp={ci > 0 ? () => movePage(ch, -1) : undefined} onDown={ci < arr.length - 1 ? () => movePage(ch, 1) : undefined} />
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-slate-100 p-2.5">
+            <Button size="sm" variant={showDesign ? 'solid' : 'flat'} color="secondary" className="w-full" onClick={() => setShowDesign(true)} startContent={<Palette className="w-3.5 h-3.5" />}>디자인 설정</Button>
+          </div>
         </aside>
 
         {/* 섹션 편집 */}
@@ -383,11 +387,12 @@ export default function SiteEditor() {
             <>
               <div className="flex items-center gap-1.5 mb-3 flex-wrap sticky top-0 bg-slate-50 py-1 z-10">
                 <span className="text-xs font-bold text-slate-500 mr-auto">‘{selectedPage.title}’ 콘텐츠</span>
-                <AddBtn onClick={() => addSection('text', { text: '', format: 'markdown' })} icon={<FileText className="w-3.5 h-3.5" />}>텍스트</AddBtn>
-                <AddBtn onClick={() => addSection('heading', { text: '제목', level: 2 })} icon={<Heading className="w-3.5 h-3.5" />}>제목</AddBtn>
+                <AddBtn onClick={() => addSection('text', { text: '', format: 'markdown' })} icon={<FileText className="w-3.5 h-3.5" />}>본문</AddBtn>
+                <AddBtn onClick={() => addSection('heading', { text: '제목', level: 2, bg: false })} icon={<Heading className="w-3.5 h-3.5" />}>제목</AddBtn>
                 <AddBtn onClick={async () => { const u = await uploadImage(); if (u) addSection('image', { url: u, alt: '', width: 'normal' }); }} icon={<ImageIcon className="w-3.5 h-3.5" />}>이미지</AddBtn>
                 <AddBtn color="danger" onClick={() => addSection('youtube', { url: '' })} icon={<MonitorPlay className="w-3.5 h-3.5" />}>유튜브</AddBtn>
-                <AddBtn onClick={() => addSection('link', { label: '버튼', url: 'https://', style: 'button', newTab: true })} icon={<LinkIcon className="w-3.5 h-3.5" />}>버튼</AddBtn>
+                <AddBtn onClick={() => addSection('link', { label: '버튼', url: '', style: 'button', newTab: true })} icon={<LinkIcon className="w-3.5 h-3.5" />}>버튼</AddBtn>
+                <AddBtn onClick={() => addSection('embed', { html: '' })} icon={<Code className="w-3.5 h-3.5" />}>임베드</AddBtn>
                 <AddBtn onClick={() => addSection('divider', {})} icon={<Minus className="w-3.5 h-3.5" />}>구분선</AddBtn>
               </div>
               {sections.length === 0 && <p className="text-sm text-slate-400 text-center py-10">위 버튼으로 콘텐츠를 추가하세요.</p>}
@@ -497,7 +502,7 @@ function IconBtn({ children, onClick, disabled, danger, title }: { children: Rea
     className={`p-1 ${danger ? 'text-slate-400 hover:text-rose-500' : 'text-slate-400 hover:text-blue-500'} disabled:opacity-20`}>{children}</button>;
 }
 
-const SEC_LABEL: Record<string, string> = { text: '텍스트', youtube: '유튜브', heading: '제목', divider: '구분선', link: '버튼/링크', image: '이미지' };
+const SEC_LABEL: Record<string, string> = { text: '본문', youtube: '유튜브', heading: '제목', divider: '구분선', link: '버튼/링크', image: '이미지', embed: '임베드(HTML)' };
 
 function SectionCard({ sec, idx, total, onSave, onUpload, onDelete, onMove }: {
   sec: SectionItem; idx: number; total: number;
@@ -523,13 +528,18 @@ function SectionBody({ sec, onSave, onUpload }: { sec: SectionItem; onSave: (c: 
   if (sec.type === 'text') return <TextBody value={c.text ?? ''} onSave={(t) => onSave({ text: t, format: 'markdown' })} />;
 
   if (sec.type === 'heading') return (
-    <div className="flex items-center gap-2">
-      <input className="flex-1 text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
-        defaultValue={c.text ?? ''} placeholder="제목 텍스트"
-        onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== c.text) onSave({ text: v, level: c.level || 2 }); }} />
-      <select className="text-sm border border-slate-200 rounded-lg px-2 py-2" value={c.level || 2} onChange={(e) => onSave({ text: c.text || '제목', level: Number(e.target.value) })}>
-        <option value={2}>큰제목</option><option value={3}>작은제목</option>
-      </select>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input className="flex-1 text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
+          defaultValue={c.text ?? ''} placeholder="제목 텍스트"
+          onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== c.text) onSave({ text: v, level: c.level || 2, bg: !!c.bg }); }} />
+        <select className="text-sm border border-slate-200 rounded-lg px-2 py-2" value={c.level || 2} onChange={(e) => onSave({ text: c.text || '제목', level: Number(e.target.value), bg: !!c.bg })}>
+          <option value={2}>큰제목</option><option value={3}>작은제목</option>
+        </select>
+      </div>
+      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+        <input type="checkbox" checked={!!c.bg} onChange={(e) => onSave({ text: c.text || '제목', level: c.level || 2, bg: e.target.checked })} /> 강조색 배경 (디자인 색조를 배경으로)
+      </label>
     </div>
   );
 
@@ -548,18 +558,20 @@ function SectionBody({ sec, onSave, onUpload }: { sec: SectionItem; onSave: (c: 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <input className="text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
         defaultValue={c.label ?? ''} placeholder="버튼 이름"
-        onBlur={(e) => onSave({ ...c, label: e.target.value.trim() || '버튼', url: c.url || 'https://', style: c.style || 'button', newTab: c.newTab !== false })} />
+        onBlur={(e) => onSave({ ...c, label: e.target.value.trim() || '버튼', url: (c.url || '').trim(), style: c.style || 'button', newTab: c.newTab !== false })} />
       <input className="text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
         defaultValue={c.url ?? ''} placeholder="https://..."
         onBlur={(e) => onSave({ ...c, label: c.label || '버튼', url: e.target.value.trim(), style: c.style || 'button', newTab: c.newTab !== false })} />
       <div className="flex gap-1.5 col-span-full">
         {['button', 'link'].map(st => (
           <button key={st} className={`text-xs px-2.5 py-1 rounded ${(c.style || 'button') === st ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-slate-400 hover:bg-slate-100'}`}
-            onClick={() => onSave({ ...c, label: c.label || '버튼', url: c.url || 'https://', style: st, newTab: c.newTab !== false })}>{st === 'button' ? '버튼 모양' : '텍스트 링크'}</button>
+            onClick={() => onSave({ ...c, label: c.label || '버튼', url: (c.url || '').trim(), style: st, newTab: c.newTab !== false })}>{st === 'button' ? '버튼 모양' : '텍스트 링크'}</button>
         ))}
       </div>
     </div>
   );
+
+  if (sec.type === 'embed') return <EmbedBody value={c.html ?? ''} onSave={(html) => onSave({ html })} />;
 
   if (sec.type === 'image') return (
     <div className="flex items-center gap-3">
@@ -592,6 +604,25 @@ function TextBody({ value, onSave }: { value: string; onSave: (t: string) => voi
     <textarea className="w-full min-h-[110px] text-sm border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-blue-400 resize-y font-mono"
       placeholder="마크다운: **굵게**, *기울임*, [링크](https://...), - 목록, > 인용"
       value={text} onChange={(e) => onChange(e.target.value)} onBlur={() => { if (timer.current) clearTimeout(timer.current); if (text !== value) onSave(text); }} />
+  );
+}
+
+function EmbedBody({ value, onSave }: { value: string; onSave: (t: string) => void }) {
+  const [html, setHtml] = useState(value);
+  const timer = useRef<any>(null);
+  useEffect(() => { setHtml(value); }, []);
+  const onChange = (v: string) => {
+    setHtml(v);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => onSave(v), 800);
+  };
+  return (
+    <div className="space-y-1.5">
+      <textarea className="w-full min-h-[120px] text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-blue-400 resize-y font-mono"
+        placeholder="<iframe ...></iframe> 등 임베드 HTML을 붙여넣으세요 (구글폼·패들릿·유튜브 등)"
+        value={html} onChange={(e) => onChange(e.target.value)} onBlur={() => { if (timer.current) clearTimeout(timer.current); if (html !== value) onSave(html); }} />
+      <p className="text-[11px] text-slate-400">&lt;script&gt;와 이벤트 핸들러는 보안상 자동 제거됩니다. iframe 임베드는 그대로 표시됩니다.</p>
+    </div>
   );
 }
 
@@ -667,20 +698,35 @@ const PRESETS: Array<{ name: string; primary: string; accent: string }> = [
   { name: '앰버', primary: '#d97706', accent: '#fbbf24' },
   { name: '스카이', primary: '#0284c7', accent: '#38bdf8' },
 ];
+// 한글 구글폰트 프리셋 — 선택 시 family+url을 함께 지정(그래야 실제로 폰트가 바뀜)
+const FONT_PRESETS: Array<{ label: string; family: string; url: string }> = [
+  { label: '프리텐다드(기본)', family: 'Pretendard', url: '' },
+  { label: '본고딕', family: 'Noto Sans KR', url: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap' },
+  { label: '나눔고딕', family: 'Nanum Gothic', url: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap' },
+  { label: '고딕 A1', family: 'Gothic A1', url: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700&display=swap' },
+  { label: '나눔명조', family: 'Nanum Myeongjo', url: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap' },
+  { label: '주아(둥근)', family: 'Jua', url: 'https://fonts.googleapis.com/css2?family=Jua&display=swap' },
+  { label: '개구(손글씨)', family: 'Gaegu', url: 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap' },
+  { label: '검은고딕', family: 'Black Han Sans', url: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' },
+];
 
 function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClose: () => void; onSave: (t: any) => void; onPreview: (t: any) => void }) {
   const [colors, setColors] = useState<any>(theme?.colors || {});
   const [headerTitle, setHeaderTitle] = useState<string>(theme?.header?.title || '');
   const [showTitle, setShowTitle] = useState<boolean>(theme?.header?.showTitle !== false);
   const [navPosition, setNavPosition] = useState<string>(theme?.header?.navPosition === 'side' ? 'side' : 'top');
+  const [fontFamily, setFontFamily] = useState<string>(theme?.font?.family || 'Pretendard');
   const [googleFontUrl, setGoogleFontUrl] = useState<string>(theme?.font?.googleFontUrl || '');
+  const [showFontUrl, setShowFontUrl] = useState(false);
+
+  const pickFont = (f: { family: string; url: string }) => { setFontFamily(f.family); setGoogleFontUrl(f.url); };
 
   const build = (over?: any) => ({
     colors: over?.colors ?? colors,
-    font: { family: theme?.font?.family || 'Pretendard', googleFontUrl: googleFontUrl.trim() || null },
+    font: { family: fontFamily, googleFontUrl: googleFontUrl.trim() || null },
     header: { title: headerTitle.trim(), showTitle, navPosition },
   });
-  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, googleFontUrl]);
+  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl]);
 
   return (
     <Backdrop onClose={onClose}>
@@ -721,8 +767,25 @@ function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClos
       </div>
       <label className="flex items-center gap-1.5 text-xs text-slate-600 mb-3"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> 헤더에 제목 표시</label>
       <div className="mb-1">
-        <div className="text-xs font-bold text-slate-500 mb-1">구글폰트 URL (선택)</div>
-        <input className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400" value={googleFontUrl} onChange={(e) => setGoogleFontUrl(e.target.value)} placeholder="https://fonts.googleapis.com/css2?family=..." />
+        <div className="text-xs font-bold text-slate-500 mb-1.5">글꼴</div>
+        <div className="flex flex-wrap gap-1.5">
+          {FONT_PRESETS.map(f => (
+            <button key={f.family} onClick={() => pickFont(f)}
+              className={`text-xs px-2.5 py-1 rounded-full border ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-semibold' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button className="text-[11px] text-slate-400 hover:text-slate-600 mt-1.5" onClick={() => setShowFontUrl(v => !v)}>{showFontUrl ? '▴ 직접 입력 접기' : '▾ 구글폰트 URL 직접 입력'}</button>
+        {showFontUrl && (
+          <div className="mt-1.5 space-y-1">
+            <input className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400" value={googleFontUrl} onChange={(e) => setGoogleFontUrl(e.target.value)} placeholder="https://fonts.googleapis.com/css2?family=..." />
+            <input className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400" value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} placeholder="폰트 이름 (예: Sunflower)" />
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              <a href="https://fonts.google.com/?script=Kore" target="_blank" rel="noreferrer" className="text-blue-500 underline">구글 폰트(한글) 열기 ↗</a> → 폰트 선택 → “Get font” → “Get embed code” → <b>@import</b>가 아닌 <b>&lt;link&gt;</b> 탭의 <code>https://fonts.googleapis.com/…</code> 주소를 위 칸에, 폰트 이름을 아래 칸에 입력하세요.
+            </p>
+          </div>
+        )}
       </div>
       <div className="flex justify-end gap-2 mt-4">
         <Button size="sm" variant="light" onClick={onClose}>닫기</Button>

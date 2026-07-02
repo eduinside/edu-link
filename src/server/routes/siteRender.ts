@@ -20,6 +20,18 @@ function safeHref(url: string): string | null {
     return null;
 }
 
+// 임베드 HTML 정화: <script>/이벤트핸들러/javascript:는 제거하되 iframe 등 임베드 태그는 허용.
+// (소유자 본인이 붙여넣는 임베드 코드용 — 구글폼/패들릿/유튜브 iframe 등)
+function sanitizeEmbed(html: string): string {
+    return String(html)
+        .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+        .replace(/<\s*script\b[^>]*>/gi, '')
+        .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+        .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+        .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+        .replace(/javascript:/gi, '');
+}
+
 // 제한 마크다운 → 안전한 HTML. 입력은 먼저 전부 escape 후 화이트리스트 변환만 적용.
 function renderMarkdown(src: string): string {
     const lines = String(src).replace(/\r\n/g, '\n').split('\n');
@@ -78,10 +90,16 @@ function renderSection(type: string, content: any): string {
     }
     if (type === 'heading') {
         const lvl = content?.level === 3 ? 3 : 2;
-        return `<section class="sec sec-heading"><h${lvl}>${escapeHtml(content?.text ?? '')}</h${lvl}></section>`;
+        const bg = content?.bg === true ? ' sec-heading-bg' : '';
+        return `<section class="sec sec-heading${bg}"><h${lvl}>${escapeHtml(content?.text ?? '')}</h${lvl}></section>`;
     }
     if (type === 'divider') {
         return `<section class="sec sec-divider"><hr></section>`;
+    }
+    if (type === 'embed') {
+        const html = sanitizeEmbed(String(content?.html ?? ''));
+        if (!html.trim()) return '';
+        return `<section class="sec sec-embed">${html}</section>`;
     }
     if (type === 'link') {
         const href = safeHref(content?.url ?? '');
@@ -109,17 +127,20 @@ function renderNav(pages: Array<any>, siteSlug: string, currentPage: any): strin
     const hasChildren = pages.length > roots.length;
     if (roots.length <= 1 && !hasChildren) return '';
     const currentRootId = currentPage.parent_id == null ? currentPage.id : currentPage.parent_id;
-    const link = (p: any) => `/${encodeURIComponent(siteSlug)}/${encodeURIComponent(p.slug)}`;
+    const base = `/${encodeURIComponent(siteSlug)}`;
+    const rootLink = (p: any) => `${base}/${encodeURIComponent(p.slug)}`;
+    // 하위 페이지 경로는 반드시 상위 슬러그를 포함해야 함 (/{slug}/{root}/{child})
+    const childLink = (root: any, c: any) => `${base}/${encodeURIComponent(root.slug)}/${encodeURIComponent(c.slug)}`;
     const aClass = (p: any) => p.id === currentPage.id ? ' class="active"' : '';
 
     const items = roots.map(root => {
         const ch = kids(root.id);
         const rootActive = root.id === currentRootId;
         const sub = ch.length
-            ? `<ul class="nav-sub">${ch.map(c => `<li><a href="${link(c)}"${aClass(c)}>${escapeHtml(c.title)}</a></li>`).join('')}</ul>`
+            ? `<ul class="nav-sub">${ch.map(c => `<li><a href="${childLink(root, c)}"${aClass(c)}>${escapeHtml(c.title)}</a></li>`).join('')}</ul>`
             : '';
         const caret = ch.length ? '<span class="nav-caret">▾</span>' : '';
-        return `<li class="nav-li${rootActive ? ' active' : ''}${ch.length ? ' has-sub' : ''}"><a href="${link(root)}"${aClass(root)}>${escapeHtml(root.title)}${caret}</a>${sub}</li>`;
+        return `<li class="nav-li${rootActive ? ' active' : ''}${ch.length ? ' has-sub' : ''}"><a href="${rootLink(root)}"${aClass(root)}>${escapeHtml(root.title)}${caret}</a>${sub}</li>`;
     }).join('');
 
     return `<input type="checkbox" id="nav-toggle" class="nav-toggle-cb"><label for="nav-toggle" class="nav-toggle" aria-label="메뉴 열기">☰</label><nav class="site-nav"><ul class="nav-list">${items}</ul></nav>`;
@@ -209,9 +230,14 @@ ${t.googleFontLink}
   .sec-text a { color:var(--c-primary); }
   .sec-text blockquote { margin:0 0 12px; padding:8px 16px; border-left:3px solid var(--c-primary); color:var(--c-muted); background:#fff; }
   .sec-text ul { margin:0 0 12px; padding-left:22px; }
-  .sec-heading h2 { font-size:1.4rem; margin:8px 0; }
-  .sec-heading h3 { font-size:1.15rem; margin:6px 0; }
+  .sec-heading h2 { font-size:1.9rem; font-weight:800; margin:10px 0; letter-spacing:-.01em; }
+  .sec-heading h3 { font-size:1.2rem; font-weight:700; margin:6px 0; color:var(--c-muted); }
+  .sec-heading-bg { background:var(--c-primary); border-radius:12px; padding:14px 20px; }
+  .sec-heading-bg h2, .sec-heading-bg h3 { color:#fff; margin:0; }
   .sec-divider hr { border:none; border-top:1px solid var(--c-border); margin:8px 0; }
+  .sec-embed { overflow:hidden; }
+  .sec-embed iframe { max-width:100%; border:0; }
+  .sec-embed img { max-width:100%; height:auto; }
   .sec-link .btn { display:inline-block; background:var(--c-primary); color:#fff; padding:10px 22px; border-radius:10px; text-decoration:none; font-weight:600; }
   .sec-link .btn-link { color:var(--c-primary); text-decoration:underline; }
   .sec-image figure { margin:0; }
@@ -243,10 +269,8 @@ ${t.googleFontLink}
     <div class="content">
       <main>
         ${renderBreadcrumb(page, pages, siteSlug)}
-        <h2 class="page-title">${escapeHtml(page.title)}</h2>
         ${sectionsHtml || '<p style="color:var(--c-muted)">아직 콘텐츠가 없습니다.</p>'}
       </main>
-      <footer>Powered by 에듀링크</footer>
     </div>
   </div>
 </body>
