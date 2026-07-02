@@ -8,7 +8,7 @@ import { Button, Card, CardContent, Chip, Input, Tooltip } from '@heroui/react';
 import {
   Globe, Plus, Copy, ExternalLink, Trash2, Edit3, Check, X,
   Home, FileText, MonitorPlay, ArrowUp, ArrowDown, ChevronLeft, Settings, Eye, EyeOff, CornerDownRight,
-  Palette, Heading, Image as ImageIcon, Link as LinkIcon, Minus,
+  Palette, Heading, Image as ImageIcon, Link as LinkIcon, Minus, Rocket,
 } from 'lucide-react';
 
 interface SiteItem {
@@ -17,6 +17,8 @@ interface SiteItem {
   is_public: number;
   home_page_id: number | null;
   rev: number;
+  published_rev?: number;
+  published_at?: string | null;
   slug: string;
   base_slug: string;
   custom_slug: string | null;
@@ -65,6 +67,8 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
   const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [dirty, setDirty] = useState(false); // 마지막 게시 이후 미반영 변경 존재 여부
 
   // ─────────── 사이트 목록 ───────────
   const fetchSites = async () => {
@@ -145,6 +149,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
       if (data.success) {
         setEditorSite(data.site);
         setPages(data.pages);
+        setDirty((data.site.rev || 0) > (data.site.published_rev || 0));
         // 홈 또는 첫 페이지 자동 선택
         const first = data.site.home_page_id && data.pages.find((p: PageNode) => p.id === data.site.home_page_id)
           ? data.site.home_page_id
@@ -165,6 +170,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
       if (data.success) {
         setEditorSite(data.site);
         setPages(data.pages);
+        setDirty(true); // 페이지/구조 변경 발생 → 재게시 필요
         if (keep && data.pages.find((p: PageNode) => p.id === keep)) selectPage(keep);
         else if (data.pages[0]) selectPage(data.pages[0].id);
         else { setSelectedPageId(null); setSections([]); }
@@ -236,7 +242,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/pages/${selectedPageId}/sections`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ type, content }) });
       const data = await res.json();
-      if (data.success) { setSuccessMsg('섹션이 추가되었습니다.'); selectPage(selectedPageId); }
+      if (data.success) { setSuccessMsg('섹션이 추가되었습니다.'); setDirty(true); selectPage(selectedPageId); }
       else setError(data.error || '추가 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
@@ -290,7 +296,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sections/${sec.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ content: { text, format: 'markdown' } }) });
       const data = await res.json();
-      if (data.success) { setSuccessMsg('저장되었습니다.'); selectPage(selectedPageId!); }
+      if (data.success) { setSuccessMsg('저장되었습니다.'); setDirty(true); selectPage(selectedPageId!); }
       else setError(data.error || '저장 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
@@ -299,7 +305,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sections/${sec.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ content }) });
       const data = await res.json();
-      if (data.success) { setSuccessMsg('변경되었습니다.'); selectPage(selectedPageId!); }
+      if (data.success) { setSuccessMsg('변경되었습니다.'); setDirty(true); selectPage(selectedPageId!); }
       else setError(data.error || '변경 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
@@ -334,7 +340,7 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sections/${sec.id}`, { method: 'DELETE', headers: getHeaders() });
       const data = await res.json();
-      if (data.success) { selectPage(selectedPageId!); }
+      if (data.success) { setDirty(true); selectPage(selectedPageId!); }
       else setError(data.error || '삭제 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
@@ -348,7 +354,8 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch('/api/sections/reorder', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ page_id: selectedPageId, order: next.map(s => s.id) }) });
       const data = await res.json();
-      if (!data.success) { setError(data.error || '정렬 실패'); selectPage(selectedPageId!); }
+      if (data.success) setDirty(true);
+      else { setError(data.error || '정렬 실패'); selectPage(selectedPageId!); }
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
 
@@ -376,9 +383,25 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sites/${editorId}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ theme }) });
       const data = await res.json();
-      if (data.success) { setSuccessMsg('디자인이 저장되었습니다.'); setEditorSite(s => s ? { ...s, theme: JSON.stringify(theme) } as any : s); setShowSettings(false); }
+      if (data.success) { setSuccessMsg('디자인이 저장되었습니다. 게시해야 공개에 반영됩니다.'); setEditorSite(s => s ? { ...s, theme: JSON.stringify(theme), rev: (s.rev || 0) + 1 } as any : s); setDirty(true); setShowSettings(false); }
       else setError(data.error || '저장 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
+  };
+
+  // 게시 — 현재 초안을 공개 스냅샷으로 반영
+  const publishSite = async () => {
+    if (!editorId) return;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/sites/${editorId}/publish`, { method: 'POST', headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(`게시되었습니다 (${data.published}개 페이지). 공개 주소에 반영됩니다.`);
+        setEditorSite(s => s ? { ...s, published_rev: data.rev, published_at: new Date().toISOString() } as any : s);
+        setDirty(false);
+      } else setError(data.error || '게시 실패');
+    } catch (e: any) { setError('네트워크 오류: ' + e.message); }
+    finally { setPublishing(false); }
   };
 
   // ───────────────── 렌더 ─────────────────
@@ -395,12 +418,27 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
             <Chip size="sm" color={editorSite.is_public ? 'success' : 'default'} variant="flat">{editorSite.is_public ? '공개' : '비공개'}</Chip>
           </div>
           <div className="flex items-center gap-1.5">
+            {(editorSite.published_rev ?? 0) === 0
+              ? <Chip size="sm" variant="flat" color="warning">미게시</Chip>
+              : dirty
+                ? <Chip size="sm" variant="flat" color="warning">게시 필요</Chip>
+                : <Chip size="sm" variant="flat" color="success">게시됨</Chip>}
             <code className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">/{slug}</code>
             <Button size="sm" variant={showSettings ? 'solid' : 'flat'} color="secondary" onClick={() => setShowSettings(v => !v)} startContent={<Palette className="w-3.5 h-3.5" />}>디자인</Button>
             <Tooltip content="주소 복사"><Button isIconOnly size="sm" variant="light" onClick={() => copyLink(slug)}><Copy className="w-4 h-4" /></Button></Tooltip>
-            <Tooltip content="새 탭에서 열기"><Button isIconOnly size="sm" variant="light" onClick={() => window.open(`/${slug}`, '_blank')}><ExternalLink className="w-4 h-4" /></Button></Tooltip>
+            <Tooltip content="공개 페이지 열기"><Button isIconOnly size="sm" variant="light" onClick={() => window.open(`/${slug}`, '_blank')}><ExternalLink className="w-4 h-4" /></Button></Tooltip>
+            <Button size="sm" color="primary" onClick={publishSite} isLoading={publishing}
+              variant={(dirty || (editorSite.published_rev ?? 0) === 0) ? 'solid' : 'flat'}
+              startContent={!publishing ? <Rocket className="w-3.5 h-3.5" /> : undefined}>게시</Button>
           </div>
         </div>
+        {(dirty || (editorSite.published_rev ?? 0) === 0) && (
+          <div className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            {(editorSite.published_rev ?? 0) === 0
+              ? '아직 게시되지 않았습니다. 공개 주소로 접속하려면 우측 상단 ‘게시’를 누르세요.'
+              : '저장되지 않은(미게시) 변경이 있습니다. ‘게시’를 눌러 공개 페이지에 반영하세요.'}
+          </div>
+        )}
 
         {showSettings && <ThemePanel theme={safeParse(editorSite.theme)} onSave={saveTheme} onClose={() => setShowSettings(false)} />}
 
@@ -503,7 +541,9 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="font-bold text-slate-800 text-sm truncate">{s.title}</h4>
-                        <Chip size="sm" color={s.is_public ? 'success' : 'default'} variant="flat">{s.is_public ? '공개' : '비공개'}</Chip>
+                        {(s.published_rev ?? 0) === 0
+                          ? <Chip size="sm" color="warning" variant="flat">미게시</Chip>
+                          : <Chip size="sm" color={s.is_public ? 'success' : 'default'} variant="flat">{s.is_public ? '게시됨' : '비공개'}</Chip>}
                       </div>
                       <button className="text-xs text-blue-500 hover:underline mt-1 inline-flex items-center gap-1" onClick={() => window.open(`/${slug}`, '_blank')}>
                         /{slug} <ExternalLink className="w-3 h-3" />

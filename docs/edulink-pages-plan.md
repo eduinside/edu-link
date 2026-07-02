@@ -1,4 +1,4 @@
-# 에듀링크 페이지(EduLink Pages) — 구현 계획서 v1.0
+# 에듀링크 페이지(EduLink Pages) — 구현 계획서 v2.0
 
 > 핸드오프 문서 v0.1을 **실제 코드베이스 조사 결과로 검증·수정**한 확정 계획서.
 > 대상: `edu-link` (Hono + React + Cloudflare Workers / D1 / KV).
@@ -301,4 +301,165 @@ slug 정규화(NFC) → reserved_slugs 체크(SPA 보호) → KV/D1 조회(base/
 JSON camelCase, 파일명 kebab-case, 파스텔 라이트 + Pretendard 기본, Cloudflare Workers/D1/R2/KV 스택, 단일 책임 모듈, 시크릿은 바인딩/환경변수로만.
 
 ---
-*v1.1 — 실제 스키마 검증 + 사용자 결정(슬러그 풀 공유 / 루트경로 depth2 / R2·테마 연기 / 토큰분할) 반영 완료. Step 1부터 착수 가능.*
+
+## 12. 사용성 개선 계획 v2 — 테스트 운영 피드백 반영 (2026-07-01)
+
+> 테스트 버전(`dgedu.link/7fmKH3`, 상위 2·하위 1페이지) 운영 피드백과 실측·소스 진단을 바탕으로 한 보완계획.
+> **구현은 Opus가 Step 단위로 수행. 본 절이 유일한 스펙이므로 재조사 없이 착수 가능하도록 상세히 기술.**
+
+### 12.0 사용자 확정 결정
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | 게시 방식 | **초안→게시 버튼 방식**(구글 사이트형). 편집은 초안으로 자동저장, '게시' 시 스냅샷 공개. **미게시 변경이 있음을 편집기에 항상 표시** |
+| 2 | 편집기 | **전용 편집기 + 실시간 미리보기**(대시보드 탭에서 분리된 전체화면) |
+| 3 | 느린 지점 | 공개 접속·편집 반응·수정→공개 반영·대시보드 로딩 **전부** 해당 |
+| 4 | R2 버킷 | **미생성** → 운영에서 이미지 업로드 현재 불가. 인프라 절차 포함(§12.7) |
+
+### 12.1 실측·소스 진단 (2026-07-01 기준)
+
+**A. 공개 페이지 접속 (실측 0.7~1.0초/요청, 재요청도 0.7초)**
+- `CF-RAY: …-LAX` — 무료 플랜의 한국 트래픽이 **미국 LA 엣지로 라우팅**. Worker↔D1 왕복마다 태평양 횡단.
+- 응답에 **`Cache-Control` 헤더 없음** → 브라우저·엣지 캐시 전무. HTML 3.9KB로 페이로드는 문제 아님 — **왕복 횟수가 문제**.
+- 렌더 경로 D1 쿼리 **직렬 4회**(`siteRender.ts`: urls 조회→sites JOIN→site_pages 전체→site_sections) + 하위 경로는 `reserved_slugs` 조회 1회 추가(`index.ts` `handleSiteSubPage`) = 최대 5왕복.
+- KV 캐시 히트여도 LAX 콜드 리드 + TLS 왕복으로 0.7초 유지.
+
+**B. 편집기 조작 반응**
+- 매 API 요청마다 `authMiddleware`가 **users SELECT 1회**(auth.ts, 4개 경로) + 매 쓰기마다 `bumpRev` UPDATE 1회(sites.ts 내 9곳).
+- 클라이언트는 mutation 성공 후 **전체 refetch**(`openEditorKeepPage`/`selectPage` 패턴 12곳) — 요청 1회가 실제로는 3~4회 왕복.
+- `prompt()/confirm()` **17곳** — 브라우저 블로킹 다이얼로그라 체감 품질 최악 + 모바일 어색.
+- 사이트 생성 시 `loadReservedSet`(전 테이블) + `slugTaken` 최대 10회 직렬 조회.
+
+**C. 대시보드/편집기 로딩**
+- 단일 번들 **JS 529KB + CSS 417KB**, `Dashboard.tsx` 3,300라인 모놀리스에 PagesTab 포함 — 코드 스플리팅 없음.
+
+**D. 수정→공개 반영 지연**
+- rev 키 캐시는 즉시 무효화되지만, KV의 엣지 간 전파(최대 60초) + 캐시 헤더 부재 + LAX 왕복이 겹쳐 "저장했는데 안 바뀜" 체감. → **게시제 전환으로 반영 시점 자체를 명시적 행위로 변경**(근본 해소).
+
+**E. 내비게이션/UX 구조**
+- 공개 내비에 **최상위 페이지만 노출**(`renderNav`가 `parent_id===null`만 필터) — **하위 페이지는 URL을 알아야만 접근 가능**. "하위가 상위 밑에 보이는" 혼란은 편집기 트리(들여쓰기)와 공개 내비 부재가 겹친 결과 → 공개 내비에 드롭다운/트리로 명시 노출해 별도 페이지임을 드러냄.
+- 편집 진입점 불명확: 목록 카드의 '관리' 버튼이 페이지 편집기임이 드러나지 않음.
+- 페이지·섹션 설정이 호버 마이크로버튼에 흩어져 "버튼을 일일이" 눌러야 함.
+
+### 12.2 게시 모델 설계 (아키텍처 변경 핵심)
+
+**데이터 (migration 0011)**
+```sql
+ALTER TABLE sites ADD COLUMN published_rev INTEGER NOT NULL DEFAULT 0; -- 0=미게시
+ALTER TABLE sites ADD COLUMN published_at  TEXT;
+CREATE TABLE IF NOT EXISTS site_snapshots (          -- 게시된 완성 HTML (공개의 유일한 소스)
+  site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  path    TEXT    NOT NULL,                          -- ''(홈) | 'a' | 'a/b'
+  html    TEXT    NOT NULL,
+  rev     INTEGER NOT NULL,
+  PRIMARY KEY (site_id, path)
+);
+```
+
+**게시 API — `POST /api/sites/:id/publish`**
+1. 소유권·level3 가드 → 사이트 전 페이지를 서버 렌더러로 일괄 렌더(기존 `renderPage` 재사용).
+2. `site_snapshots` UPSERT(전 경로) + 사라진 경로 행 삭제 → `published_rev = rev`, `published_at` 갱신.
+3. KV에 `pub:{slug}:{path}` 로 HTML 저장(내구 저장 겸 캐시). 슬러그 변경 시 이전 슬러그 키 삭제(경로 목록은 snapshots에서 열거).
+4. 응답에 게시된 경로 수 반환.
+
+**공개 라우트 전환 (`index.ts` + `siteRender.ts`)**
+```
+GET /{slug}[/p1[/p2]]  (kind='site')
+  1) KV get pub:{slug}:{path}  → 히트: 즉시 응답 (D1 0회)
+  2) 미스: D1 site_snapshots 1회 조회 → 응답 + KV 재적재(waitUntil)
+  3) 스냅샷 없음(미게시/비공개): 404 안내 페이지("아직 게시되지 않은 페이지")
+  응답 헤더: Cache-Control: public, max-age=60, stale-while-revalidate=600
+  + Cloudflare Cache API(caches.default)에 저장, 게시 시 해당 URL purge
+```
+- 기존 실시간 렌더 경로(`renderSiteById`의 D1 4쿼리)는 **초안 미리보기 전용**으로 강등(§12.3).
+- `is_public` 의미 정리: 게시 여부는 `published_rev>0`, `is_public=0`은 **게시 중단**(스냅샷 서빙 차단 + KV `pub:` 키 삭제).
+- 미게시 변경 감지: **`rev > published_rev`** → 편집기 상단에 "게시 필요" 배지 + 게시 버튼 강조.
+
+### 12.3 전용 편집기 설계 (`/dashboard/sites/:id`)
+
+**라우팅/로딩**: React Router 신규 라우트, `React.lazy` + `Suspense`로 **에디터 청크 분리**(대시보드 최초 로딩 경량화). PagesTab은 목록·생성만 남기고 편집 기능 전부 이전.
+
+**레이아웃 (3패널 + 상단바)**
+```
+┌──────────────────────────────────────────────────────────────┐
+│ ← 나가기 | 사이트제목(인라인 편집) | ●저장됨 ✓ 14:02          │
+│           [미리보기 ⌕] [디자인 🎨] [게시 ●변경 있음]  /slug 🔗 │
+├─────────┬──────────────────────────┬─────────────────────────┤
+│ 페이지   │ 섹션 편집(선택 페이지)     │ 실시간 미리보기(iframe)  │
+│ 트리     │  + 콘텐츠 추가 바         │  모바일/PC 토글          │
+└─────────┴──────────────────────────┴─────────────────────────┘
+```
+- 우측 미리보기는 토글 가능(좁은 화면은 오버레이). **초안 미리보기 엔드포인트** 신설: `GET /api/sites/:id/preview?path=…` — 인증+소유권 가드, 현재 D1 초안 상태를 기존 렌더러로 렌더(테마 미저장 상태도 쿼리 파라미터로 오버라이드 지원 → 디자인 패널 실시간 반영). iframe `src`로 연결, 저장 완료 이벤트마다 새로고침(디바운스).
+
+**자동저장 + 상태 표시**
+- 텍스트 섹션: 입력 **디바운스 800ms 자동 PATCH**(저장 버튼 제거). 기타 편집(제목·설정·정렬)은 즉시 PATCH.
+- 전역 저장 인디케이터: `저장 중…`(스피너) → `저장됨 ✓ HH:MM` / 실패 시 `재시도` 버튼. 저장 실패분은 로컬 보존.
+- **낙관적 업데이트로 전체 refetch 제거**: mutation 응답을 로컬 상태에 직접 반영(추가는 서버 반환 id 사용, 실패 시 롤백). `openEditorKeepPage` 전면 refetch 12곳 폐지.
+
+**prompt/confirm 17곳 전면 제거 → 대체 매핑**
+| 현행 | 대체 |
+|---|---|
+| 페이지 생성 prompt×2 | **페이지 생성 모달**: 제목 입력 → 슬러그 자동 생성(제목 정규화, 수정 가능), 위치(최상위/상위 선택) 드롭다운 |
+| 이름변경/슬러그 prompt | 트리 노드 **더블클릭 인라인 편집** + 페이지 설정 팝오버(슬러그·홈지정·삭제 한곳에) |
+| 삭제 confirm×4 | **삭제 확인 모달**(삭제 대상·하위 포함 경고 명시) |
+| 유튜브/제목/버튼 섹션 prompt | **섹션 카드 내 인라인 폼**(입력+저장, 유튜브는 URL 붙여넣기 즉시 썸네일 확인) |
+| 주소변경 prompt | 상단 `/slug 🔗` 클릭 → 주소 변경 모달(중복 실시간 검사) |
+| 링크 style confirm | 인라인 폼의 버튼/링크 토글 |
+
+### 12.4 공개 화면·내비 디자인 v2
+
+- **상단 내비(top)**: 최상위 메뉴 + **하위 페이지 드롭다운**(hover/터치 클릭). **좌측 내비(side)**: 아코디언 트리(현재 페이지 경로 자동 펼침). 640px 이하 **햄버거 메뉴**(전체 트리).
+- 현재 페이지 강조 + 상위 경로 브레드크럼(2단계 페이지).
+- **테마 프리셋 5종**: SurveyTab `THEMES`(indigo/emerald/rose/amber/sky) 색상을 사이트 테마 프리셋으로 재사용 — 디자인 패널을 "프리셋 카드 5개(원클릭) + 고급(개별 색·구글폰트)" 2단 구성으로 재편.
+- 공개 페이지 기본 디자인 다듬기: 헤더(사이트 제목+내비) 스티키, 본문 카드 여백·타이포 정리, 섹션 간격 리듬, 푸터 간결화, 다크 배경 유튜브 라운드 유지. 목표: "기본값만으로 수려".
+
+### 12.5 성능 세부 작업 (게시제와 별개로 즉효)
+
+1. **Smart Placement**: `wrangler.jsonc`에 `"placement": { "mode": "smart" }` — Worker를 D1 인접 리전으로 이동시켜 편집 API의 쿼리 왕복 단축(무료 플랜 가용, 1줄).
+2. **편집 API 왕복 축소**: `bumpRev`를 각 핸들러의 본 쿼리와 `DB.batch()`로 묶기(9곳). base_slug 발급은 후보 10개를 `WHERE slug IN(…)` 1회 검사로. `reserved_slugs`는 요청당 1회만 로드.
+3. **공개 응답 캐시 계층**: §12.2의 Cache-Control + Cache API. `/media/*`는 기존 immutable 유지.
+4. **번들 분할**: 에디터 lazy 청크(§12.3) + 가능하면 SurveyTab도 lazy(동일 패턴, 부수 효과 최소).
+5. (선택) authMiddleware의 users SELECT를 JWT 페이로드(level 포함, 서명됨) 신뢰로 대체 가능 — 등급 변경 반영이 토큰 만료까지 지연되는 트레이드오프 있으므로 **보류, 기록만**.
+
+### 12.6 구현 단계 (Step 12~17, Opus 실행용 — 각 Step 독립 커밋)
+
+**Step 12 — 인프라 + 즉효 성능** ⟶ ✅ 완료(2026-07-02)
+- Smart Placement(`wrangler.jsonc` `placement.mode=smart`), base_slug 후보 12개 1회 검사(`takenSlugSet`/`issueBaseSlug`).
+- 공개 응답 `Cache-Control: public, max-age=60, stale-while-revalidate=600`(§13 스냅샷 서빙에 통합).
+- R2 버킷 생성은 **인프라 미완**(§12.7, 계정 인증 필요) — 코드/바인딩은 준비됨.
+- (보류) bumpRev batch화: 게시제 도입으로 편집 왕복보다 게시 시점이 핵심이 되어 우선순위 낮춤. Smart Placement로 왕복 지연 자체가 감소.
+
+**Step 13 — 게시 모델(백엔드) + 최소 게시 UI** ⟶ ✅ 완료(2026-07-02)
+- migration 0011(`sites.published_rev`/`published_at` + `site_snapshots`).
+- `POST /api/sites/:id/publish`(전 경로 렌더→스냅샷 D1 교체 + KV `pub:{slug}:{path}` 적재), `GET /api/sites/:id/preview`(초안 실시간+테마 오버라이드).
+- 공개 라우트를 **스냅샷 서빙**으로 전환(KV→D1, 미게시/비공개 404 안내). is_public=0 → 게시중단(KV 삭제+D1 gate). 콘텐츠 변경만 rev 증가(is_public 토글 제외).
+- PagesTab에 게시 버튼·미게시/게시필요/게시됨 배지·미게시 배너(게시 필요 안내) 추가.
+- 검증(로컬): 게시 전 404 → 게시 후 200+Cache-Control → 수정 시 공개 불변(초안 격리) + preview는 초안 반영 → 재게시 반영 → is_public 토글 404/200. UI: 배지·게시버튼·공개 서빙 확인.
+> ⚠️ 배포 시 주의: 공개 서빙이 스냅샷 기반으로 바뀌어 **기존 미게시 사이트는 게시 전까지 404**. 배포 후 각 사이트 1회 게시 필요.
+
+**Step 14 — 전용 편집기 셸** ⟶ *프론트 골격*
+- `/dashboard/sites/:id` lazy 라우트, 3패널 레이아웃, 상단바(저장 인디케이터·게시 버튼·"게시 필요" 배지), 미리보기 iframe 연결. PagesTab은 목록/생성/진입("편집" 버튼 명명)으로 축소.
+- 검증: 대시보드 초기 JS 감소 확인, rev>published_rev 배지 동작.
+
+**Step 15 — 편집 UX 리팩터** ⟶ *프론트 본체*
+- prompt/confirm 17곳 제거(§12.3 매핑), 페이지 생성 모달+슬러그 자동, 인라인 편집/팝오버, 텍스트 자동저장+인디케이터, 낙관적 업데이트로 refetch 12곳 폐지.
+- 검증: 다이얼로그 0개(grep), 연속 편집 시 화면 깜빡임·지연 없음.
+
+**Step 16 — 내비/디자인 v2** ⟶ *공개 화면*
+- 드롭다운/아코디언 내비 + 햄버거, 브레드크럼, 프리셋 5종 테마 패널 재편, 기본 디자인 다듬기(§12.4).
+- 검증: 하위 페이지가 내비로 도달 가능, 모바일 스냅샷 확인, 프리셋 원클릭 반영(미리보기 연동).
+
+**Step 17 — 마무리·재실측**
+- 편집기 트리 UX(페이지 아이콘·펼침 셰브론·"별도 페이지" 명확화), 페이지 설정 팝오버 통합, 엣지케이스(게시 중 슬러그 변경·홈 삭제), 성능 재실측 기록(§12.1 대비표).
+
+### 12.7 인프라 체크리스트 (코드 외, 계정 인증 필요)
+
+```bash
+wrangler r2 bucket create edulink-pages-media                     # R2 (미생성 확인됨)
+wrangler d1 execute edu-link-db --remote --file=migrations/0011_publish_model.sql
+```
+- 운영 D1의 0010은 적용 완료(테스트 페이지 동작으로 확인).
+- 한국 접속 라우팅(LAX)은 무료 플랜 특성 — Smart Placement+캐시로 완화하되, 잔여 지연 시 유료 플랜 검토는 운영 판단 사항으로 기록.
+
+---
+*v2.0 — 테스트 운영 피드백 진단(실측 포함) + 게시제 전환·전용 편집기·내비/디자인 v2 보완계획(Step 12~17) 추가. 구현은 Opus가 Step 단위로 수행.*

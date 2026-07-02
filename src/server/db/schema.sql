@@ -93,7 +93,7 @@ INSERT OR IGNORE INTO reserved_slugs (slug, reason) VALUES
 ('public', 'Public Folder Route'),
 ('favicon.ico', 'Favicon');
 
--- 7. 에듀링크 페이지: 사이트 / 페이지 / 섹션 (0010)
+-- 7. 에듀링크 페이지: 사이트 / 페이지 / 섹션 (0010) + 게시 모델 (0011)
 CREATE TABLE IF NOT EXISTS sites (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id       INTEGER NOT NULL,
@@ -103,10 +103,21 @@ CREATE TABLE IF NOT EXISTS sites (
     home_page_id  INTEGER,
     is_public     INTEGER NOT NULL DEFAULT 1 CHECK(is_public IN (0, 1)),
     rev           INTEGER NOT NULL DEFAULT 0,
+    published_rev INTEGER NOT NULL DEFAULT 0,  -- 0=미게시. rev>published_rev면 '게시 필요'
+    published_at  TEXT,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (url_id)  REFERENCES urls(id)  ON DELETE CASCADE
+);
+
+-- 게시 스냅샷 (공개의 유일한 소스)
+CREATE TABLE IF NOT EXISTS site_snapshots (
+    site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    path    TEXT    NOT NULL,
+    html    TEXT    NOT NULL,
+    rev     INTEGER NOT NULL,
+    PRIMARY KEY (site_id, path)
 );
 
 CREATE TABLE IF NOT EXISTS site_pages (
@@ -135,6 +146,7 @@ CREATE TABLE IF NOT EXISTS site_sections (
 CREATE INDEX IF NOT EXISTS idx_urls_slug ON urls(slug);
 CREATE INDEX IF NOT EXISTS idx_urls_user_id ON urls(user_id);
 CREATE INDEX IF NOT EXISTS idx_urls_site_id ON urls(site_id);
+CREATE INDEX IF NOT EXISTS idx_site_snapshots_site ON site_snapshots(site_id);
 CREATE INDEX IF NOT EXISTS idx_click_logs_url_id ON click_logs(url_id);
 CREATE INDEX IF NOT EXISTS idx_click_logs_created_at ON click_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);

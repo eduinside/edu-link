@@ -3,6 +3,7 @@
 // 기존 `api` Hono 인스턴스(authMiddleware 적용됨)에 등록한다.
 import { Hono } from 'hono';
 import { generateRandomSlug, isValidCustomSlug } from '../utils/slug';
+import { renderAllSnapshots, renderDraftResponse, pubKey } from './siteRender';
 
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 type ApiApp = Hono<{ Bindings: Env; Variables: UserVariables }>;
@@ -31,6 +32,44 @@ async function slugTaken(c: any, slug: string, exceptId?: number): Promise<boole
     return !!(await stmt.first());
 }
 
+// 여러 후보 슬러그의 사용 여부를 1회 쿼리로 확인 (LAX 왕복 절감)
+async function takenSlugSet(c: any, candidates: string[]): Promise<Set<string>> {
+    if (!candidates.length) return new Set();
+    const ph = candidates.map(() => '?').join(',');
+    const { results } = await c.env.DB.prepare(
+        `SELECT slug, base_slug, custom_slug FROM urls WHERE slug IN (${ph}) OR base_slug IN (${ph}) OR custom_slug IN (${ph})`
+    ).bind(...candidates, ...candidates, ...candidates).all();
+    const taken = new Set<string>();
+    for (const r of results as Array<{ slug: string; base_slug: string | null; custom_slug: string | null }>) {
+        if (r.slug) taken.add(r.slug);
+        if (r.base_slug) taken.add(r.base_slug);
+        if (r.custom_slug) taken.add(r.custom_slug);
+    }
+    return taken;
+}
+
+// base_slug 자동 발급: 후보 12개를 1회 검사로 충돌 회피
+async function issueBaseSlug(c: any, reservedSet: Set<string>): Promise<string | null> {
+    const cands: string[] = [];
+    for (let i = 0; i < 12; i++) {
+        const cand = generateRandomSlug(6);
+        if (!reservedSet.has(cand.toLowerCase())) cands.push(cand);
+    }
+    if (!cands.length) return null;
+    const taken = await takenSlugSet(c, cands);
+    return cands.find(s => !taken.has(s)) ?? null;
+}
+
+// 사이트의 모든 게시 KV 키 삭제 (미공개 전환/삭제/슬러그 변경 시)
+async function deletePubKeys(c: any, siteId: number | string, slug: string): Promise<void> {
+    try {
+        const { results } = await c.env.DB.prepare("SELECT path FROM site_snapshots WHERE site_id = ?").bind(siteId).all();
+        for (const r of results as Array<{ path: string }>) {
+            try { await c.env.URL_CACHE.delete(pubKey(slug, r.path)); } catch { /* noop */ }
+        }
+    } catch { /* noop */ }
+}
+
 export function registerSiteRoutes(api: ApiApp) {
     // GET /api/sites — 내 사이트 목록
     api.get('/sites', async (c) => {
@@ -40,7 +79,7 @@ export function registerSiteRoutes(api: ApiApp) {
         }
         try {
             const { results } = await c.env.DB.prepare(
-                `SELECT s.id, s.title, s.is_public, s.home_page_id, s.rev, s.created_at, s.updated_at,
+                `SELECT s.id, s.title, s.is_public, s.home_page_id, s.rev, s.published_rev, s.published_at, s.created_at, s.updated_at,
                         u.slug, u.base_slug, u.custom_slug
                  FROM sites s JOIN urls u ON u.id = s.url_id
                  WHERE s.user_id = ?
@@ -84,13 +123,8 @@ export function registerSiteRoutes(api: ApiApp) {
                 customSlug = cs;
             }
 
-            // base_slug 자동 발급 (6자리, 충돌 회피)
-            let baseSlug = '';
-            for (let i = 0; i < 10; i++) {
-                const cand = generateRandomSlug(6);
-                if (reservedSet.has(cand.toLowerCase())) continue;
-                if (!(await slugTaken(c, cand))) { baseSlug = cand; break; }
-            }
+            // base_slug 자동 발급 (후보 12개 1회 검사)
+            const baseSlug = await issueBaseSlug(c, reservedSet);
             if (!baseSlug) {
                 return c.json({ success: false, error: '슬러그 생성에 실패했습니다.' }, 500);
             }
@@ -136,7 +170,7 @@ export function registerSiteRoutes(api: ApiApp) {
         const id = c.req.param('id');
         try {
             const site = await c.env.DB.prepare(
-                `SELECT s.id, s.title, s.theme, s.is_public, s.home_page_id, s.rev, s.created_at, s.updated_at,
+                `SELECT s.id, s.title, s.theme, s.is_public, s.home_page_id, s.rev, s.published_rev, s.published_at, s.created_at, s.updated_at,
                         u.slug, u.base_slug, u.custom_slug
                  FROM sites s JOIN urls u ON u.id = s.url_id
                  WHERE s.id = ? AND s.user_id = ?`
@@ -170,6 +204,8 @@ export function registerSiteRoutes(api: ApiApp) {
             ).bind(id, user.id).first<{ id: number; url_id: number; base_slug: string; custom_slug: string | null }>();
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
+            let contentChanged = false;
+
             // 주소(custom_slug) 변경 — urls 행에 반영
             if (custom_slug !== undefined) {
                 let updatedCustomSlug: string | null = site.custom_slug;
@@ -197,6 +233,11 @@ export function registerSiteRoutes(api: ApiApp) {
                 await c.env.DB.prepare(
                     "UPDATE urls SET custom_slug = ?, original_url = ?, updated_at = datetime('now') WHERE id = ?"
                 ).bind(updatedCustomSlug, '/' + newPublic, site.url_id).run();
+                if (updatedCustomSlug !== site.custom_slug) {
+                    contentChanged = true;
+                    // 이전 슬러그의 게시 KV 키 정리 (재발행 전까지 stale 방지)
+                    await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+                }
             }
 
             // sites 필드 수정
@@ -205,11 +246,16 @@ export function registerSiteRoutes(api: ApiApp) {
             if (title !== undefined) {
                 if (!String(title).trim()) return c.json({ success: false, error: '사이트 제목이 비어 있습니다.' }, 400);
                 sets.push('title = ?'); binds.push(String(title).trim());
+                contentChanged = true;
                 // urls.title 도 함께 갱신(목록 표기 일관성)
                 await c.env.DB.prepare("UPDATE urls SET title = ? WHERE id = ?").bind(String(title).trim(), site.url_id).run();
             }
-            if (is_public !== undefined) { sets.push('is_public = ?'); binds.push(is_public ? 1 : 0); }
-            if (theme !== undefined) { sets.push('theme = ?'); binds.push(JSON.stringify(normalizeTheme(theme))); }
+            if (is_public !== undefined) {
+                sets.push('is_public = ?'); binds.push(is_public ? 1 : 0);
+                // 게시 중단 시 공개 KV 즉시 제거 (D1 serve는 is_public=1만 반환)
+                if (!is_public) await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+            }
+            if (theme !== undefined) { sets.push('theme = ?'); binds.push(JSON.stringify(normalizeTheme(theme))); contentChanged = true; }
             if (home_page_id !== undefined) {
                 // 소유 사이트의 페이지인지 검증
                 if (home_page_id !== null) {
@@ -217,10 +263,10 @@ export function registerSiteRoutes(api: ApiApp) {
                         .bind(home_page_id, id).first();
                     if (!pg) return c.json({ success: false, error: '홈으로 지정할 페이지를 찾을 수 없습니다.' }, 400);
                 }
-                sets.push('home_page_id = ?'); binds.push(home_page_id);
+                sets.push('home_page_id = ?'); binds.push(home_page_id); contentChanged = true;
             }
-            // 변경이 있으면 rev 증가
-            sets.push("rev = rev + 1");
+            // 콘텐츠에 영향을 주는 변경만 rev 증가(is_public 토글은 제외 = 재발행 불필요)
+            if (contentChanged) sets.push("rev = rev + 1");
             sets.push("updated_at = datetime('now')");
             binds.push(id);
             await c.env.DB.prepare(`UPDATE sites SET ${sets.join(', ')} WHERE id = ?`).bind(...binds).run();
@@ -244,8 +290,12 @@ export function registerSiteRoutes(api: ApiApp) {
             ).bind(id, user.id).first<{ id: number; url_id: number; base_slug: string; custom_slug: string | null; slug: string }>();
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
+            // 게시 KV 키 정리 (스냅샷 경로 기준) — 삭제 전에 수행
+            await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+
             // FK CASCADE 의존하지 않고 명시적으로 하위부터 삭제 (D1 안전)
             await c.env.DB.batch([
+                c.env.DB.prepare("DELETE FROM site_snapshots WHERE site_id = ?").bind(id),
                 c.env.DB.prepare(
                     "DELETE FROM site_sections WHERE page_id IN (SELECT id FROM site_pages WHERE site_id = ?)"
                 ).bind(id),
@@ -254,7 +304,7 @@ export function registerSiteRoutes(api: ApiApp) {
                 c.env.DB.prepare("DELETE FROM urls WHERE id = ?").bind(site.url_id),
             ]);
 
-            // 슬러그 회수 — KV 캐시 정리(혹시 남아 있을 수 있는 키)
+            // 슬러그 회수 — 리다이렉트 KV 캐시 정리(혹시 남아 있을 수 있는 키)
             for (const s of [site.slug, site.base_slug, site.custom_slug]) {
                 if (s) { try { await c.env.URL_CACHE.delete(s); } catch {} }
             }
@@ -777,6 +827,82 @@ export function registerMediaRoutes(api: ApiApp) {
             return c.json({ success: true, url: `/media/${key}` });
         } catch (err: any) {
             return c.json({ success: false, error: err.message }, 500);
+        }
+    });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Step 13: 게시(publish) + 초안 미리보기(preview)
+// ─────────────────────────────────────────────────────────────
+
+export function registerPublishRoutes(api: ApiApp) {
+    // POST /api/sites/:id/publish — 초안을 렌더해 스냅샷 생성 + 공개 반영
+    api.post('/sites/:id/publish', async (c) => {
+        const user = c.get('user');
+        if (user.level < SITE_MIN_LEVEL) return c.json({ success: false, error: '권한이 필요합니다.' }, 403);
+        const id = c.req.param('id');
+        try {
+            const owned = await c.env.DB.prepare("SELECT id FROM sites WHERE id = ? AND user_id = ?").bind(id, user.id).first();
+            if (!owned) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
+
+            const rendered = await renderAllSnapshots(c, Number(id));
+            if (!rendered) return c.json({ success: false, error: '렌더에 실패했습니다.' }, 500);
+            if (!rendered.snapshots.length) return c.json({ success: false, error: '게시할 페이지가 없습니다. 페이지를 먼저 추가하세요.' }, 400);
+
+            // 기존 스냅샷 경로 (제거된 경로의 KV 정리용)
+            const { results: oldRows } = await c.env.DB.prepare("SELECT path FROM site_snapshots WHERE site_id = ?").bind(id).all();
+            const oldPaths = new Set((oldRows as Array<{ path: string }>).map(r => r.path));
+            const newPaths = new Set(rendered.snapshots.map(s => s.path));
+
+            // D1: 스냅샷 전량 교체 + 게시 상태 갱신 (원자적 batch)
+            const stmts = [c.env.DB.prepare("DELETE FROM site_snapshots WHERE site_id = ?").bind(id)];
+            for (const snap of rendered.snapshots) {
+                stmts.push(c.env.DB.prepare(
+                    "INSERT INTO site_snapshots (site_id, path, html, rev) VALUES (?, ?, ?, ?)"
+                ).bind(id, snap.path, snap.html, rendered.rev));
+            }
+            stmts.push(c.env.DB.prepare(
+                "UPDATE sites SET published_rev = ?, published_at = datetime('now') WHERE id = ?"
+            ).bind(rendered.rev, id));
+            await c.env.DB.batch(stmts);
+
+            // KV: 신규 경로 적재 + 제거된 경로 삭제
+            const kvOps = async () => {
+                for (const snap of rendered.snapshots) {
+                    try { await c.env.URL_CACHE.put(pubKey(rendered.siteSlug, snap.path), snap.html, { expirationTtl: 604800 }); } catch { /* noop */ }
+                }
+                for (const p of oldPaths) {
+                    if (!newPaths.has(p)) { try { await c.env.URL_CACHE.delete(pubKey(rendered.siteSlug, p)); } catch { /* noop */ } }
+                }
+            };
+            try { c.executionCtx.waitUntil(kvOps()); } catch { await kvOps(); }
+
+            return c.json({ success: true, published: rendered.snapshots.length, rev: rendered.rev, slug: rendered.siteSlug });
+        } catch (err: any) {
+            return c.json({ success: false, error: err.message }, 500);
+        }
+    });
+
+    // GET /api/sites/:id/preview?path=&theme= — 소유자 초안 실시간 미리보기(HTML)
+    api.get('/sites/:id/preview', async (c) => {
+        const user = c.get('user');
+        if (user.level < SITE_MIN_LEVEL) return c.text('권한이 필요합니다.', 403);
+        const id = c.req.param('id');
+        try {
+            const owned = await c.env.DB.prepare("SELECT id FROM sites WHERE id = ? AND user_id = ?").bind(id, user.id).first();
+            if (!owned) return c.text('사이트를 찾을 수 없거나 권한이 없습니다.', 404);
+
+            const pathParam = c.req.query('path') || '';
+            const segs = pathParam ? pathParam.split('/').filter(Boolean) : [];
+
+            // 저장 전 테마 미리보기 오버라이드(선택)
+            let themeOverride: string | undefined;
+            const themeQ = c.req.query('theme');
+            if (themeQ) { try { themeOverride = JSON.stringify(normalizeTheme(JSON.parse(themeQ))); } catch { /* 무시 */ } }
+
+            return await renderDraftResponse(c, Number(id), segs, themeOverride);
+        } catch (err: any) {
+            return c.text('미리보기 오류: ' + err.message, 500);
         }
     });
 }

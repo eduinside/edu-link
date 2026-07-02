@@ -212,10 +212,10 @@ ${t.googleFontLink}
 </html>`;
 }
 
-function notFoundHtml(): string {
-    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>페이지를 찾을 수 없습니다</title>
-<style>body{margin:0;font-family:-apple-system,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#F8FAFC;color:#1F2937}.box{text-align:center}h1{font-size:3rem;margin:0}p{color:#6B7280}</style>
-</head><body><div class="box"><h1>404</h1><p>요청하신 페이지를 찾을 수 없습니다.</p></div></body></html>`;
+function notFoundHtml(title = '페이지를 찾을 수 없습니다', msg = '요청하신 페이지를 찾을 수 없습니다.'): string {
+    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escapeHtml(title)}</title>
+<style>body{margin:0;font-family:'Pretendard',-apple-system,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#F8FAFC;color:#1F2937}.box{text-align:center;padding:24px}h1{font-size:3rem;margin:0}p{color:#6B7280}</style>
+</head><body><div class="box"><h1>404</h1><p>${escapeHtml(msg)}</p></div></body></html>`;
 }
 
 // slug → 사이트 여부 확인. 사이트가 아니면 null (호출측에서 SPA fallback).
@@ -227,56 +227,131 @@ export async function lookupSiteBySlug(c: AnyCtx, slug: string): Promise<{ siteI
     return { siteId: row.site_id };
 }
 
-// 사이트 페이지 렌더. 항상 Response 반환 (사이트 비공개/페이지 미스 → 404 HTML).
-export async function renderSiteById(c: AnyCtx, siteId: number, segs: string[]): Promise<Response> {
+// KV 게시 캐시 키
+export function pubKey(slug: string, path: string): string { return `pub:${slug}:${path}`; }
+
+const PUBLIC_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=600' };
+
+function htmlResponse(html: string, status = 200, extraHeaders: Record<string, string> = {}): Response {
+    return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=UTF-8', ...extraHeaders } });
+}
+
+// 페이지 → 공개 경로('' | 'a' | 'a/b') 매핑. 홈은 '' 로도 매핑.
+function pagePathMap(pages: Array<any>, homePageId: number | null): Map<number, string> {
+    const byId = new Map<number, any>(pages.map(p => [p.id, p]));
+    const pathOf = (p: any): string => {
+        if (p.parent_id == null) return p.slug;
+        const parent = byId.get(p.parent_id);
+        return parent ? `${parent.slug}/${p.slug}` : p.slug;
+    };
+    const map = new Map<number, string>();
+    for (const p of pages) map.set(p.id, pathOf(p));
+    return map;
+}
+
+function resolveHome(pages: Array<any>, homePageId: number | null): any | null {
+    return (homePageId && pages.find(p => p.id === homePageId))
+        || pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort)[0]
+        || null;
+}
+
+// ── 게시(publish)용: 사이트의 모든 경로를 렌더해 스냅샷 배열 반환 ──
+export async function renderAllSnapshots(c: AnyCtx, siteId: number): Promise<{ siteSlug: string; rev: number; snapshots: Array<{ path: string; html: string }> } | null> {
     const site = await c.env.DB.prepare(
-        `SELECT s.id, s.title, s.theme, s.is_public, s.home_page_id, s.rev, u.base_slug, u.custom_slug
+        `SELECT s.id, s.title, s.theme, s.home_page_id, s.rev, u.base_slug, u.custom_slug
          FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
     ).bind(siteId).first() as any;
-    if (!site || site.is_public === 0) return c.html(notFoundHtml(), 404);
-
+    if (!site) return null;
     const siteSlug = site.custom_slug || site.base_slug;
 
-    // KV 캐시 확인 — rev 포함 키라 변경 시 자연 무효화. 비공개/삭제는 위에서 이미 차단.
-    const cacheKey = `site:${siteSlug}:${site.rev}:${segs.join('/')}`;
-    try {
-        const cached = await c.env.URL_CACHE.get(cacheKey);
-        if (cached) return c.html(cached);
-    } catch { /* 캐시 실패는 무시하고 렌더 */ }
-
-    // 전체 페이지 (내비 + 경로 해석용)
     const { results: pagesRaw } = await c.env.DB.prepare(
         "SELECT id, parent_id, slug, title, depth, sort FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
     ).bind(siteId).all();
     const pages = pagesRaw as Array<any>;
 
-    // 경로 해석
+    // 사이트 전체 섹션을 1회 조회 후 페이지별 그룹핑
+    const { results: secRaw } = await c.env.DB.prepare(
+        `SELECT sec.id, sec.page_id, sec.type, sec.content, sec.sort
+         FROM site_sections sec JOIN site_pages p ON p.id = sec.page_id
+         WHERE p.site_id = ? ORDER BY sec.sort, sec.id`
+    ).bind(siteId).all();
+    const sectionsByPage = new Map<number, Array<any>>();
+    for (const s of secRaw as Array<any>) {
+        if (!sectionsByPage.has(s.page_id)) sectionsByPage.set(s.page_id, []);
+        sectionsByPage.get(s.page_id)!.push(s);
+    }
+
+    const paths = pagePathMap(pages, site.home_page_id);
+    const snapshots: Array<{ path: string; html: string }> = [];
+    for (const p of pages) {
+        const html = renderPage(site, p, sectionsByPage.get(p.id) || [], pages, siteSlug);
+        snapshots.push({ path: paths.get(p.id)!, html });
+    }
+    // 홈('' 경로)
+    const home = resolveHome(pages, site.home_page_id);
+    if (home) snapshots.push({ path: '', html: renderPage(site, home, sectionsByPage.get(home.id) || [], pages, siteSlug) });
+
+    return { siteSlug, rev: site.rev, snapshots };
+}
+
+// ── 공개 서빙: 게시 스냅샷(KV → D1) 기반. 미게시/비공개/미스는 404 ──
+export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, segs: string[]): Promise<Response> {
+    const path = segs.map(s => { try { return decodeURIComponent(s).normalize('NFC'); } catch { return s.normalize('NFC'); } }).join('/');
+
+    // 1) KV 게시 캐시
+    try {
+        const cached = await c.env.URL_CACHE.get(pubKey(slug, path));
+        if (cached) return htmlResponse(cached, 200, PUBLIC_CACHE_HEADERS);
+    } catch { /* KV 실패는 D1로 폴백 */ }
+
+    // 2) D1 스냅샷 (is_public=1 게시분만)
+    const row = await c.env.DB.prepare(
+        `SELECT snap.html AS html FROM site_snapshots snap
+         JOIN sites s ON s.id = snap.site_id
+         WHERE snap.site_id = ? AND snap.path = ? AND s.is_public = 1 AND s.published_rev > 0`
+    ).bind(siteId, path).first() as { html: string } | null;
+
+    if (!row) {
+        return htmlResponse(notFoundHtml('아직 게시되지 않았습니다', '이 페이지는 아직 게시되지 않았거나 존재하지 않습니다.'), 404);
+    }
+
+    // KV 재적재 (7일 TTL 안전망 — D1이 권위 소스)
+    try { c.executionCtx.waitUntil(c.env.URL_CACHE.put(pubKey(slug, path), row.html, { expirationTtl: 604800 })); } catch { /* noop */ }
+    return htmlResponse(row.html, 200, PUBLIC_CACHE_HEADERS);
+}
+
+// ── 초안 미리보기(preview): 인증된 소유자용. D1 실시간 렌더, 캐시 없음. theme 오버라이드 지원 ──
+export async function renderDraftResponse(c: AnyCtx, siteId: number, segs: string[], themeOverride?: string): Promise<Response> {
+    const site = await c.env.DB.prepare(
+        `SELECT s.id, s.title, s.theme, s.home_page_id, u.base_slug, u.custom_slug
+         FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
+    ).bind(siteId).first() as any;
+    if (!site) return htmlResponse(notFoundHtml(), 404);
+    if (themeOverride) site.theme = themeOverride;
+    const siteSlug = site.custom_slug || site.base_slug;
+
+    const { results: pagesRaw } = await c.env.DB.prepare(
+        "SELECT id, parent_id, slug, title, depth, sort FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
+    ).bind(siteId).all();
+    const pages = pagesRaw as Array<any>;
+
     let page: any = null;
     if (segs.length === 0) {
-        page = (site.home_page_id && pages.find(p => p.id === site.home_page_id))
-            || pages.filter(p => p.parent_id === null).sort((a, b) => a.sort - b.sort)[0]
-            || null;
+        page = resolveHome(pages, site.home_page_id);
     } else {
         let parentId: number | null = null;
         for (const seg of segs) {
             const decoded = (() => { try { return decodeURIComponent(seg).normalize('NFC'); } catch { return seg.normalize('NFC'); } })();
             const match = pages.find(p => p.slug === decoded && (p.parent_id ?? null) === parentId);
             if (!match) { page = null; break; }
-            page = match;
-            parentId = match.id;
+            page = match; parentId = match.id;
         }
     }
-
-    if (!page) return c.html(notFoundHtml(), 404);
+    if (!page) return htmlResponse(notFoundHtml(), 404);
 
     const { results: sections } = await c.env.DB.prepare(
         "SELECT id, type, content, sort FROM site_sections WHERE page_id = ? ORDER BY sort, id"
     ).bind(page.id).all();
 
-    const html = renderPage(site, page, sections as Array<any>, pages, siteSlug);
-    // 렌더 결과 캐시 (rev 키 + 1일 TTL 안전망). 비동기로 저장.
-    try { c.executionCtx.waitUntil(c.env.URL_CACHE.put(cacheKey, html, { expirationTtl: 86400 })); }
-    catch { try { await c.env.URL_CACHE.put(cacheKey, html, { expirationTtl: 86400 }); } catch { /* noop */ } }
-
-    return c.html(html);
+    return htmlResponse(renderPage(site, page, sections as Array<any>, pages, siteSlug), 200, { 'Cache-Control': 'no-store' });
 }

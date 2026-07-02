@@ -5,8 +5,8 @@ import { SignJWT } from 'jose';
 import { generateRandomSlug, isValidCustomSlug } from './utils/slug';
 import { authMiddleware, adminMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rateLimit';
-import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes, registerMediaRoutes } from './routes/sites';
-import { renderSiteById, lookupSiteBySlug } from './routes/siteRender';
+import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes, registerMediaRoutes, registerPublishRoutes } from './routes/sites';
+import { serveSiteById, lookupSiteBySlug } from './routes/siteRender';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -1287,6 +1287,7 @@ registerSiteRoutes(api);
 registerPageRoutes(api);
 registerSectionRoutes(api);
 registerMediaRoutes(api);
+registerPublishRoutes(api);
 
 app.route("/api", api);
 
@@ -1907,9 +1908,9 @@ app.get('/:slug', async (c) => {
             .first<{ id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind: string; survey_config: string | null; response_limit: number | null; response_count: number; site_id: number | null }>();
 
             if (urlRecord) {
-                // 에듀링크 페이지(사이트) — 홈 렌더
+                // 에듀링크 페이지(사이트) — 게시 스냅샷 홈 서빙
                 if (urlRecord.kind === 'site' && urlRecord.site_id) {
-                    return await renderSiteById(c, urlRecord.site_id, []);
+                    return await serveSiteById(c, urlRecord.site_id, slug, []);
                 }
                 // 비활성 링크 처리
                 if (urlRecord.is_active === 0) {
@@ -2054,8 +2055,7 @@ async function handleSiteSubPage(c: any, segs: string[]) {
 
     const info = await lookupSiteBySlug(c, slug);
     if (!info) return c.env.ASSETS.fetch(c.req.raw); // 사이트가 아니면 SPA fallback
-    const decoded = segs.map(s => { try { return decodeURIComponent(s).normalize('NFC'); } catch { return s.normalize('NFC'); } });
-    return await renderSiteById(c, info.siteId, decoded);
+    return await serveSiteById(c, info.siteId, slug, segs);
 }
 
 app.get('/:slug/:p1', (c) => handleSiteSubPage(c, [c.req.param('p1')]));
