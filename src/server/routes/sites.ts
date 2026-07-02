@@ -80,7 +80,8 @@ export function registerSiteRoutes(api: ApiApp) {
         try {
             const { results } = await c.env.DB.prepare(
                 `SELECT s.id, s.title, s.is_public, s.home_page_id, s.rev, s.published_rev, s.published_at, s.created_at, s.updated_at,
-                        u.slug, u.base_slug, u.custom_slug
+                        u.slug, u.base_slug, u.custom_slug, u.click_count,
+                        (SELECT COUNT(*) FROM site_pages sp WHERE sp.site_id = s.id) AS page_count
                  FROM sites s JOIN urls u ON u.id = s.url_id
                  WHERE s.user_id = ?
                  ORDER BY s.created_at DESC`

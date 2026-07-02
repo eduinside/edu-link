@@ -20,6 +20,7 @@ import {
   BarChart3,
   TrendingUp,
   LayoutDashboard,
+  LayoutTemplate,
   KeyRound, 
   Settings,
   ChevronRight,
@@ -39,7 +40,7 @@ import {
   LogIn,
   Menu,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import SurveyTab from './SurveyTab';
 import PagesTab from './PagesTab';
 import { FileText } from 'lucide-react';
@@ -129,7 +130,20 @@ export default function Dashboard() {
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'links' | 'surveys' | 'pages' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>('links');
+  const TAB_KEYS = ['links', 'surveys', 'pages', 'apikeys', 'profile', 'guide', 'notices', 'admin'] as const;
+  const { tab: urlTab } = useParams();
+  const initialTab = (TAB_KEYS as readonly string[]).includes(urlTab || '') ? (urlTab as any) : 'links';
+  const [activeTab, setActiveTab] = useState<'links' | 'surveys' | 'pages' | 'apikeys' | 'profile' | 'guide' | 'notices' | 'admin'>(initialTab);
+  // URL(/dashboard/:tab) ↔ activeTab 동기화
+  useEffect(() => {
+    if (urlTab && (TAB_KEYS as readonly string[]).includes(urlTab) && urlTab !== activeTab) setActiveTab(urlTab as any);
+  }, [urlTab]);
+  useEffect(() => {
+    const target = `/dashboard/${activeTab}`;
+    if (window.location.pathname !== target && !window.location.pathname.startsWith('/dashboard/sites/')) {
+      navigate(target, { replace: true });
+    }
+  }, [activeTab]);
   const [linkSourceFilter, setLinkSourceFilter] = useState<'web' | 'api'>('web');
   
   // 새 단축 링크 상태
@@ -930,7 +944,7 @@ export default function Dashboard() {
           {[
             { key: 'links', label: '단축주소 관리', Icon: LayoutDashboard, show: !!user && user.level >= 2, danger: false, onClick: () => setActiveTab('links') },
             { key: 'surveys', label: '설문 관리', Icon: FileText, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('surveys') },
-            { key: 'pages', label: '페이지 관리', Icon: Globe, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('pages') },
+            { key: 'pages', label: '페이지 관리', Icon: LayoutTemplate, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('pages') },
             { key: 'apikeys', label: '개발자 도구', Icon: Terminal, show: !!user && user.level >= 3, danger: false, onClick: () => setActiveTab('apikeys') },
             { key: 'profile', label: '개인정보관리', Icon: User, show: true, danger: false, onClick: () => { setActiveTab('profile'); if (user) { setNewProfileName(user.name); setNewProfileAffiliation(user.affiliation || ''); } } },
             { key: 'guide', label: '활용방법', Icon: BookOpen, show: true, danger: false, onClick: () => setActiveTab('guide') },

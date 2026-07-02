@@ -152,7 +152,8 @@ function renderBreadcrumb(page: any, pages: Array<any>, siteSlug: string): strin
     const parent = pages.find(p => p.id === page.parent_id);
     if (!parent) return '';
     const base = `/${encodeURIComponent(siteSlug)}`;
-    return `<nav class="crumb"><a href="${base}">홈</a><span>›</span><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(parent.title)}</a><span>›</span><b>${escapeHtml(page.title)}</b></nav>`;
+    // depth 최대 2단계이므로 브레드크럼도 상위 › 현재 2단만 노출(사이트 루트 링크 중복 제거)
+    return `<nav class="crumb"><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(parent.title)}</a><span>›</span><b>${escapeHtml(page.title)}</b></nav>`;
 }
 
 function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navSide: boolean; headerTitle: string; showTitle: boolean } {
@@ -359,6 +360,11 @@ export async function renderAllSnapshots(c: AnyCtx, siteId: number): Promise<{ s
     return { siteSlug, rev: site.rev, snapshots };
 }
 
+// 공개 조회수 집계 (사이트 urls 행의 click_count += 1). 비동기, 실패 무시.
+function bumpView(c: AnyCtx, siteId: number): void {
+    try { c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE urls SET click_count = click_count + 1 WHERE site_id = ?").bind(siteId).run()); } catch { /* noop */ }
+}
+
 // ── 공개 서빙: 게시 스냅샷(KV → D1) 기반. 미게시/비공개/미스는 404 ──
 export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, segs: string[]): Promise<Response> {
     const path = segs.map(s => { try { return decodeURIComponent(s).normalize('NFC'); } catch { return s.normalize('NFC'); } }).join('/');
@@ -366,7 +372,7 @@ export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, seg
     // 1) KV 게시 캐시
     try {
         const cached = await c.env.URL_CACHE.get(pubKey(slug, path));
-        if (cached) return htmlResponse(cached, 200, PUBLIC_CACHE_HEADERS);
+        if (cached) { bumpView(c, siteId); return htmlResponse(cached, 200, PUBLIC_CACHE_HEADERS); }
     } catch { /* KV 실패는 D1로 폴백 */ }
 
     // 2) D1 스냅샷 (is_public=1 게시분만)
@@ -382,6 +388,7 @@ export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, seg
 
     // KV 재적재 (7일 TTL 안전망 — D1이 권위 소스)
     try { c.executionCtx.waitUntil(c.env.URL_CACHE.put(pubKey(slug, path), row.html, { expirationTtl: 604800 })); } catch { /* noop */ }
+    bumpView(c, siteId);
     return htmlResponse(row.html, 200, PUBLIC_CACHE_HEADERS);
 }
 

@@ -18,6 +18,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/sites/:id" element={<Suspense fallback={<EditorFallback />}><SiteEditor /></Suspense>} />
+        <Route path="/dashboard/:tab" element={<Dashboard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
