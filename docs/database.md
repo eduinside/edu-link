@@ -193,6 +193,7 @@ CREATE TABLE site_sections (
 ```
 
 - 이미지(`image`)는 R2 프록시 경로(`/media/sites/{siteId}/{uuid}.webp`)만 허용. 업로드 시 Images 바인딩으로 **WebP로 변환**되어 저장되므로 확장자는 항상 `.webp`. 섹션 삭제·교체, 페이지 삭제(하위 포함), 사이트 삭제 시 해당 R2 객체도 정리.
+- 업로드는 회원 등급별 제한(파일당 용량 + level3의 일일 개수, KV `media_quota:{userId}:{KST날짜}` 카운터)이 적용된다. §api.md 참조.
 - 임베드(`embed`)는 저장 원본을 렌더 시 `<script>`·이벤트핸들러 제거 후 표시(iframe 허용).
 
 ### `site_snapshots` — 게시 스냅샷 (공개의 유일한 소스)

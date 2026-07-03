@@ -280,6 +280,15 @@ UTF-8 BOM CSV 파일 다운로드. 첫 행은 `제출일시, 질문1, 질문2, .
 | GET | `/api/sites/:id/preview?path=&theme=` | 소유자 초안 실시간 미리보기(HTML, no-store) |
 | POST | `/api/sites/:id/media` | 이미지 업로드(multipart) → WebP 변환(Images 바인딩) → R2 → `/media/....webp` URL 반환 |
 
+`/api/sites/:id/media`는 회원 등급별로 다른 정책을 적용한다(초과 시 각각 400 / 429):
+
+| 등급 | 파일당 최대 용량 | 일일 업로드 개수 |
+|---|---|---|
+| level 3(고급사용자) | 5MB | 30장/일 (KST 자정 리셋) |
+| level 4(최고관리자) | 10MB | 무제한 |
+
+성공 응답에는 `remaining`(당일 남은 업로드 가능 수, 무제한이면 `null`)이 포함된다. 실패한 업로드(용량 초과·변환 실패)는 일일 한도를 차감하지 않는다.
+
 **페이지**
 
 | 메서드 | 경로 | 설명 |

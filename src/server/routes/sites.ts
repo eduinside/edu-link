@@ -854,10 +854,23 @@ export function registerSectionRoutes(api: ApiApp) {
 
 // ─────────────────────────────────────────────────────────────
 // Step 10: 미디어 업로드 (R2) — 업로드 즉시 WebP로 변환해 저장
+// 레벨별 정책: level4(최고관리자)는 무제한, level3(고급사용자)은 일간 개수 + 파일당 용량 제한.
 // ─────────────────────────────────────────────────────────────
 
 const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5MB (원본 기준)
+
+interface MediaPolicy { maxFileBytes: number; dailyLimit: number | null } // dailyLimit=null → 무제한
+const MEDIA_POLICY_BY_LEVEL: Record<number, MediaPolicy> = {
+    3: { maxFileBytes: 5 * 1024 * 1024, dailyLimit: 30 },   // 고급사용자: 5MB / 일 30장
+    4: { maxFileBytes: 10 * 1024 * 1024, dailyLimit: null }, // 최고관리자: 10MB / 무제한
+};
+function mediaPolicyFor(level: number): MediaPolicy {
+    return MEDIA_POLICY_BY_LEVEL[level] || MEDIA_POLICY_BY_LEVEL[3];
+}
+// KST(UTC+9) 기준 오늘 날짜 — 사용자 체감상 자정(한국시간) 리셋을 위해 UTC 타임스탬프 대신 사용
+function todayKstDateKey(): string {
+    return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 export function registerMediaRoutes(api: ApiApp) {
     // POST /api/sites/:id/media — 이미지 업로드 → WebP 변환 → R2 → 프록시 URL 반환
@@ -871,13 +884,27 @@ export function registerMediaRoutes(api: ApiApp) {
             const site = await ownedSite(c, siteId, user.id);
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
+            const policy = mediaPolicyFor(user.level);
+
+            // 일간 업로드 개수 제한 (KV 카운터, level4는 dailyLimit=null이라 건너뜀)
+            const quotaKey = `media_quota:${user.id}:${todayKstDateKey()}`;
+            let quotaUsed = 0;
+            if (policy.dailyLimit !== null) {
+                quotaUsed = Number((await c.env.URL_CACHE.get(quotaKey)) || '0');
+                if (quotaUsed >= policy.dailyLimit) {
+                    return c.json({ success: false, error: `일일 이미지 업로드 한도(${policy.dailyLimit}장)를 초과했습니다. 내일 다시 시도해주세요.` }, 429);
+                }
+            }
+
             const form = await c.req.formData();
             const file = form.get('file');
             if (!file || typeof file === 'string') return c.json({ success: false, error: '파일이 필요합니다.' }, 400);
 
             const type = (file as File).type;
             if (!ALLOWED_UPLOAD_MIME.has(type)) return c.json({ success: false, error: 'jpg/png/webp/gif 이미지만 업로드할 수 있습니다.' }, 400);
-            if ((file as File).size > MAX_MEDIA_BYTES) return c.json({ success: false, error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
+            if ((file as File).size > policy.maxFileBytes) {
+                return c.json({ success: false, error: `파일 크기는 ${Math.floor(policy.maxFileBytes / (1024 * 1024))}MB 이하여야 합니다.` }, 400);
+            }
 
             // 모든 업로드를 WebP로 통일 변환(용량 절감). 애니메이션 GIF는 애니메이션 WebP로 보존.
             // .image() 스트림은 길이를 알 수 없어 R2 put()이 거부하므로, ArrayBuffer로 받아 저장한다.
@@ -892,7 +919,16 @@ export function registerMediaRoutes(api: ApiApp) {
             const key = `sites/${siteId}/${crypto.randomUUID()}.webp`;
             await c.env.MEDIA.put(key, webpBuffer, { httpMetadata: { contentType: 'image/webp' } });
 
-            return c.json({ success: true, url: `/media/${key}` });
+            // 변환·저장 성공 후에만 일일 쿼터 차감(실패한 시도는 소모하지 않음)
+            if (policy.dailyLimit !== null) {
+                c.executionCtx.waitUntil(c.env.URL_CACHE.put(quotaKey, String(quotaUsed + 1), { expirationTtl: 60 * 60 * 48 }));
+            }
+
+            return c.json({
+                success: true,
+                url: `/media/${key}`,
+                remaining: policy.dailyLimit === null ? null : Math.max(0, policy.dailyLimit - (quotaUsed + 1)),
+            });
         } catch (err: any) {
             return c.json({ success: false, error: err.message }, 500);
         }
