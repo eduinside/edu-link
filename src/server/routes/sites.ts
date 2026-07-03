@@ -711,7 +711,7 @@ function normalizeTheme(raw: any): any {
     const header: any = {};
     if (typeof hIn.title === 'string') header.title = hIn.title.slice(0, 120);
     header.showTitle = hIn.showTitle !== false;
-    header.navPosition = hIn.navPosition === 'side' ? 'side' : 'top';
+    header.navPosition = ['side', 'right'].includes(hIn.navPosition) ? hIn.navPosition : 'top';
     return { colors, font, header };
 }
 

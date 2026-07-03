@@ -427,9 +427,11 @@ export default function SiteEditor() {
         </section>
       </div>
 
-      {/* 토스트 */}
+      {/* 토스트 — 페이지 중앙 */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm text-white ${toast.type === 'ok' ? 'bg-slate-800' : 'bg-rose-600'}`}>{toast.msg}</div>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+          <div className={`px-5 py-3 rounded-xl shadow-xl text-sm text-white text-center max-w-[90%] ${toast.type === 'ok' ? 'bg-slate-800' : 'bg-rose-600'}`}>{toast.msg}</div>
+        </div>
       )}
 
       {/* 모달들 */}
@@ -714,7 +716,7 @@ function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClos
   const [colors, setColors] = useState<any>(theme?.colors || {});
   const [headerTitle, setHeaderTitle] = useState<string>(theme?.header?.title || '');
   const [showTitle, setShowTitle] = useState<boolean>(theme?.header?.showTitle !== false);
-  const [navPosition, setNavPosition] = useState<string>(theme?.header?.navPosition === 'side' ? 'side' : 'top');
+  const [navPosition, setNavPosition] = useState<string>(['side', 'right'].includes(theme?.header?.navPosition) ? theme.header.navPosition : 'top');
   const [fontFamily, setFontFamily] = useState<string>(theme?.font?.family || 'Pretendard');
   const [googleFontUrl, setGoogleFontUrl] = useState<string>(theme?.font?.googleFontUrl || '');
   const [showFontUrl, setShowFontUrl] = useState(false);
@@ -762,6 +764,7 @@ function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClos
           <div className="flex gap-1.5 items-center">
             <Button size="sm" variant={navPosition === 'top' ? 'solid' : 'flat'} color="primary" onClick={() => setNavPosition('top')}>상단</Button>
             <Button size="sm" variant={navPosition === 'side' ? 'solid' : 'flat'} color="primary" onClick={() => setNavPosition('side')}>좌측</Button>
+            <Button size="sm" variant={navPosition === 'right' ? 'solid' : 'flat'} color="primary" onClick={() => setNavPosition('right')}>우측</Button>
           </div>
         </div>
       </div>
