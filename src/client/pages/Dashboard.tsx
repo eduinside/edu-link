@@ -209,6 +209,8 @@ export default function Dashboard() {
   
   // 최고관리자용 사용자 관리 상태
   const [adminUsers, setAdminUsers] = useState<User[]>([]);
+  // 최고관리자용 플랫폼 전체 콘텐츠 현황 (단축링크/API생성링크/설문/페이지)
+  const [adminStats, setAdminStats] = useState<{ webLinks: number; apiLinks: number; surveys: number; pages: number } | null>(null);
 
   // 개인정보수정 상태
   const [newProfileName, setNewProfileName] = useState('');
@@ -310,6 +312,10 @@ export default function Dashboard() {
       const resU = await fetch('/api/admin/users', { headers });
       const dataU = await resU.json();
       if (dataU.success) setAdminUsers(dataU.users);
+
+      const resS = await fetch('/api/admin/stats', { headers });
+      const dataS = await resS.json();
+      if (dataS.success) setAdminStats(dataS.stats);
     } catch (e) {
       console.error('관리자 데이터 로드 실패', e);
     }
@@ -2402,7 +2408,7 @@ export default function Dashboard() {
               <div className="bg-gradient-to-r from-blue-600 to-brand-600 p-8 rounded-xl text-white space-y-2.5 shadow-lg shadow-brand-100/50">
                 <h3 className="text-xl font-bold font-sans">에듀링크(edu-link) 활용방법</h3>
                 <p className="text-xs text-brand-100 leading-relaxed">
-                  단축주소·설문지 생성부터 API 연동까지, 에듀링크의 주요 기능을 한눈에 확인하세요.
+                  단축주소·설문지·페이지 생성부터 API 연동까지, 에듀링크의 주요 기능을 한눈에 확인하세요.
                 </p>
               </div>
 
@@ -2419,6 +2425,7 @@ export default function Dashboard() {
                         <th className="text-left px-3 py-2 rounded-l-lg font-semibold">등급</th>
                         <th className="text-left px-3 py-2 font-semibold">단축주소</th>
                         <th className="text-left px-3 py-2 font-semibold">설문지</th>
+                        <th className="text-left px-3 py-2 font-semibold">페이지</th>
                         <th className="text-left px-3 py-2 font-semibold">API 연동</th>
                         <th className="text-left px-3 py-2 rounded-r-lg font-semibold">관리</th>
                       </tr>
@@ -2435,6 +2442,7 @@ export default function Dashboard() {
                         <td className="px-3 py-2.5 text-slate-400">—</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
                       </tr>
                       <tr className="text-slate-600">
                         <td className="px-3 py-2.5 font-semibold">
@@ -2444,6 +2452,7 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-slate-400">—</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
@@ -2457,6 +2466,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
                         <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 생성·관리</td>
                         <td className="px-3 py-2.5 text-green-600">✓ API Key</td>
                         <td className="px-3 py-2.5 text-slate-400">—</td>
                       </tr>
@@ -2467,6 +2477,7 @@ export default function Dashboard() {
                             최고관리자
                           </span>
                         </td>
+                        <td className="px-3 py-2.5 text-green-600">✓ 전체 관리</td>
                         <td className="px-3 py-2.5 text-green-600">✓ 전체 관리</td>
                         <td className="px-3 py-2.5 text-green-600">✓ 전체 관리</td>
                         <td className="px-3 py-2.5 text-green-600">✓ API Key</td>
@@ -2549,6 +2560,52 @@ export default function Dashboard() {
                     <h5 className="font-bold text-slate-800">응답 수집 및 내보내기</h5>
                     <p className="text-slate-500 leading-relaxed">
                       대시보드 설문 관리 탭에서 누적 응답 수가 30초마다 자동 갱신되며, '결과 보기'를 클릭하면 응답 그리드를 확인할 수 있습니다. CSV 다운로드 기능으로 엑셀에서도 분석이 가능합니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 페이지 기능 */}
+              <div className="bg-white border border-slate-100 rounded-xl p-8 space-y-5 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-xs font-bold">🌐</span>
+                  페이지 기능 <span className="text-[10px] bg-brand-50 text-brand-500 px-2 py-0.5 rounded-full font-semibold">Lv.3 이상</span>
+                </h4>
+                <div className="space-y-4 text-xs text-slate-700">
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">페이지(사이트) 만들기</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      '페이지 관리' 탭에서 회원당 여러 개의 사이트를 만들 수 있습니다. 단축주소와 동일한 슬러그 풀을 공유하여 dgedu.link/내슬러그로 공개되며, 최상위 페이지 아래 1단계 하위 페이지까지 만들 수 있습니다(예: dgedu.link/우리반/공지사항).
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">전용 편집기</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      페이지별 전용 편집 화면에서 좌측 페이지 트리, 가운데 콘텐츠 편집, 우측 실시간 미리보기를 함께 보며 작업합니다. 입력 내용은 자동 저장됩니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">콘텐츠 구성 요소</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      본문(서식 있는 텍스트) · 제목(강조색 배경 옵션) · 이미지(업로드 시 자동 최적화) · 유튜브 영상 · 버튼/링크 · 구분선 · 임베드(외부 서비스 HTML 삽입) 등 다양한 콘텐츠 블록을 순서대로 배치할 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">저장과 게시는 별개</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      편집 중인 내용은 자동으로 저장되지만 실제 방문자에게는 보이지 않습니다. 화면 상단의 '게시' 버튼을 눌러야 그 시점의 내용이 실제 공개 주소에 반영됩니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">디자인 설정</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      색상 테마, 다양한 한글 글꼴(고딕·명조·디스플레이·손글씨·고정폭), 메뉴 위치(상단·좌측·우측)를 페이지별로 자유롭게 설정할 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="border-l-4 border-sky-400 pl-4 py-1 space-y-1">
+                    <h5 className="font-bold text-slate-800">관리 및 통계</h5>
+                    <p className="text-slate-500 leading-relaxed">
+                      '페이지 관리' 탭에서 생성일·최종수정일·누적 클릭 수를 확인하고, QR 코드 다운로드와 공개/비공개 전환도 지원합니다. 이미지 업로드는 등급별로 파일당 용량과 일일 업로드 개수 제한이 적용됩니다.
                     </p>
                   </div>
                 </div>
@@ -2710,6 +2767,33 @@ export default function Dashboard() {
                         </CardContent>
                       </Card>
                     ))}
+                  </div>
+
+                  {/* 플랫폼 전체 콘텐츠 현황 (전체 회원 합산) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-indigo-500" />
+                      <h4 className="font-bold text-sm text-slate-800">플랫폼 전체 콘텐츠 현황</h4>
+                      <span className="text-[10px] text-slate-400">전체 회원 합산</span>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: '단축링크 수', value: adminStats?.webLinks ?? 0, sub: '개', Icon: Link2, color: 'bg-brand-50 border-brand-100', textColor: 'text-brand-600' },
+                        { label: 'API 생성 링크 수', value: adminStats?.apiLinks ?? 0, sub: '개', Icon: Terminal, color: 'bg-green-50 border-green-100', textColor: 'text-green-600' },
+                        { label: '설문 수', value: adminStats?.surveys ?? 0, sub: '개', Icon: FileText, color: 'bg-purple-50 border-purple-100', textColor: 'text-purple-600' },
+                        { label: '페이지 수', value: adminStats?.pages ?? 0, sub: '개', Icon: LayoutTemplate, color: 'bg-sky-50 border-sky-100', textColor: 'text-sky-600' },
+                      ].map((stat) => (
+                        <Card key={stat.label} className={`border ${stat.color} rounded-xl shadow-sm`}>
+                          <CardContent className="p-5 space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <stat.Icon className={`w-3.5 h-3.5 ${stat.textColor}`} />
+                              <p className="text-[11px] font-bold text-slate-500">{stat.label}</p>
+                            </div>
+                            <p className={`text-2xl font-black ${stat.textColor}`}>{stat.value}<span className="text-sm font-bold ml-1">{stat.sub}</span></p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
 
                   {/* 승급 요청 관리 */}

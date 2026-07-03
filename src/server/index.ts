@@ -1417,6 +1417,31 @@ adminApi.get('/users', async (c) => {
     }
 });
 
+// 10.6b 플랫폼 전체 콘텐츠 현황 (어드민 대시보드 위젯용) — 전체 회원 합산
+adminApi.get('/stats', async (c) => {
+    try {
+        const row = await c.env.DB.prepare(
+            `SELECT
+                SUM(CASE WHEN (kind IS NULL OR kind = 'link') AND created_by != 'api' THEN 1 ELSE 0 END) AS web_links,
+                SUM(CASE WHEN (kind IS NULL OR kind = 'link') AND created_by = 'api' THEN 1 ELSE 0 END) AS api_links,
+                SUM(CASE WHEN kind = 'survey' THEN 1 ELSE 0 END) AS surveys,
+                SUM(CASE WHEN kind = 'site' THEN 1 ELSE 0 END) AS pages
+             FROM urls`
+        ).first<{ web_links: number; api_links: number; surveys: number; pages: number }>();
+        return c.json({
+            success: true,
+            stats: {
+                webLinks: row?.web_links ?? 0,
+                apiLinks: row?.api_links ?? 0,
+                surveys: row?.surveys ?? 0,
+                pages: row?.pages ?? 0,
+            },
+        });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
 // 10.7 사용자 등급 설정 (최고관리자 전용)
 adminApi.patch('/users/:id', async (c) => {
     const id = c.req.param('id');

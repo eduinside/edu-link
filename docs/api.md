@@ -321,6 +321,7 @@ UTF-8 BOM CSV 파일 다운로드. 첫 행은 `제출일시, 질문1, 질문2, .
 | DELETE | `/api/admin/domains/:id` | 허용 도메인 삭제 |
 | GET | `/api/admin/users` | 전체 사용자 목록 |
 | PATCH | `/api/admin/users/:id` | 사용자 등급 변경 (본인 제외) |
+| GET | `/api/admin/stats` | 플랫폼 전체 콘텐츠 현황 — 단축링크(웹) / API 생성 링크 / 설문 / 페이지 수 (전체 회원 합산) |
 | POST | `/api/admin/notices` | 공지사항 등록 |
 | DELETE | `/api/admin/notices/:id` | 공지사항 삭제 |
 

@@ -701,16 +701,54 @@ const PRESETS: Array<{ name: string; primary: string; accent: string }> = [
   { name: '스카이', primary: '#0284c7', accent: '#38bdf8' },
 ];
 // 한글 구글폰트 프리셋 — 선택 시 family+url을 함께 지정(그래야 실제로 폰트가 바뀜)
-const FONT_PRESETS: Array<{ label: string; family: string; url: string }> = [
-  { label: '프리텐다드(기본)', family: 'Pretendard', url: '' },
-  { label: '본고딕', family: 'Noto Sans KR', url: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap' },
-  { label: '나눔고딕', family: 'Nanum Gothic', url: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap' },
-  { label: '고딕 A1', family: 'Gothic A1', url: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700&display=swap' },
-  { label: '나눔명조', family: 'Nanum Myeongjo', url: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap' },
-  { label: '주아(둥근)', family: 'Jua', url: 'https://fonts.googleapis.com/css2?family=Jua&display=swap' },
-  { label: '개구(손글씨)', family: 'Gaegu', url: 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap' },
-  { label: '검은고딕', family: 'Black Han Sans', url: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' },
+type FontPreset = { label: string; family: string; url: string };
+// 구글 폰트(한글) 카테고리(https://fonts.google.com/?script=Kore 의 분류)와 동일하게 그룹 구성
+const FONT_PRESET_GROUPS: Array<{ category: string; fonts: FontPreset[] }> = [
+  {
+    category: '고딕 (Sans Serif)',
+    fonts: [
+      { label: '본고딕', family: 'Noto Sans KR', url: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap' },
+      { label: '나눔고딕', family: 'Nanum Gothic', url: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap' },
+      { label: '고딕 A1', family: 'Gothic A1', url: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700&display=swap' },
+      { label: 'IBM 플렉스', family: 'IBM Plex Sans KR', url: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&display=swap' },
+    ],
+  },
+  {
+    category: '명조 (Serif)',
+    fonts: [
+      { label: '나눔명조', family: 'Nanum Myeongjo', url: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap' },
+      { label: '본명조', family: 'Noto Serif KR', url: 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap' },
+      { label: '송명', family: 'Song Myung', url: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=swap' },
+    ],
+  },
+  {
+    category: '디스플레이 (Display)',
+    fonts: [
+      { label: '주아(둥근)', family: 'Jua', url: 'https://fonts.googleapis.com/css2?family=Jua&display=swap' },
+      { label: '검은고딕', family: 'Black Han Sans', url: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' },
+      { label: '도현', family: 'Do Hyeon', url: 'https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap' },
+      { label: '구기', family: 'Gugi', url: 'https://fonts.googleapis.com/css2?family=Gugi&display=swap' },
+      { label: '스타일리쉬', family: 'Stylish', url: 'https://fonts.googleapis.com/css2?family=Stylish&display=swap' },
+    ],
+  },
+  {
+    category: '손글씨 (Handwriting)',
+    fonts: [
+      { label: '개구', family: 'Gaegu', url: 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap' },
+      { label: '나눔손글씨 펜', family: 'Nanum Pen Script', url: 'https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap' },
+      { label: '하이멜로디', family: 'Hi Melody', url: 'https://fonts.googleapis.com/css2?family=Hi+Melody&display=swap' },
+      { label: '푸어스토리', family: 'Poor Story', url: 'https://fonts.googleapis.com/css2?family=Poor+Story&display=swap' },
+      { label: '감자꽃', family: 'Gamja Flower', url: 'https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap' },
+    ],
+  },
+  {
+    category: '고정폭 (Monospace)',
+    fonts: [
+      { label: '나눔고딕 코딩', family: 'Nanum Gothic Coding', url: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap' },
+    ],
+  },
 ];
+const DEFAULT_FONT: FontPreset = { label: '프리텐다드(기본)', family: 'Pretendard', url: '' };
 
 function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClose: () => void; onSave: (t: any) => void; onPreview: (t: any) => void }) {
   const [colors, setColors] = useState<any>(theme?.colors || {});
@@ -771,15 +809,28 @@ function DesignModal({ theme, onClose, onSave, onPreview }: { theme: any; onClos
       <label className="flex items-center gap-1.5 text-xs text-slate-600 mb-3"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} /> 헤더에 제목 표시</label>
       <div className="mb-1">
         <div className="text-xs font-bold text-slate-500 mb-1.5">글꼴</div>
-        <div className="flex flex-wrap gap-1.5">
-          {FONT_PRESETS.map(f => (
-            <button key={f.family} onClick={() => pickFont(f)}
-              className={`text-xs px-2.5 py-1 rounded-full border ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-semibold' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
-              {f.label}
-            </button>
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          <button onClick={() => pickFont(DEFAULT_FONT)}
+            className={`text-xs px-2.5 py-1 rounded-full border ${fontFamily === DEFAULT_FONT.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-semibold' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
+            {DEFAULT_FONT.label}
+          </button>
+        </div>
+        <div className="space-y-2">
+          {FONT_PRESET_GROUPS.map(group => (
+            <div key={group.category}>
+              <div className="text-[10px] font-bold text-slate-400 mb-1">{group.category}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {group.fonts.map(f => (
+                  <button key={f.family} onClick={() => pickFont(f)}
+                    className={`text-xs px-2.5 py-1 rounded-full border ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-semibold' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-        <button className="text-[11px] text-slate-400 hover:text-slate-600 mt-1.5" onClick={() => setShowFontUrl(v => !v)}>{showFontUrl ? '▴ 직접 입력 접기' : '▾ 구글폰트 URL 직접 입력'}</button>
+        <button className="text-[11px] text-slate-400 hover:text-slate-600 mt-2" onClick={() => setShowFontUrl(v => !v)}>{showFontUrl ? '▴ 직접 입력 접기' : '▾ 구글폰트 URL 직접 입력'}</button>
         {showFontUrl && (
           <div className="mt-1.5 space-y-1">
             <input className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400" value={googleFontUrl} onChange={(e) => setGoogleFontUrl(e.target.value)} placeholder="https://fonts.googleapis.com/css2?family=..." />
