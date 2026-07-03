@@ -1643,6 +1643,71 @@ app.post('/api/v1/shorten', async (c) => {
 
 
 // ----------------------------------------------------
+// [edumaps 연동] 리소스 카드 클릭/다운로드 카운터 (공개, 인증 불필요)
+// ----------------------------------------------------
+
+app.use('/api/v1/resource-stats/*', rateLimitMiddleware({ limit: 60, windowSec: 60 }));
+
+// 클릭/다운로드 카운트 증가 (fire-and-forget: DB 쓰기는 waitUntil로 미뤄 응답을 막지 않음)
+app.post('/api/v1/resource-stats/hit', async (c) => {
+    try {
+        const body = await c.req.json().catch(() => null);
+        const resourceId = typeof body?.resource_id === 'string' ? body.resource_id.trim() : '';
+        const kind = body?.kind;
+
+        if (!resourceId || resourceId.length > 64) {
+            return c.json({ success: false, error: 'resource_id가 유효하지 않습니다.' }, 400);
+        }
+        if (kind !== 'click' && kind !== 'download') {
+            return c.json({ success: false, error: "kind는 'click' 또는 'download'여야 합니다." }, 400);
+        }
+
+        // kind는 컬럼명에 대응되므로 문자열 조립 대신 두 SQL문 중 하나를 그대로 선택한다 (SQL 인젝션 방지)
+        const sql = kind === 'click'
+            ? `INSERT INTO resource_stats (resource_id, click_count, download_count, updated_at)
+               VALUES (?, 1, 0, datetime('now'))
+               ON CONFLICT(resource_id) DO UPDATE SET
+                   click_count = click_count + 1,
+                   updated_at = datetime('now')`
+            : `INSERT INTO resource_stats (resource_id, click_count, download_count, updated_at)
+               VALUES (?, 0, 1, datetime('now'))
+               ON CONFLICT(resource_id) DO UPDATE SET
+                   download_count = download_count + 1,
+                   updated_at = datetime('now')`;
+
+        c.executionCtx.waitUntil(
+            c.env.DB.prepare(sql).bind(resourceId).run().catch((err) => {
+                console.error('resource_stats hit error:', err);
+            })
+        );
+
+        return c.json({ success: true });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+// 인기 리소스 조회 (edumaps 랜딩 하단 "많이 찾는 자료" 섹션용) - 리소스 메타데이터는 안 돌려주고 id/카운트만 반환
+app.get('/api/v1/resource-stats/top', async (c) => {
+    try {
+        const metric = c.req.query('metric') === 'download' ? 'download' : 'click';
+        const limitParam = parseInt(c.req.query('limit') || '10', 10);
+        const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 10;
+
+        const sql = metric === 'download'
+            ? `SELECT resource_id, click_count, download_count FROM resource_stats ORDER BY download_count DESC LIMIT ?`
+            : `SELECT resource_id, click_count, download_count FROM resource_stats ORDER BY click_count DESC LIMIT ?`;
+
+        const { results } = await c.env.DB.prepare(sql).bind(limit).all();
+        return c.json({ success: true, items: results });
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message }, 500);
+    }
+});
+
+
+
+// ----------------------------------------------------
 // [공개 리디렉션 및 SPA 서빙]
 // ----------------------------------------------------
 
