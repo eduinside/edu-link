@@ -158,7 +158,7 @@ edu-link/
 ```
 
 - 편집은 `rev`만 올리고 공개(스냅샷)는 불변 → `rev > published_rev`면 편집기에 "게시 필요" 표시.
-- 이미지는 `POST /api/sites/:id/media`로 R2 업로드 후 `/media/*`(Worker 프록시)로 서빙. 섹션·사이트 삭제 시 R2 객체 정리.
+- 이미지는 `POST /api/sites/:id/media`로 업로드 → **Images 바인딩(`IMAGES`)이 WebP로 변환** → R2 저장 → `/media/*`(Worker 프록시)로 서빙. 섹션 삭제·교체, 페이지 삭제(하위 포함), 사이트 삭제 시 해당 R2 객체 정리(사이트 삭제는 프리픽스 전체를 커서로 순회).
 
 ---
 

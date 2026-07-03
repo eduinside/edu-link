@@ -278,7 +278,7 @@ UTF-8 BOM CSV 파일 다운로드. 첫 행은 `제출일시, 질문1, 질문2, .
 | DELETE | `/api/sites/:id` | 사이트 삭제 (페이지·섹션·스냅샷·urls·R2·KV 회수) |
 | POST | `/api/sites/:id/publish` | 게시 — 전 경로 렌더 → 스냅샷 교체 + `published_rev` 갱신 |
 | GET | `/api/sites/:id/preview?path=&theme=` | 소유자 초안 실시간 미리보기(HTML, no-store) |
-| POST | `/api/sites/:id/media` | 이미지 업로드(multipart) → R2 → `/media/...` URL 반환 |
+| POST | `/api/sites/:id/media` | 이미지 업로드(multipart) → WebP 변환(Images 바인딩) → R2 → `/media/....webp` URL 반환 |
 
 **페이지**
 

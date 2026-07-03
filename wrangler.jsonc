@@ -35,6 +35,9 @@
 			"bucket_name": "edulink-pages-media"
 		}
 	],
+	"images": {
+		"binding": "IMAGES"
+	},
 	"observability": {
 		"enabled": true
 	},

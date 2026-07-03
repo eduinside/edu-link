@@ -8,6 +8,7 @@
 | D1 Database | `edu-link-db` | `e5fa6f54-6063-48f9-9cf3-0517381dd005` |
 | KV Namespace | `URL_CACHE` | `8acabbbf2c7c43eaaf876f0c27cc2bd1` |
 | R2 Bucket | `edulink-pages-media` (바인딩 `MEDIA`) | — |
+| Images 바인딩 | `IMAGES` (업로드 이미지 WebP 변환) | — |
 | 프로덕션 도메인 | `dgedu.link` | — |
 | Worker 기본 URL | `edu-link.parkjh85.workers.dev` | — |
 | GA4 측정 ID | `G-T9GZNBEXJ0` | — |
@@ -101,7 +102,7 @@ npx wrangler d1 export edu-link-db --remote --output=backup_$(date +%Y%m%d).sql
 
 ## R2 (페이지 이미지) 관리
 
-페이지 기능의 이미지 업로드는 R2 버킷 `edulink-pages-media`(바인딩 `MEDIA`)를 사용합니다. `wrangler.jsonc`의 `r2_buckets`에 등록되어 있으며, **버킷 자체는 1회 생성이 필요**합니다.
+페이지 기능의 이미지 업로드는 R2 버킷 `edulink-pages-media`(바인딩 `MEDIA`)를 사용합니다. `wrangler.jsonc`의 `r2_buckets`에 등록되어 있으며, **버킷 자체는 1회 생성이 필요**합니다. 업로드된 이미지는 저장 전 **Images 바인딩(`IMAGES`)으로 WebP로 변환**하여 저장합니다(원본 포맷 무관, 애니메이션 GIF는 애니메이션 WebP로 보존).
 
 ```bash
 # 버킷 생성 (최초 1회)
@@ -111,8 +112,9 @@ npx wrangler r2 bucket create edulink-pages-media
 npx wrangler r2 object list edulink-pages-media --prefix "sites/12/"
 ```
 
+- Images 바인딩은 `wrangler.jsonc`의 `images.binding: "IMAGES"`로 활성화되며 별도 리소스 생성 없이 바로 사용 가능(로컬 `wrangler dev`에서도 과금 없이 동작).
 - 공개 서빙은 Worker의 `/media/*` 프록시가 담당(별도 public bucket/커스텀 도메인 불필요).
-- 이미지 섹션 삭제·교체, 사이트 삭제 시 해당 객체가 자동 정리됨.
+- 이미지 섹션 삭제·교체, 페이지 삭제(하위 페이지 포함), 사이트 삭제 시 해당 R2 객체가 자동 정리됨(사이트 삭제는 `sites/{id}/` 프리픽스 전체를 커서로 순회하며 삭제).
 
 ---
 

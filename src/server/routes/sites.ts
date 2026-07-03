@@ -294,13 +294,8 @@ export function registerSiteRoutes(api: ApiApp) {
             // 게시 KV 키 정리 (스냅샷 경로 기준) — 삭제 전에 수행
             await deletePubKeys(c, id, site.custom_slug || site.base_slug);
 
-            // R2 미디어 전량 삭제 (sites/{id}/ 프리픽스)
-            if (c.env.MEDIA) {
-                try {
-                    const listed = await c.env.MEDIA.list({ prefix: `sites/${id}/` });
-                    for (const obj of listed.objects) { try { await c.env.MEDIA.delete(obj.key); } catch { /* noop */ } }
-                } catch { /* noop */ }
-            }
+            // R2 미디어 전량 삭제 (sites/{id}/ 프리픽스, 1000개 초과분까지 커서로 순회)
+            await deleteMediaByPrefix(c, `sites/${id}/`);
 
             // FK CASCADE 의존하지 않고 명시적으로 하위부터 삭제 (D1 안전)
             await c.env.DB.batch([
@@ -548,6 +543,16 @@ export function registerPageRoutes(api: ApiApp) {
             const allIds = [id, ...descendants.map(d => d.id)];
             const placeholders = allIds.map(() => '?').join(',');
 
+            // 삭제될 페이지(하위 포함)의 이미지 섹션은 R2 객체도 함께 정리
+            const { results: imgRows } = await c.env.DB.prepare(
+                `SELECT content FROM site_sections WHERE type = 'image' AND page_id IN (${placeholders})`
+            ).bind(...allIds).all<{ content: string }>();
+            for (const row of imgRows as Array<{ content: string }>) {
+                let url: string | undefined;
+                try { url = JSON.parse(row.content || '{}').url; } catch { /* noop */ }
+                if (url) await deleteMediaByUrl(c, url);
+            }
+
             await c.env.DB.batch([
                 c.env.DB.prepare(`DELETE FROM site_sections WHERE page_id IN (${placeholders})`).bind(...allIds),
                 c.env.DB.prepare(`DELETE FROM site_pages WHERE id IN (${placeholders})`).bind(...allIds),
@@ -610,6 +615,21 @@ function mediaKeyFromUrl(url: any): string | null {
 async function deleteMediaByUrl(c: any, url: any): Promise<void> {
     const key = mediaKeyFromUrl(url);
     if (key && c.env.MEDIA) { try { await c.env.MEDIA.delete(key); } catch { /* noop */ } }
+}
+
+// R2에서 프리픽스에 해당하는 객체 전체 삭제 (1000개 초과 시 cursor로 순회)
+async function deleteMediaByPrefix(c: any, prefix: string): Promise<void> {
+    if (!c.env.MEDIA) return;
+    try {
+        let cursor: string | undefined;
+        do {
+            const listed = await c.env.MEDIA.list({ prefix, cursor });
+            if (listed.objects.length) {
+                try { await c.env.MEDIA.delete(listed.objects.map((o: any) => o.key)); } catch { /* noop */ }
+            }
+            cursor = listed.truncated ? listed.cursor : undefined;
+        } while (cursor);
+    } catch { /* noop */ }
 }
 
 function isHttpUrl(u: string): boolean {
@@ -833,22 +853,21 @@ export function registerSectionRoutes(api: ApiApp) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Step 10: 미디어 업로드 (R2)
+// Step 10: 미디어 업로드 (R2) — 업로드 즉시 WebP로 변환해 저장
 // ─────────────────────────────────────────────────────────────
 
-const MIME_EXT: Record<string, string> = {
-    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
-};
-const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_UPLOAD_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5MB (원본 기준)
 
 export function registerMediaRoutes(api: ApiApp) {
-    // POST /api/sites/:id/media — 이미지 업로드 → R2 → 프록시 URL 반환
+    // POST /api/sites/:id/media — 이미지 업로드 → WebP 변환 → R2 → 프록시 URL 반환
     api.post('/sites/:id/media', async (c) => {
         const user = c.get('user');
         if (user.level < SITE_MIN_LEVEL) return c.json({ success: false, error: '권한이 필요합니다.' }, 403);
         const siteId = c.req.param('id');
         try {
             if (!c.env.MEDIA) return c.json({ success: false, error: '미디어 저장소가 설정되지 않았습니다.' }, 500);
+            if (!c.env.IMAGES) return c.json({ success: false, error: '이미지 변환기가 설정되지 않았습니다.' }, 500);
             const site = await ownedSite(c, siteId, user.id);
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
@@ -857,12 +876,21 @@ export function registerMediaRoutes(api: ApiApp) {
             if (!file || typeof file === 'string') return c.json({ success: false, error: '파일이 필요합니다.' }, 400);
 
             const type = (file as File).type;
-            const ext = MIME_EXT[type];
-            if (!ext) return c.json({ success: false, error: 'jpg/png/webp/gif 이미지만 업로드할 수 있습니다.' }, 400);
+            if (!ALLOWED_UPLOAD_MIME.has(type)) return c.json({ success: false, error: 'jpg/png/webp/gif 이미지만 업로드할 수 있습니다.' }, 400);
             if ((file as File).size > MAX_MEDIA_BYTES) return c.json({ success: false, error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
 
-            const key = `sites/${siteId}/${crypto.randomUUID()}.${ext}`;
-            await c.env.MEDIA.put(key, (file as File).stream(), { httpMetadata: { contentType: type } });
+            // 모든 업로드를 WebP로 통일 변환(용량 절감). 애니메이션 GIF는 애니메이션 WebP로 보존.
+            // .image() 스트림은 길이를 알 수 없어 R2 put()이 거부하므로, ArrayBuffer로 받아 저장한다.
+            let webpBuffer: ArrayBuffer;
+            try {
+                const result = await c.env.IMAGES.input((file as File).stream()).output({ format: 'image/webp' });
+                webpBuffer = await result.response().arrayBuffer();
+            } catch (e: any) {
+                return c.json({ success: false, error: '이미지 변환에 실패했습니다. 손상된 파일이거나 지원하지 않는 이미지입니다.' }, 400);
+            }
+
+            const key = `sites/${siteId}/${crypto.randomUUID()}.webp`;
+            await c.env.MEDIA.put(key, webpBuffer, { httpMetadata: { contentType: 'image/webp' } });
 
             return c.json({ success: true, url: `/media/${key}` });
         } catch (err: any) {
