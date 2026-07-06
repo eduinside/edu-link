@@ -333,6 +333,7 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
+      setSuccessMsg('설문지 주소가 복사되었습니다: ' + url);
       setTimeout(() => setCopiedId(null), 1500);
     } catch { setError('복사 실패'); }
   };
@@ -465,19 +466,19 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <Tooltip content={isCopied ? '복사됨!' : '주소 복사'}>
+                          <Tooltip content={isCopied ? '복사됨!' : '설문지 주소 클립보드에 복사'} delay={200}>
                             <Button size="sm" variant="flat" color={isCopied ? 'success' : 'default'} isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => copyToClipboard(s.id, slugShown)}>
                               {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                             </Button>
                           </Tooltip>
-                          <Tooltip content="설문 열기">
+                          <Tooltip content="새 탭에서 설문지 페이지 열기" delay={200}>
                             <Button size="sm" variant="flat" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => window.open(`/${slugShown}`, '_blank')}>
                               <ExternalLink className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="QR 코드">
+                          <Tooltip content="QR 코드 보기 및 PNG 저장" delay={200}>
                             <Button size="sm" variant="flat" color="secondary" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => setQrModalLink({
                                 id: s.id, slug: slugShown, base_slug: s.base_slug,
@@ -488,25 +489,25 @@ export default function SurveyTab({ getHeaders, setSuccessMsg, setError, setQrMo
                               <QrCode className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="응답 결과 보기">
+                          <Tooltip content="설문 응답 결과 통계 보기" delay={200}>
                             <Button size="sm" variant="flat" color="primary" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => openResults(s.id)}>
                               <BarChart3 className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="CSV 다운로드">
+                          <Tooltip content="설문 응답 원본 CSV 다운로드" delay={200}>
                             <Button size="sm" variant="flat" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => window.open(`/api/surveys/${s.id}/responses.csv`, '_blank')}>
                               <Download className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="편집">
+                          <Tooltip content="설문 구성 및 디자인 편집" delay={200}>
                             <Button size="sm" variant="flat" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => startEdit(s)}>
                               <Edit3 className="w-3 h-3" />
                             </Button>
                           </Tooltip>
-                          <Tooltip content="삭제">
+                          <Tooltip content="설문 영구 삭제" delay={200}>
                             <Button size="sm" variant="flat" color="danger" isIconOnly className="rounded-lg w-7 h-7 min-w-0 p-0"
                               onClick={() => handleDelete(s.id)}>
                               <Trash2 className="w-3 h-3" />

@@ -321,7 +321,7 @@ export default function SiteEditor() {
 
   // ─────────── 렌더 ───────────
   if (loading) return <FullMsg><Loader2 className="w-6 h-6 animate-spin text-blue-500" /><span className="text-slate-500 text-sm">불러오는 중…</span></FullMsg>;
-  if (notFound || !site) return <FullMsg><p className="text-slate-600">사이트를 찾을 수 없거나 권한이 없습니다.</p><Button size="sm" variant="flat" onClick={() => navigate('/dashboard')}>대시보드로</Button></FullMsg>;
+  if (notFound || !site) return <FullMsg><p className="text-slate-600">사이트를 찾을 수 없거나 권한이 없습니다.</p><Button size="sm" variant="flat" onClick={() => navigate('/dashboard/pages')}>대시보드로</Button></FullMsg>;
 
   const publicSlug = site.custom_slug || site.base_slug;
   const needPublish = dirty || site.published_rev === 0;
@@ -331,20 +331,28 @@ export default function SiteEditor() {
     <div className="h-screen flex flex-col bg-slate-50">
       {/* 상단바 */}
       <header className="flex items-center gap-2 px-3 h-14 bg-white border-b border-slate-200 shrink-0">
-        <Button size="sm" variant="light" onClick={() => navigate('/dashboard')} startContent={<ChevronLeft className="w-4 h-4" />}>나가기</Button>
+        <Tooltip content="대시보드로 나가기" delay={200}>
+          <Button size="sm" variant="bordered" onClick={() => navigate('/dashboard/pages')} className="bg-slate-50 border-slate-200 text-slate-600 font-medium hover:bg-slate-100" startContent={<ChevronLeft className="w-4 h-4" />}>나가기</Button>
+        </Tooltip>
         <input className="font-bold text-slate-800 text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 rounded px-2 py-1 focus:outline-none max-w-[220px]"
           value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} onBlur={commitTitle}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
         <SaveIndicator state={saveState} at={savedAt} />
         <div className="flex-1" />
-        <button className="text-xs text-slate-500 hover:text-blue-600 inline-flex items-center gap-1 px-2" onClick={copyPublicLink}>/{publicSlug} <Copy className="w-3 h-3" /></button>
-        <Tooltip content="주소 변경"><Button isIconOnly size="sm" variant="light" onClick={() => setAddressModal(true)}><Edit3 className="w-4 h-4" /></Button></Tooltip>
-        <Tooltip content="공개 페이지"><Button isIconOnly size="sm" variant="light" onClick={() => window.open(`/${publicSlug}`, '_blank')}><ExternalLink className="w-4 h-4" /></Button></Tooltip>
+        <Tooltip content="클릭하면 공개용 주소를 복사합니다" delay={200}>
+          <button className="text-xs text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 border border-slate-200 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5 transition-colors font-mono" onClick={copyPublicLink}>
+            /{publicSlug} <Copy className="w-3 h-3 text-slate-400" />
+          </button>
+        </Tooltip>
+        <Tooltip content="연결용 맞춤 주소 변경" delay={200}><Button isIconOnly size="sm" variant="bordered" className="border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setAddressModal(true)}><Edit3 className="w-4 h-4" /></Button></Tooltip>
+        <Tooltip content="공개용 웹 페이지 열기" delay={200}><Button isIconOnly size="sm" variant="bordered" className="border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => window.open(`/${publicSlug}`, '_blank')}><ExternalLink className="w-4 h-4" /></Button></Tooltip>
         {needPublish
           ? <Chip size="sm" variant="flat" color="warning">{site.published_rev === 0 ? '미게시' : '게시 필요'}</Chip>
           : <Chip size="sm" variant="flat" color="success">게시됨</Chip>}
-        <Button size="sm" color="primary" variant={needPublish ? 'solid' : 'flat'} isLoading={publishing}
-          onClick={publish} startContent={!publishing ? <Rocket className="w-3.5 h-3.5" /> : undefined}>게시</Button>
+        <Tooltip content="현재 편집 중인 초안 상태를 사이트에 최종 반영(게시)합니다" delay={200}>
+          <Button size="sm" color="primary" variant={needPublish ? 'solid' : 'flat'} isLoading={publishing}
+            onClick={publish} startContent={!publishing ? <Rocket className="w-3.5 h-3.5" /> : undefined}>게시</Button>
+        </Tooltip>
       </header>
 
       {/* 본문 3패널 */}
@@ -385,15 +393,15 @@ export default function SiteEditor() {
             <p className="text-sm text-slate-400 text-center py-16">왼쪽에서 페이지를 선택하거나 추가하세요.</p>
           ) : (
             <>
-              <div className="flex items-center gap-1.5 mb-3 flex-wrap sticky top-0 bg-slate-50 py-1 z-10">
+              <div className="flex items-center gap-1.5 mb-3 flex-wrap sticky top-0 bg-slate-50 py-2 border-b border-slate-200/60 z-10">
                 <span className="text-xs font-bold text-slate-500 mr-auto">‘{selectedPage.title}’ 콘텐츠</span>
-                <AddBtn onClick={() => addSection('text', { text: '', format: 'markdown' })} icon={<FileText className="w-3.5 h-3.5" />}>본문</AddBtn>
-                <AddBtn onClick={() => addSection('heading', { text: '제목', level: 2, bg: false })} icon={<Heading className="w-3.5 h-3.5" />}>제목</AddBtn>
-                <AddBtn onClick={async () => { const u = await uploadImage(); if (u) addSection('image', { url: u, alt: '', width: 'normal' }); }} icon={<ImageIcon className="w-3.5 h-3.5" />}>이미지</AddBtn>
-                <AddBtn color="danger" onClick={() => addSection('youtube', { url: '' })} icon={<MonitorPlay className="w-3.5 h-3.5" />}>유튜브</AddBtn>
-                <AddBtn onClick={() => addSection('link', { label: '버튼', url: '', style: 'button', newTab: true })} icon={<LinkIcon className="w-3.5 h-3.5" />}>버튼</AddBtn>
-                <AddBtn onClick={() => addSection('embed', { html: '' })} icon={<Code className="w-3.5 h-3.5" />}>임베드</AddBtn>
-                <AddBtn onClick={() => addSection('divider', {})} icon={<Minus className="w-3.5 h-3.5" />}>구분선</AddBtn>
+                <AddBtn onClick={() => addSection('text', { text: '', format: 'markdown' })} icon={<FileText className="w-3.5 h-3.5" />} tooltip="본문에 들어갈 텍스트 단락 추가 (마크다운 지원)">본문</AddBtn>
+                <AddBtn onClick={() => addSection('heading', { text: '제목', level: 2, bg: false })} icon={<Heading className="w-3.5 h-3.5" />} tooltip="텍스트 단락들을 나눌 대/소제목 섹션 추가">제목</AddBtn>
+                <AddBtn onClick={async () => { const u = await uploadImage(); if (u) addSection('image', { url: u, alt: '', width: 'normal' }); }} icon={<ImageIcon className="w-3.5 h-3.5" />} tooltip="기기에 소장한 사진/이미지 파일 삽입">이미지</AddBtn>
+                <AddBtn color="danger" onClick={() => addSection('youtube', { url: '' })} icon={<MonitorPlay className="w-3.5 h-3.5" />} tooltip="유튜브 비디오 플레이어 삽입">유튜브</AddBtn>
+                <AddBtn onClick={() => addSection('link', { label: '버튼', url: '', style: 'button', newTab: true })} icon={<LinkIcon className="w-3.5 h-3.5" />} tooltip="외부 링크 혹은 타 페이지 연결 버튼 추가">버튼</AddBtn>
+                <AddBtn onClick={() => addSection('embed', { html: '' })} icon={<Code className="w-3.5 h-3.5" />} tooltip="구글 폼/지도/패들릿 등 외부 HTML 아이프레임(iframe) 삽입">임베드</AddBtn>
+                <AddBtn onClick={() => addSection('divider', {})} icon={<Minus className="w-3.5 h-3.5" />} tooltip="섹션을 구분하는 가로줄 추가">구분선</AddBtn>
               </div>
               {sections.length === 0 && <p className="text-sm text-slate-400 text-center py-10">위 버튼으로 콘텐츠를 추가하세요.</p>}
               <div className="space-y-3">
@@ -474,8 +482,23 @@ function SaveIndicator({ state, at }: { state: SaveState; at: string }) {
   return null;
 }
 
-function AddBtn({ children, icon, onClick, color }: { children: React.ReactNode; icon: React.ReactNode; onClick: () => void; color?: any }) {
-  return <Button size="sm" variant="flat" color={color} onClick={onClick} startContent={icon}>{children}</Button>;
+function AddBtn({ children, icon, onClick, color, tooltip }: { children: React.ReactNode; icon: React.ReactNode; onClick: () => void; color?: any; tooltip?: string }) {
+  const btn = (
+    <Button
+      size="sm"
+      variant="flat"
+      color={color}
+      onClick={onClick}
+      className="border border-slate-200/80 shadow-sm hover:shadow hover:bg-slate-100 transition-all font-semibold"
+      startContent={icon}
+    >
+      {children}
+    </Button>
+  );
+  if (tooltip) {
+    return <Tooltip content={tooltip} delay={200}>{btn}</Tooltip>;
+  }
+  return btn;
 }
 
 function TreeRow({ page, isHome, active, child, canChild, onSelect, onEdit, onDelete, onHome, onAddChild, onUp, onDown }: {
@@ -500,8 +523,23 @@ function TreeRow({ page, isHome, active, child, canChild, onSelect, onEdit, onDe
 }
 
 function IconBtn({ children, onClick, disabled, danger, title }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; danger?: boolean; title?: string }) {
-  return <button title={title} disabled={disabled} onClick={onClick}
-    className={`p-1 ${danger ? 'text-slate-400 hover:text-rose-500' : 'text-slate-400 hover:text-blue-500'} disabled:opacity-20`}>{children}</button>;
+  const btn = (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className={`p-1 rounded transition-all ${
+        danger 
+          ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50' 
+          : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50'
+      } disabled:opacity-20`}
+    >
+      {children}
+    </button>
+  );
+  if (title) {
+    return <Tooltip content={title} delay={200}>{btn}</Tooltip>;
+  }
+  return btn;
 }
 
 const SEC_LABEL: Record<string, string> = { text: '본문', youtube: '유튜브', heading: '제목', divider: '구분선', link: '버튼/링크', image: '이미지', embed: '임베드(HTML)' };
@@ -511,13 +549,13 @@ function SectionCard({ sec, idx, total, onSave, onUpload, onDelete, onMove }: {
   onSave: (content: any) => void; onUpload: () => Promise<string | null>; onDelete: () => void; onMove: (d: -1 | 1) => void;
 }) {
   return (
-    <div className="border border-slate-200 rounded-xl p-3 bg-white">
-      <div className="flex items-center gap-2 mb-2">
-        <Chip size="sm" variant="flat" color={sec.type === 'youtube' ? 'danger' : 'default'}>{SEC_LABEL[sec.type] || sec.type}</Chip>
+    <div className="border border-slate-200/80 hover:border-slate-300 shadow-sm hover:shadow rounded-xl p-4 bg-white transition-all">
+      <div className="flex items-center gap-2 mb-3">
+        <Chip size="sm" variant="flat" color={sec.type === 'youtube' ? 'danger' : 'default'} className="font-bold">{SEC_LABEL[sec.type] || sec.type}</Chip>
         <div className="flex-1" />
-        <IconBtn disabled={idx === 0} onClick={() => onMove(-1)}><ArrowUp className="w-4 h-4" /></IconBtn>
-        <IconBtn disabled={idx === total - 1} onClick={() => onMove(1)}><ArrowDown className="w-4 h-4" /></IconBtn>
-        <IconBtn onClick={onDelete} danger><Trash2 className="w-4 h-4" /></IconBtn>
+        <IconBtn disabled={idx === 0} onClick={() => onMove(-1)} title="위로 이동"><ArrowUp className="w-4 h-4" /></IconBtn>
+        <IconBtn disabled={idx === total - 1} onClick={() => onMove(1)} title="아래로 이동"><ArrowDown className="w-4 h-4" /></IconBtn>
+        <IconBtn onClick={onDelete} danger title="삭제"><Trash2 className="w-4 h-4" /></IconBtn>
       </div>
       <SectionBody sec={sec} onSave={onSave} onUpload={onUpload} />
     </div>
@@ -603,7 +641,7 @@ function TextBody({ value, onSave }: { value: string; onSave: (t: string) => voi
     timer.current = setTimeout(() => onSave(v), 800); // 자동저장
   };
   return (
-    <textarea className="w-full min-h-[110px] text-sm border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-blue-400 resize-y font-mono"
+    <textarea className="w-full min-h-[110px] text-sm border border-slate-200 bg-slate-50/20 hover:bg-slate-50/50 focus:bg-white rounded-lg p-2.5 transition-all focus:outline-none focus:border-blue-400 resize-y font-mono"
       placeholder="마크다운: **굵게**, *기울임*, [링크](https://...), - 목록, > 인용"
       value={text} onChange={(e) => onChange(e.target.value)} onBlur={() => { if (timer.current) clearTimeout(timer.current); if (text !== value) onSave(text); }} />
   );
@@ -620,7 +658,7 @@ function EmbedBody({ value, onSave }: { value: string; onSave: (t: string) => vo
   };
   return (
     <div className="space-y-1.5">
-      <textarea className="w-full min-h-[120px] text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-blue-400 resize-y font-mono"
+      <textarea className="w-full min-h-[120px] text-xs border border-slate-200 bg-slate-50/20 hover:bg-slate-50/50 focus:bg-white rounded-lg p-2.5 transition-all focus:outline-none focus:border-blue-400 resize-y font-mono"
         placeholder="<iframe ...></iframe> 등 임베드 HTML을 붙여넣으세요 (구글폼·패들릿·유튜브 등)"
         value={html} onChange={(e) => onChange(e.target.value)} onBlur={() => { if (timer.current) clearTimeout(timer.current); if (html !== value) onSave(html); }} />
       <p className="text-[11px] text-slate-400">&lt;script&gt;와 이벤트 핸들러는 보안상 자동 제거됩니다. iframe 임베드는 그대로 표시됩니다.</p>

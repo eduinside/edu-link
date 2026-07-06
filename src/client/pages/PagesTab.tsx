@@ -370,14 +370,6 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
         isLoadingStats={isLoadingStats}
         statsData={statsData}
         togglePublic={togglePublic}
-        onNavigateEditor={(site) => {
-          setStatsDrawerLink(null);
-          navigate(`/dashboard/sites/${site.id}`);
-        }}
-        onConfirmDel={(site) => {
-          setStatsDrawerLink(null);
-          setConfirmDel(site);
-        }}
       />
 
       {/* 삭제 확인 모달 */}
@@ -624,17 +616,13 @@ function StatsDrawer({
   onClose,
   isLoadingStats,
   statsData,
-  togglePublic,
-  onNavigateEditor,
-  onConfirmDel
+  togglePublic
 }: {
   site: SiteItem | null;
   onClose: () => void;
   isLoadingStats: boolean;
   statsData: { daily_clicks: { date: string; clicks: number }[] } | null;
   togglePublic: (s: SiteItem) => Promise<void>;
-  onNavigateEditor: (s: SiteItem) => void;
-  onConfirmDel: (s: SiteItem) => void;
 }) {
   const [togglingPublic, setTogglingPublic] = useState(false);
 
@@ -738,24 +726,7 @@ function StatsDrawer({
 
                 {/* 관리 조작 영역 */}
                 <div className="pt-4 border-t border-slate-100 space-y-2">
-                  <h4 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">페이지 설정/관리</h4>
-                  <Button
-                    className="w-full"
-                    color="primary"
-                    variant="flat"
-                    startContent={<Edit3 className="w-4 h-4" />}
-                    onClick={() => onNavigateEditor(site)}
-                  >
-                    편집기 열기
-                  </Button>
-                  <Button
-                    className="w-full"
-                    variant="flat"
-                    startContent={<ExternalLink className="w-4 h-4" />}
-                    onClick={() => window.open(openUrl, '_blank')}
-                  >
-                    공개 페이지 열기
-                  </Button>
+                  <h4 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">공개 여부 설정</h4>
                   <Button
                     className="w-full"
                     variant="flat"
@@ -765,15 +736,6 @@ function StatsDrawer({
                     disabled={!published}
                   >
                     {!published ? '게시되지 않음 (공개 전환 불가)' : site.is_public ? '비공개로 전환' : '공개로 전환'}
-                  </Button>
-                  <Button
-                    className="w-full"
-                    color="danger"
-                    variant="flat"
-                    startContent={<Trash2 className="w-4 h-4" />}
-                    onClick={() => onConfirmDel(site)}
-                  >
-                    페이지 삭제
                   </Button>
                 </div>
               </div>

@@ -199,6 +199,20 @@ export default function Dashboard() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [keyResultCopied, setKeyResultCopied] = useState(false);
 
+  useEffect(() => {
+    if (successMsg) {
+      const t = setTimeout(() => setSuccessMsg(''), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [successMsg]);
+
+  useEffect(() => {
+    if (error) {
+      const t = setTimeout(() => setError(''), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [error]);
+
   // 최고관리자(admin) 전용 상태
   const [adminDomains, setAdminDomains] = useState<{id: number; domain: string; created_at: string}[]>([]);
   const [adminNotices, setAdminNotices] = useState<Notice[]>([]);
@@ -891,6 +905,7 @@ export default function Dashboard() {
     const shortUrl = `${window.location.protocol}//${window.location.host}/${slug}`;
     navigator.clipboard.writeText(shortUrl);
     setCopiedId(id);
+    setSuccessMsg('단축주소가 복사되었습니다: ' + shortUrl);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -3187,6 +3202,16 @@ export default function Dashboard() {
               </Button>
             </CardContent>
           </Card>
+        </div>
+      )}
+      {/* Floating Toast Notification */}
+      {(successMsg || error) && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none animate-fade-in">
+          <div className={`px-5 py-3 rounded-xl shadow-xl text-xs font-bold text-white text-center max-w-[90%] ${
+            error ? 'bg-rose-600' : 'bg-slate-800'
+          }`}>
+            {error || successMsg}
+          </div>
         </div>
       )}
 
