@@ -142,7 +142,8 @@ function renderSection(type: string, content: any): string {
         const label = escapeHtml(content?.label ?? '');
         const cls = content?.style === 'link' ? 'btn-link' : 'btn';
         const tab = content?.newTab !== false ? ' target="_blank" rel="noopener noreferrer nofollow"' : '';
-        return `<section class="sec sec-link"><a class="${cls}" href="${escapeHtml(href)}"${tab}>${label}</a></section>`;
+        const align = ['center', 'right', 'left'].includes(content?.align) ? content.align : 'left';
+        return `<section class="sec sec-link align-${align}"><a class="${cls}" href="${escapeHtml(href)}"${tab}>${label}</a></section>`;
     }
     if (type === 'image') {
         const url = String(content?.url ?? '');
@@ -158,7 +159,7 @@ function renderSection(type: string, content: any): string {
 // 페이지 트리 → 내비 (드롭다운/아코디언 + 모바일 햄버거). 정적 HTML이라 CSS-only 상호작용.
 function renderNav(pages: Array<any>, siteSlug: string, currentPage: any): string {
     const roots = pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort);
-    const kids = (id: number) => pages.filter(p => p.parent_id === id).sort((a, b) => a.sort - b.sort);
+    const kids = (id: number) => pages.filter(p => p.parent_id != null && Number(p.parent_id) === Number(id)).sort((a, b) => a.sort - b.sort);
     const hasChildren = pages.length > roots.length;
     if (roots.length <= 1 && !hasChildren) return '';
     const currentRootId = currentPage.parent_id == null ? currentPage.id : currentPage.parent_id;
@@ -226,7 +227,7 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
 function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: string, showNavigation: boolean): string {
     if (!showNavigation) return '';
     const roots = pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort);
-    const kids = (id: number) => pages.filter(p => p.parent_id === id).sort((a, b) => a.sort - b.sort);
+    const kids = (id: number) => pages.filter(p => p.parent_id != null && Number(p.parent_id) === Number(id)).sort((a, b) => a.sort - b.sort);
     const flatPages: Array<any> = [];
     for (const r of roots) {
         flatPages.push(r);
@@ -242,7 +243,7 @@ function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: str
     const base = `/${encodeURIComponent(siteSlug)}`;
     const getPageLink = (p: any) => {
         if (p.parent_id == null) return `${base}/${encodeURIComponent(p.slug)}`;
-        const parent = pages.find(parentPage => parentPage.id === p.parent_id);
+        const parent = pages.find(parentPage => Number(parentPage.id) === Number(p.parent_id));
         return parent ? `${base}/${encodeURIComponent(parent.slug)}/${encodeURIComponent(p.slug)}` : `${base}/${encodeURIComponent(p.slug)}`;
     };
     const pageLabel = (p: any) => `${p.icon ? p.icon + ' ' : ''}${p.title}`;
@@ -347,7 +348,7 @@ ${t.googleFontLink}
   .sec-image figcaption { color:var(--c-muted); font-size:.85rem; margin-top:6px; text-align:center; }
   .yt { position:relative; width:100%; padding-top:56.25%; border-radius:12px; overflow:hidden; background:#000; }
   .yt iframe { position:absolute; inset:0; width:100%; height:100%; }
-  footer { text-align:center; color:var(--c-muted); font-size:.8rem; padding:24px; }
+  .site-footer { text-align: center; color: #94A3B8; font-size: 10px; padding: 24px 20px; border-top: 1px solid var(--c-border); margin-top: 64px; opacity: 0.85; }
   .page-nav-container { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; border-t: 1px solid var(--c-border); padding-top: 32px; }
   .page-nav-card { display: flex; align-items: center; gap: 16px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 12px; padding: 16px 20px; text-decoration: none; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
   .page-nav-card:hover { border-color: var(--c-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transform: translateY(-1px); }
@@ -389,6 +390,9 @@ ${t.googleFontLink}
         ${renderPageNavigation(page, pages, siteSlug, t.showNavigation)}
         ${t.showCounter && navSide ? `<div style="display:flex; justify-content:center; margin-top:48px; width:100%;"><div class="site-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div></div>` : ''}
       </main>
+      <footer class="site-footer">
+        최종 게시: ${site.published_at ? site.published_at : '미게시 상태'}
+      </footer>
     </div>
   </div>
 </body>
@@ -441,7 +445,7 @@ function resolveHome(pages: Array<any>, homePageId: number | null): any | null {
 // ── 게시(publish)용: 사이트의 모든 경로를 렌더해 스냅샷 배열 반환 ──
 export async function renderAllSnapshots(c: AnyCtx, siteId: number): Promise<{ siteSlug: string; rev: number; snapshots: Array<{ path: string; html: string }> } | null> {
     const site = await c.env.DB.prepare(
-        `SELECT s.id, s.title, s.theme, s.home_page_id, s.rev, u.base_slug, u.custom_slug, u.click_count AS click_count
+        `SELECT s.id, s.title, s.theme, s.home_page_id, s.rev, s.published_at, u.base_slug, u.custom_slug, u.click_count AS click_count
          FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
     ).bind(siteId).first() as any;
     if (!site) return null;
@@ -512,7 +516,7 @@ export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, seg
 // ── 초안 미리보기(preview): 인증된 소유자용. D1 실시간 렌더, 캐시 없음. theme 오버라이드 지원 ──
 export async function renderDraftResponse(c: AnyCtx, siteId: number, segs: string[], themeOverride?: string): Promise<Response> {
     const site = await c.env.DB.prepare(
-        `SELECT s.id, s.title, s.theme, s.home_page_id, u.base_slug, u.custom_slug, u.click_count AS click_count
+        `SELECT s.id, s.title, s.theme, s.home_page_id, s.published_at, u.base_slug, u.custom_slug, u.click_count AS click_count
          FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
     ).bind(siteId).first() as any;
     if (!site) return htmlResponse(notFoundHtml(), 404);

@@ -50,6 +50,7 @@ export default function SiteEditor() {
 
   const [site, setSite] = useState<SiteDetail | null>(null);
   const [pages, setPages] = useState<PageNode[]>([]);
+  const [activeTheme, setActiveTheme] = useState<any>(null);
   const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,7 @@ export default function SiteEditor() {
       const data = await res.json();
       if (!data.success) { setNotFound(true); setLoading(false); return; }
       setSite(data.site);
+      setActiveTheme(safeParse(data.site.theme));
       setPages(data.pages);
       setDirty((data.site.rev || 0) > (data.site.published_rev || 0));
       const first = (data.site.home_page_id && data.pages.find((p: PageNode) => p.id === data.site.home_page_id))
@@ -359,7 +361,14 @@ export default function SiteEditor() {
       {/* 본문 3패널 */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
         {/* 페이지 트리 + 디자인(하단) */}
-        <aside className="border-r border-slate-200 bg-white flex flex-col min-h-0">
+        <aside 
+          className="border-r border-slate-200 flex flex-col min-h-0 transition-all duration-300"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${
+              (activeTheme || safeParse(site?.theme))?.colors?.primary || '#5B8DEF'
+            } 6%, #FFFFFF)`
+          }}
+        >
           <div className="flex-1 overflow-y-auto p-2.5">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <span className="text-xs font-bold text-slate-500">페이지</span>
@@ -401,15 +410,20 @@ export default function SiteEditor() {
         </aside>
 
         {/* 섹션 편집 */}
-        <main className="overflow-y-auto p-4 bg-slate-50">
+        <main className="overflow-y-auto p-4 bg-white">
           {showDesign ? (
             <DesignPanel
-              theme={safeParse(site.theme)}
+              theme={activeTheme || safeParse(site.theme)}
               onClose={() => setShowDesign(false)}
-              onPreview={(t) => fetchPreviewTheme(t)}
+              onPreview={(t) => {
+                setActiveTheme(t);
+                fetchPreviewTheme(t);
+              }}
               onSave={async (t) => {
-                const ok = await patchSite({ theme: t });
+                const themeStr = typeof t === 'string' ? t : JSON.stringify(t);
+                const ok = await patchSite({ theme: themeStr }, { theme: themeStr } as any);
                 if (ok) {
+                  setActiveTheme(t);
                   showToast('ok', '디자인 저장됨. 게시하면 반영됩니다.');
                 }
               }}

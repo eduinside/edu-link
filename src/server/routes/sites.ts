@@ -146,6 +146,29 @@ export function registerSiteRoutes(api: ApiApp) {
             ).bind(user.id, urlId, cleanTitle).run();
             const siteId = Number(siteRes.meta.last_row_id);
 
+            // 2.1) 기본 홈페이지 추가 (slug='home', title='홈', depth=0, sort=0)
+            const pageRes = await c.env.DB.prepare(
+                `INSERT INTO site_pages (site_id, parent_id, slug, title, depth, sort) VALUES (?, NULL, 'home', '홈', 0, 0)`
+            ).bind(siteId).run();
+            const pageId = Number(pageRes.meta.last_row_id);
+
+            // 2.2) 기본 섹션 추가 (제목1개, 본문1개)
+            const headingContent = JSON.stringify({ text: "새 페이지에 오신 것을 환영합니다!", level: 2, bg: false });
+            const textContent = JSON.stringify({ text: "이곳은 페이지의 홈 화면입니다. 에디터를 통해 새로운 컴포넌트를 추가하거나 레이아웃을 마음껏 꾸며보세요.", format: "markdown" });
+            
+            await c.env.DB.prepare(
+                `INSERT INTO site_sections (page_id, type, content, sort) VALUES (?, 'heading', ?, 0)`
+            ).bind(pageId, headingContent).run();
+
+            await c.env.DB.prepare(
+                `INSERT INTO site_sections (page_id, type, content, sort) VALUES (?, 'text', ?, 1)`
+            ).bind(pageId, textContent).run();
+
+            // 2.3) sites의 home_page_id 업데이트
+            await c.env.DB.prepare(
+                `UPDATE sites SET home_page_id = ? WHERE id = ?`
+            ).bind(pageId, siteId).run();
+
             // 3) 역참조 연결
             await c.env.DB.prepare("UPDATE urls SET site_id = ? WHERE id = ?").bind(siteId, urlId).run();
 
