@@ -981,7 +981,8 @@ export function registerPublishRoutes(api: ApiApp) {
             };
             try { c.executionCtx.waitUntil(kvOps()); } catch { await kvOps(); }
 
-            return c.json({ success: true, published: rendered.snapshots.length, rev: rendered.rev, slug: rendered.siteSlug });
+            const actualPageCount = rendered.snapshots.filter(s => s.path !== '').length;
+            return c.json({ success: true, published: actualPageCount, rev: rendered.rev, slug: rendered.siteSlug });
         } catch (err: any) {
             return c.json({ success: false, error: err.message }, 500);
         }
