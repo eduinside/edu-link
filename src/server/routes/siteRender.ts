@@ -191,7 +191,7 @@ function renderBreadcrumb(page: any, pages: Array<any>, siteSlug: string): strin
     return `<nav class="crumb"><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(parent.title)}</a><span>›</span><b>${escapeHtml(page.title)}</b></nav>`;
 }
 
-function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navPos: 'top' | 'side' | 'right'; headerTitle: string; showTitle: boolean } {
+function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navPos: 'top' | 'side' | 'right'; headerTitle: string; showTitle: boolean; showNavigation: boolean } {
     const colors = theme?.colors && typeof theme.colors === 'object' ? theme.colors : {};
     const map: Record<string, string> = { primary: '--c-primary', bg: '--c-bg', text: '--c-text', muted: '--c-muted', accent: '--c-accent' };
     const hexRe = /^#[0-9A-Fa-f]{3,8}$/;
@@ -206,6 +206,7 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
         try { const u = new URL(font.googleFontUrl); if (u.protocol === 'https:' && u.hostname === 'fonts.googleapis.com') googleFontLink = `<link rel="stylesheet" href="${escapeHtml(u.toString())}">`; } catch { /* ignore */ }
     }
     const header = theme?.header && typeof theme.header === 'object' ? theme.header : {};
+    const footer = theme?.footer && typeof theme.footer === 'object' ? theme.footer : {};
     return {
         vars: overrides.join('; '),
         fontFamily: `'${fam}','Pretendard',-apple-system,sans-serif`,
@@ -213,7 +214,56 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
         navPos: header.navPosition === 'side' ? 'side' : header.navPosition === 'right' ? 'right' : 'top',
         headerTitle: typeof header.title === 'string' && header.title.trim() ? header.title : '',
         showTitle: header.showTitle !== false,
+        showNavigation: footer.showNavigation !== false,
     };
+}
+
+function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: string, showNavigation: boolean): string {
+    if (!showNavigation) return '';
+    const curIdx = pages.findIndex(p => p.id === currentPage.id);
+    if (curIdx === -1) return '';
+    
+    const prev = curIdx > 0 ? pages[curIdx - 1] : null;
+    const next = curIdx < pages.length - 1 ? pages[curIdx + 1] : null;
+    if (!prev && !next) return '';
+
+    const base = `/${encodeURIComponent(siteSlug)}`;
+    const getPageLink = (p: any) => {
+        if (p.parent_id == null) return `${base}/${encodeURIComponent(p.slug)}`;
+        const parent = pages.find(parentPage => parentPage.id === p.parent_id);
+        return parent ? `${base}/${encodeURIComponent(parent.slug)}/${encodeURIComponent(p.slug)}` : `${base}/${encodeURIComponent(p.slug)}`;
+    };
+
+    const prevHtml = prev ? `
+        <a href="${getPageLink(prev)}" class="page-nav-card prev">
+            <div class="page-nav-icon">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+            </div>
+            <div style="flex: 1; text-align: right; min-width: 0;">
+                <span class="page-nav-label">Previous</span>
+                <span class="page-nav-title">${escapeHtml(prev.title)}</span>
+            </div>
+        </a>
+    ` : `<div></div>`;
+
+    const nextHtml = next ? `
+        <a href="${getPageLink(next)}" class="page-nav-card next">
+            <div style="flex: 1; text-align: left; min-width: 0;">
+                <span class="page-nav-label">Next</span>
+                <span class="page-nav-title">${escapeHtml(next.title)}</span>
+            </div>
+            <div class="page-nav-icon">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>
+            </div>
+        </a>
+    ` : `<div></div>`;
+
+    return `
+        <div class="page-nav-container">
+            ${prevHtml}
+            ${nextHtml}
+        </div>
+    `;
 }
 
 function renderPage(site: any, page: any, sections: Array<any>, pages: Array<any>, siteSlug: string): string {
@@ -285,6 +335,14 @@ ${t.googleFontLink}
   .yt { position:relative; width:100%; padding-top:56.25%; border-radius:12px; overflow:hidden; background:#000; }
   .yt iframe { position:absolute; inset:0; width:100%; height:100%; }
   footer { text-align:center; color:var(--c-muted); font-size:.8rem; padding:24px; }
+  .page-nav-container { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; border-t: 1px solid var(--c-border); padding-top: 32px; }
+  .page-nav-card { display: flex; align-items: center; gap: 16px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 12px; padding: 16px 20px; text-decoration: none; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+  .page-nav-card:hover { border-color: var(--c-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05); transform: translateY(-1px); }
+  .page-nav-label { display: block; font-size: 10px; font-weight: 700; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2; margin-bottom: 4px; }
+  .page-nav-title { display: block; font-size: 0.95rem; font-weight: 700; color: var(--c-text); line-height: 1.3; }
+  .page-nav-card:hover .page-nav-title { color: var(--c-primary); }
+  .page-nav-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--c-muted); }
+  .page-nav-card:hover .page-nav-icon { color: var(--c-primary); }
   @media (max-width:640px){
     .layout{display:block;}
     .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
@@ -295,6 +353,7 @@ ${t.googleFontLink}
     .nav-list{flex-direction:column;gap:2px;}
     .nav-caret{display:none;}
     .nav-sub{position:static;display:block;border:none;box-shadow:none;padding:2px 0 4px 14px;min-width:0;background:transparent;}
+    .page-nav-container { grid-template-columns: 1fr; gap: 12px; }
   }
 </style>
 </head>
@@ -308,6 +367,7 @@ ${t.googleFontLink}
       <main>
         ${renderBreadcrumb(page, pages, siteSlug)}
         ${sectionsHtml || '<p style="color:var(--c-muted)">아직 콘텐츠가 없습니다.</p>'}
+        ${renderPageNavigation(page, pages, siteSlug, t.showNavigation)}
       </main>
     </div>
   </div>

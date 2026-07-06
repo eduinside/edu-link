@@ -368,14 +368,14 @@ export default function SiteEditor() {
             {rootPages.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">페이지를 추가하세요.</p>}
             {rootPages.map((root, ri) => (
               <div key={root.id}>
-                <TreeRow page={root} isHome={site.home_page_id === root.id} active={selectedPageId === root.id}
+                <TreeRow page={root} isHome={site.home_page_id === root.id} active={!showDesign && selectedPageId === root.id}
                   canChild={childrenOf(root.id).length < 99}
                   onSelect={() => selectPage(root.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: root.parent_id, page: root })}
                   onDelete={() => setConfirmDel({ kind: 'page', id: root.id, label: root.title })} onHome={() => setHome(root)}
                   onAddChild={() => setPageModal({ mode: 'create', parentId: root.id })}
                   onUp={ri > 0 ? () => movePage(root, -1) : undefined} onDown={ri < rootPages.length - 1 ? () => movePage(root, 1) : undefined} />
                 {childrenOf(root.id).map((ch, ci, arr) => (
-                  <TreeRow key={ch.id} page={ch} child isHome={site.home_page_id === ch.id} active={selectedPageId === ch.id}
+                  <TreeRow key={ch.id} page={ch} child isHome={site.home_page_id === ch.id} active={!showDesign && selectedPageId === ch.id}
                     onSelect={() => selectPage(ch.id)} onEdit={() => setPageModal({ mode: 'edit', parentId: ch.parent_id, page: ch })}
                     onDelete={() => setConfirmDel({ kind: 'page', id: ch.id, label: ch.title })} onHome={() => setHome(ch)}
                     onUp={ci > 0 ? () => movePage(ch, -1) : undefined} onDown={ci < arr.length - 1 ? () => movePage(ch, 1) : undefined} />
@@ -384,7 +384,19 @@ export default function SiteEditor() {
             ))}
           </div>
           <div className="border-t border-slate-100 p-2.5">
-            <Button size="sm" variant={showDesign ? 'solid' : 'flat'} color="secondary" className="w-full" onClick={() => setShowDesign(true)} startContent={<Palette className="w-3.5 h-3.5" />}>디자인 설정</Button>
+            <Button 
+              size="sm" 
+              variant={showDesign ? 'solid' : 'bordered'} 
+              color={showDesign ? 'secondary' : 'default'} 
+              className={showDesign 
+                ? 'w-full font-bold shadow-md shadow-secondary/20 bg-purple-600 text-white' 
+                : 'w-full border-purple-200 text-purple-600 hover:bg-purple-50 font-bold'
+              } 
+              onClick={() => setShowDesign(true)} 
+              startContent={<Palette className="w-3.5 h-3.5" />}
+            >
+              디자인 설정
+            </Button>
           </div>
         </aside>
 
@@ -808,6 +820,15 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
   const [fontFamily, setFontFamily] = useState<string>(theme?.font?.family || 'Pretendard');
   const [googleFontUrl, setGoogleFontUrl] = useState<string>(theme?.font?.googleFontUrl || '');
   const [showFontUrl, setShowFontUrl] = useState(false);
+  const [showNavigation, setShowNavigation] = useState<boolean>(theme?.footer?.showNavigation !== false);
+
+  const [customFonts, setCustomFonts] = useState<FontPreset[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('edulink_custom_fonts') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const pickFont = (f: { family: string; url: string }) => { setFontFamily(f.family); setGoogleFontUrl(f.url); };
 
@@ -815,8 +836,28 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
     colors: over?.colors ?? colors,
     font: { family: fontFamily, googleFontUrl: googleFontUrl.trim() || null },
     header: { title: headerTitle.trim(), showTitle, navPosition },
+    footer: { showNavigation },
   });
-  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl]);
+  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl, showNavigation]);
+
+  const handleSave = () => {
+    if (fontFamily && googleFontUrl.trim()) {
+      const isPreset = FONT_PRESET_GROUPS.some(group => 
+        group.fonts.some(f => f.family === fontFamily)
+      ) || fontFamily === DEFAULT_FONT.family;
+      
+      if (!isPreset) {
+        const newFont = { label: fontFamily, family: fontFamily, url: googleFontUrl.trim() };
+        let updated = [...customFonts];
+        if (!updated.some(f => f.family === fontFamily)) {
+          updated.push(newFont);
+          setCustomFonts(updated);
+          localStorage.setItem('edulink_custom_fonts', JSON.stringify(updated));
+        }
+      }
+    }
+    onSave(build());
+  };
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-6 max-w-2xl mx-auto animate-fade-in">
@@ -881,9 +922,18 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-        <input type="checkbox" id="showTitleCheckbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-        <label htmlFor="showTitleCheckbox" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">헤더에 제목 표시</label>
+      <div className="space-y-3 pt-2">
+        <div className="text-xs font-bold text-slate-500">레이아웃 및 기능 설정</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <span>헤더에 제목 표시</span>
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" checked={showNavigation} onChange={(e) => setShowNavigation(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <span>페이지 하단 네비게이션 표시 (이전/다음)</span>
+          </label>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -894,6 +944,21 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
             {DEFAULT_FONT.label}
           </button>
         </div>
+
+        {customFonts.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">추가한 글꼴 (로컬 저장)</div>
+            <div className="flex flex-wrap gap-1.5">
+              {customFonts.map(f => (
+                <button key={f.family} onClick={() => pickFont(f)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-all ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-bold shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-white text-slate-600'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
           {FONT_PRESET_GROUPS.map(group => (
             <div key={group.category} className="space-y-1.5">
@@ -934,7 +999,7 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
 
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 mt-6">
         <Button size="sm" variant="flat" onClick={onClose} className="font-bold">닫기</Button>
-        <Button size="sm" color="secondary" onClick={() => onSave(build())} startContent={<Check className="w-4 h-4" />} className="font-bold shadow-md shadow-secondary/15">디자인 저장</Button>
+        <Button size="sm" color="secondary" onClick={handleSave} startContent={<Check className="w-4 h-4" />} className="font-bold shadow-md shadow-secondary/15">디자인 저장</Button>
       </div>
     </div>
   );
