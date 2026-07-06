@@ -1,11 +1,11 @@
 // src/client/pages/PagesTab.tsx
 // 에듀링크 페이지: 대시보드 목록(요약 카드 + 표 + 액션 드로워). 편집은 /dashboard/sites/:id 로.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, CardContent, Input } from '@heroui/react';
+import { Button, Card, CardContent, Input, Tooltip, Chip } from '@heroui/react';
 import {
   LayoutTemplate, Plus, Copy, ExternalLink, Trash2, Edit3, Eye, EyeOff,
-  QrCode, BarChart3, FileStack, X, MoreHorizontal, Download,
+  QrCode, BarChart3, FileStack, X, Download, Check, TrendingUp,
 } from 'lucide-react';
 
 interface SiteItem {
@@ -23,6 +23,8 @@ interface SiteItem {
   slug: string;
   base_slug: string;
   custom_slug: string | null;
+  url_id?: number;
+  is_active?: number;
 }
 
 interface Props {
@@ -34,11 +36,18 @@ interface Props {
 function publicSlug(s: SiteItem): string {
   return s.custom_slug || s.base_slug || s.slug;
 }
-function fmtDate(s?: string | null): string {
-  if (!s) return '—';
-  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+
+function fmtDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  // DB는 UTC 저장, Z를 붙여 명시적으로 UTC 파싱 후 KST 표시
+  const utc = dateStr.replace(' ', 'T') + (dateStr.includes('Z') || dateStr.includes('+') ? '' : 'Z');
+  const d = new Date(utc);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\.$/, '');
+  return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
 }
 
 export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props) {
@@ -49,7 +58,13 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
   const [newSlug, setNewSlug] = useState('');
   const [creating, setCreating] = useState(false);
   const [confirmDel, setConfirmDel] = useState<SiteItem | null>(null);
-  const [drawer, setDrawer] = useState<SiteItem | null>(null);
+
+  // States for copy action, QR drawer, and Stats drawer
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [qrModalLink, setQrModalLink] = useState<SiteItem | null>(null);
+  const [statsDrawerLink, setStatsDrawerLink] = useState<SiteItem | null>(null);
+  const [statsData, setStatsData] = useState<{ daily_clicks: { date: string; clicks: number }[] } | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const fetchSites = async () => {
     setLoading(true);
@@ -81,7 +96,11 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sites/${s.id}`, { method: 'DELETE', headers: getHeaders() });
       const data = await res.json();
-      if (data.success) { setSuccessMsg('삭제되었습니다.'); setDrawer(null); fetchSites(); }
+      if (data.success) {
+        setSuccessMsg('삭제되었습니다.');
+        setStatsDrawerLink(null);
+        fetchSites();
+      }
       else setError(data.error || '삭제 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
     finally { setConfirmDel(null); }
@@ -91,14 +110,36 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
     try {
       const res = await fetch(`/api/sites/${s.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ is_public: s.is_public ? 0 : 1 }) });
       const data = await res.json();
-      if (data.success) { fetchSites(); setDrawer(d => d && d.id === s.id ? { ...d, is_public: d.is_public ? 0 : 1 } : d); }
+      if (data.success) {
+        fetchSites();
+        setStatsDrawerLink(prev => prev && prev.id === s.id ? { ...prev, is_public: prev.is_public ? 0 : 1 } : prev);
+      }
       else setError(data.error || '변경 실패');
     } catch (e: any) { setError('네트워크 오류: ' + e.message); }
   };
 
-  const copyLink = (slug: string) => {
+  const openStats = async (site: SiteItem) => {
+    if (!site.url_id) return;
+    setStatsDrawerLink(site);
+    setStatsData(null);
+    setIsLoadingStats(true);
+    try {
+      const res = await fetch(`/api/links/${site.url_id}/stats`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setStatsData({ daily_clicks: data.daily_clicks });
+      }
+    } catch { /* ignore */ }
+    setIsLoadingStats(false);
+  };
+
+  const copyLink = (id: number, slug: string) => {
     const url = `${window.location.origin}/${slug}`;
-    navigator.clipboard.writeText(url).then(() => setSuccessMsg('주소가 복사되었습니다: ' + url));
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(id);
+      setSuccessMsg('주소가 복사되었습니다: ' + url);
+      setTimeout(() => setCopiedId(null), 1800);
+    });
   };
 
   const totalClicks = sites.reduce((sum, s) => sum + (s.click_count || 0), 0);
@@ -143,43 +184,170 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
             <p className="text-sm text-slate-400 text-center py-10">아직 만든 페이지가 없습니다. 위에서 새로 만들어보세요.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="text-[11px] text-slate-400 border-b border-slate-100">
-                    <th className="text-left font-semibold px-4 py-2.5">제목 / 주소</th>
-                    <th className="text-center font-semibold px-2 py-2.5 whitespace-nowrap">생성일</th>
-                    <th className="text-center font-semibold px-2 py-2.5 whitespace-nowrap">최종수정</th>
-                    <th className="text-center font-semibold px-2 py-2.5 whitespace-nowrap">클릭</th>
-                    <th className="text-center font-semibold px-2 py-2.5">상태</th>
-                    <th className="text-right font-semibold px-4 py-2.5">작업</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
+                    <th className="text-left p-3 pl-5 whitespace-nowrap">슬러그</th>
+                    <th className="text-left p-3 whitespace-nowrap">제목 / 원본 주소</th>
+                    <th className="text-left p-3 whitespace-nowrap">클릭</th>
+                    <th className="text-left p-3 whitespace-nowrap">생성일</th>
+                    <th className="text-left p-3 whitespace-nowrap">상태</th>
+                    <th className="text-right p-3 pr-4 whitespace-nowrap">작업</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {sites.map(s => {
                     const slug = publicSlug(s);
+                    const openUrl = `${window.location.protocol}//${window.location.host}/${slug}`;
+                    const isCopied = copiedId === s.url_id;
                     const published = (s.published_rev ?? 0) > 0;
                     return (
-                      <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-800 truncate max-w-[240px]">{s.title}</div>
-                          <button className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1" onClick={() => window.open(`/${slug}`, '_blank')}>
-                            /{slug} <ExternalLink className="w-3 h-3" />
-                          </button>
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors group">
+                        {/* 슬러그 */}
+                        <td className="p-3 pl-5 align-middle">
+                          <div className="font-mono font-bold text-slate-800 text-[11px]">
+                            /{s.base_slug || s.slug}
+                          </div>
+                          {s.custom_slug && (
+                            <div className="font-mono text-[10px] text-blue-500 mt-0.5">
+                              /{s.custom_slug}
+                            </div>
+                          )}
                         </td>
-                        <td className="text-center px-2 py-3 text-slate-500 text-xs whitespace-nowrap">{fmtDate(s.created_at)}</td>
-                        <td className="text-center px-2 py-3 text-slate-500 text-xs whitespace-nowrap">{fmtDate(s.updated_at)}</td>
-                        <td className="text-center px-2 py-3"><span className="font-extrabold text-slate-800">{s.click_count ?? 0}</span></td>
-                        <td className="text-center px-2 py-3">
-                          {!published
-                            ? <span className="text-[11px] font-bold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">미게시</span>
-                            : s.is_public
-                              ? <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5">게시됨</span>
-                              : <span className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">비공개</span>}
+
+                        {/* 제목 / 원본 주소 */}
+                        <td className="p-3 align-middle max-w-xs">
+                          {s.title ? (
+                            <div className="font-semibold text-slate-700 truncate max-w-[240px]" title={s.title}>
+                              {s.title}
+                            </div>
+                          ) : (
+                            <div className="text-slate-300 italic text-[10px]">제목 없음</div>
+                          )}
+                          <a
+                            href={openUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-[10px] text-slate-400 truncate max-w-[240px] mt-0.5 block hover:text-blue-500 hover:underline"
+                            title={openUrl}
+                          >
+                            {openUrl}
+                          </a>
                         </td>
-                        <td className="px-4 py-3">
+
+                        {/* 클릭 수 */}
+                        <td className="p-3 align-middle whitespace-nowrap">
+                          <span className="font-extrabold text-slate-800">{s.click_count ?? 0}</span>
+                          <span className="text-slate-400 ml-0.5">회</span>
+                        </td>
+
+                        {/* 생성일 */}
+                        <td className="p-3 align-middle whitespace-nowrap text-slate-400">
+                          {fmtDate(s.created_at)}
+                        </td>
+
+                        {/* 상태 */}
+                        <td className="p-3 align-middle">
+                          <div className="flex flex-col gap-1">
+                            <Chip
+                              size="sm"
+                              color={s.is_active === 1 ? 'success' : 'default'}
+                              variant="flat"
+                              className="px-1.5 h-4 text-[9px] font-bold"
+                            >
+                              {s.is_active === 1 ? '활성' : '비활성'}
+                            </Chip>
+                            <Chip
+                              size="sm"
+                              color={!published ? 'warning' : s.is_public === 1 ? 'secondary' : 'default'}
+                              variant="flat"
+                              className="px-1.5 h-4 text-[9px] font-bold"
+                            >
+                              {!published ? '미게시' : s.is_public === 1 ? '공개' : '비공개'}
+                            </Chip>
+                          </div>
+                        </td>
+
+                        {/* 작업 버튼 */}
+                        <td className="p-3 pr-4 align-middle">
                           <div className="flex items-center justify-end gap-1">
-                            <Button size="sm" color="primary" variant="flat" onClick={() => navigate(`/dashboard/sites/${s.id}`)} startContent={<Edit3 className="w-3.5 h-3.5" />}>편집</Button>
-                            <button className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100" title="관리(QR·통계)" onClick={() => setDrawer(s)}><MoreHorizontal className="w-4 h-4" /></button>
+                            <Tooltip content={isCopied ? '복사됨!' : '페이지 주소 클립보드에 복사'} delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color={isCopied ? 'success' : 'default'}
+                                isIconOnly
+                                onClick={() => copyLink(s.url_id ?? s.id, slug)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="새 탭에서 페이지 열기" delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="default"
+                                isIconOnly
+                                onClick={() => window.open(openUrl, '_blank')}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="QR 코드 보기 및 PNG 저장" delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="secondary"
+                                isIconOnly
+                                onClick={() => setQrModalLink(s)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                <QrCode className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="접속 통계 및 페이지 관리" delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="primary"
+                                isIconOnly
+                                onClick={() => openStats(s)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                <TrendingUp className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="페이지 디자인 편집기 열기" delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="default"
+                                isIconOnly
+                                onClick={() => navigate(`/dashboard/sites/${s.id}`)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="페이지 영구 삭제" delay={200}>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="danger"
+                                isIconOnly
+                                onClick={() => setConfirmDel(s)}
+                                className="rounded-lg w-7 h-7 min-w-0 p-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
                           </div>
                         </td>
                       </tr>
@@ -192,59 +360,25 @@ export default function PagesTab({ getHeaders, setSuccessMsg, setError }: Props)
         </CardContent>
       </Card>
 
-      {/* 액션 드로워 (QR · 통계 · 관리) */}
-      <div className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${drawer ? 'visible' : 'invisible pointer-events-none'}`}>
-        <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity ${drawer ? 'opacity-100' : 'opacity-0'}`} onClick={() => setDrawer(null)} />
-        <div className="absolute inset-y-0 right-0 flex max-w-full">
-          <div className={`w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 ${drawer ? 'translate-x-0' : 'translate-x-full'}`}>
-            {drawer && (() => {
-              const slug = publicSlug(drawer);
-              const published = (drawer.published_rev ?? 0) > 0;
-              return (
-                <>
-                  <div className="flex items-start justify-between p-5 border-b border-slate-100">
-                    <div className="min-w-0">
-                      <h3 className="font-extrabold text-slate-800 truncate">{drawer.title}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">/{slug}</p>
-                    </div>
-                    <button className="p-1.5 text-slate-400 hover:text-slate-700" onClick={() => setDrawer(null)}><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {/* QR */}
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="bg-white border border-slate-200 rounded-xl p-3">
-                        <img src={`/qr/${encodeURIComponent(slug)}`} alt="QR" className="w-40 h-40" />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="flat" startContent={<Download className="w-3.5 h-3.5" />} onClick={() => window.open(`/qr/${encodeURIComponent(slug)}`, '_blank')}>QR 저장</Button>
-                        <Button size="sm" variant="flat" startContent={<Copy className="w-3.5 h-3.5" />} onClick={() => copyLink(slug)}>주소 복사</Button>
-                      </div>
-                    </div>
-                    {/* 통계 */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <Stat label="누적 클릭" value={`${drawer.click_count ?? 0}회`} big />
-                      <Stat label="페이지 수" value={`${drawer.page_count ?? 0}개`} big />
-                      <Stat label="생성일" value={fmtDate(drawer.created_at)} />
-                      <Stat label="최종 수정" value={fmtDate(drawer.updated_at)} />
-                      <Stat label="상태" value={!published ? '미게시' : drawer.is_public ? '게시됨' : '비공개'} />
-                      <Stat label="최근 게시" value={fmtDate(drawer.published_at)} />
-                    </div>
-                    {/* 관리 */}
-                    <div className="space-y-2 pt-1">
-                      <Button className="w-full" color="primary" variant="flat" startContent={<Edit3 className="w-4 h-4" />} onClick={() => navigate(`/dashboard/sites/${drawer.id}`)}>편집기 열기</Button>
-                      <Button className="w-full" variant="flat" startContent={<ExternalLink className="w-4 h-4" />} onClick={() => window.open(`/${slug}`, '_blank')}>공개 페이지 열기</Button>
-                      <Button className="w-full" variant="flat" startContent={drawer.is_public ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />} onClick={() => togglePublic(drawer)}>
-                        {drawer.is_public ? '비공개로 전환' : '공개로 전환'}
-                      </Button>
-                      <Button className="w-full" color="danger" variant="flat" startContent={<Trash2 className="w-4 h-4" />} onClick={() => setConfirmDel(drawer)}>삭제</Button>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      </div>
+      {/* QR 드로어 */}
+      <QrDrawer site={qrModalLink} onClose={() => setQrModalLink(null)} />
+
+      {/* 통계 및 관리 드로어 */}
+      <StatsDrawer
+        site={statsDrawerLink}
+        onClose={() => setStatsDrawerLink(null)}
+        isLoadingStats={isLoadingStats}
+        statsData={statsData}
+        togglePublic={togglePublic}
+        onNavigateEditor={(site) => {
+          setStatsDrawerLink(null);
+          navigate(`/dashboard/sites/${site.id}`);
+        }}
+        onConfirmDel={(site) => {
+          setStatsDrawerLink(null);
+          setConfirmDel(site);
+        }}
+      />
 
       {/* 삭제 확인 모달 */}
       {confirmDel && (
@@ -276,11 +410,377 @@ function SummaryCard({ icon, tone, value, label }: { icon: React.ReactNode; tone
   );
 }
 
-function Stat({ label, value, big }: { label: string; value: string; big?: boolean }) {
+// SVG 클릭 통계 차트 컴포넌트
+function StatsBarChart({ dailyClicks }: { dailyClicks: { date: string; clicks: number }[] }) {
+  const DAYS = 30;
+  const today = new Date();
+
+  const dates = Array.from({ length: DAYS }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (DAYS - 1 - i));
+    return d.toISOString().split('T')[0];
+  });
+
+  const clickMap: Record<string, number> = {};
+  dailyClicks.forEach(({ date, clicks }) => { clickMap[date] = clicks; });
+
+  const data = dates.map(date => ({ date, clicks: clickMap[date] || 0 }));
+  const maxClicks = Math.max(...data.map(d => d.clicks), 1);
+  const totalClicks = data.reduce((s, d) => s + d.clicks, 0);
+
+  if (totalClicks === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-300 border border-dashed border-slate-200 rounded-xl">
+        <BarChart3 className="w-8 h-8" />
+        <p className="text-xs text-slate-400">최근 30일 간 접속 기록이 없습니다.</p>
+      </div>
+    );
+  }
+
+  const W = 340;
+  const BAR_AREA_H = 90;
+  const LABEL_OFFSET = 14;
+  const H = BAR_AREA_H + LABEL_OFFSET + 6;
+  const barW = Math.floor((W - 8) / DAYS) - 1;
+  const step = (W - 8) / DAYS;
+
   return (
-    <div className="bg-slate-50 rounded-xl px-3 py-2.5">
-      <p className="text-[11px] text-slate-400 font-bold mb-0.5">{label}</p>
-      <p className={`text-slate-800 font-extrabold ${big ? 'text-lg' : 'text-sm'}`}>{value}</p>
+    <div className="space-y-3">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+        <line x1={0} y1={4} x2={W} y2={4} stroke="#e2e8f0" strokeWidth={0.5} strokeDasharray="2 2" />
+        <text x={2} y={3} fontSize={6.5} fill="#94a3b8" dominantBaseline="auto">{maxClicks}회</text>
+
+        {data.map((d, i) => {
+          const barH = Math.max((d.clicks / maxClicks) * BAR_AREA_H, d.clicks > 0 ? 3 : 0.5);
+          const x = 4 + i * step;
+          const y = BAR_AREA_H - barH + 4;
+          const showLabel = i === 0 || i === DAYS - 1 || (i + 1) % 6 === 0;
+          const dateObj = new Date(d.date + 'T00:00:00');
+          const label = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+
+          return (
+            <g key={d.date}>
+              <rect
+                x={x}
+                y={y}
+                width={Math.max(barW, 2)}
+                height={barH}
+                rx={1.5}
+                fill={d.clicks > 0 ? '#3b82f6' : '#e2e8f0'}
+                opacity={d.clicks > 0 ? 0.82 : 0.6}
+              />
+              {showLabel && (
+                <text
+                  x={x + barW / 2}
+                  y={BAR_AREA_H + LABEL_OFFSET + 2}
+                  textAnchor="middle"
+                  fontSize={6.5}
+                  fill="#94a3b8"
+                >
+                  {label}
+                </text>
+              )}
+              {d.clicks > 0 && (
+                <title>{d.date}: {d.clicks}회</title>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <p className="text-[10px] text-slate-400 text-center">
+        기간 내 총 <strong className="text-slate-700 font-extrabold">{totalClicks}회</strong> 접속
+      </p>
+    </div>
+  );
+}
+
+// QR 드로어 컴포넌트
+function QrDrawer({ site, onClose }: { site: SiteItem | null; onClose: () => void }) {
+  const qrSlug = site ? (site.base_slug || site.slug) : '';
+  const shortUrl = site ? `${window.location.protocol}//${window.location.host}/${qrSlug}` : '';
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shortUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  };
+
+  const handleDownload = async () => {
+    if (downloading || !site) return;
+    setDownloading(true);
+    try {
+      const img = imgRef.current;
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      const target = imgRef.current!;
+      const canvas = document.createElement('canvas');
+      canvas.width = target.naturalWidth || 600;
+      canvas.height = target.naturalHeight || 600;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(target, 0, 0);
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${qrSlug}-qr.png`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
+      }
+    } finally {
+      setTimeout(() => setDownloading(false), 600);
+    }
+  };
+
+  return (
+    <div className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${site ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+      <div
+        className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${site ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+        <div className={`w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 transform ${site ? 'translate-x-0' : 'translate-x-full'}`}>
+          {site && (
+            <div className="h-full flex flex-col">
+              {/* 헤더 */}
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                <div className="space-y-0.5 min-w-0">
+                  <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    QR 코드
+                  </h3>
+                  <p className="text-[10px] text-blue-600 font-bold font-mono truncate">
+                    dgedu.link/{qrSlug}
+                    {site.custom_slug && <span className="text-slate-400 font-normal"> · /{site.custom_slug}</span>}
+                  </p>
+                </div>
+                <Tooltip content="QR 패널 닫기" delay={300}>
+                  <Button
+                    size="sm" variant="light" isIconOnly
+                    onClick={onClose}
+                    className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                  >✕</Button>
+                </Tooltip>
+              </div>
+
+              {/* 컨텐츠 */}
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-6">
+                <div className="bg-white border-2 border-slate-100 rounded-xl p-4 shadow-sm">
+                  <img
+                    ref={imgRef}
+                    src={`/qr/${encodeURIComponent(qrSlug)}`}
+                    alt="QR Code"
+                    className="w-48 h-48 object-contain"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+                <div className="flex gap-2 w-full max-w-xs">
+                  <Button
+                    className="flex-1"
+                    size="sm"
+                    variant="flat"
+                    color="default"
+                    startContent={<Download className="w-3.5 h-3.5" />}
+                    onClick={handleDownload}
+                    isLoading={downloading}
+                  >
+                    PNG 저장
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    size="sm"
+                    variant="flat"
+                    color={copied ? 'success' : 'default'}
+                    startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    onClick={handleCopy}
+                  >
+                    {copied ? '복사됨!' : '주소 복사'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 통계 및 관리 드로어 컴포넌트
+function StatsDrawer({
+  site,
+  onClose,
+  isLoadingStats,
+  statsData,
+  togglePublic,
+  onNavigateEditor,
+  onConfirmDel
+}: {
+  site: SiteItem | null;
+  onClose: () => void;
+  isLoadingStats: boolean;
+  statsData: { daily_clicks: { date: string; clicks: number }[] } | null;
+  togglePublic: (s: SiteItem) => Promise<void>;
+  onNavigateEditor: (s: SiteItem) => void;
+  onConfirmDel: (s: SiteItem) => void;
+}) {
+  const [togglingPublic, setTogglingPublic] = useState(false);
+
+  const handleTogglePublic = async () => {
+    if (!site) return;
+    setTogglingPublic(true);
+    try {
+      await togglePublic(site);
+    } finally {
+      setTogglingPublic(false);
+    }
+  };
+
+  const slug = site ? (site.custom_slug || site.base_slug || site.slug) : '';
+  const openUrl = site ? `${window.location.protocol}//${window.location.host}/${slug}` : '';
+  const published = site ? (site.published_rev ?? 0) > 0 : false;
+
+  return (
+    <div className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${site ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+      <div
+        className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${site ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+        <div className={`w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 transform ${site ? 'translate-x-0' : 'translate-x-full'}`}>
+          {site && (
+            <div className="h-full flex flex-col">
+              {/* 헤더 */}
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                <div className="space-y-0.5 min-w-0">
+                  <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    접속 통계 및 관리
+                  </h3>
+                  <p className="text-[10px] text-blue-600 font-bold font-mono truncate">
+                    dgedu.link/{site.base_slug || site.slug}
+                    {site.custom_slug && <span className="text-slate-400 font-normal"> · /{site.custom_slug}</span>}
+                  </p>
+                </div>
+                <Tooltip content="패널 닫기" delay={300}>
+                  <Button
+                    size="sm" variant="light" isIconOnly
+                    onClick={onClose}
+                    className="rounded-lg w-7 h-7 min-w-0 p-0 text-slate-400 flex-shrink-0 ml-2"
+                  >✕</Button>
+                </Tooltip>
+              </div>
+
+              {/* 컨텐츠 */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* 기본 정보 */}
+                <div className="bg-slate-50 rounded-xl p-4 space-y-3 text-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-slate-400 font-bold flex-shrink-0">페이지 제목</span>
+                    <span className="text-slate-800 font-semibold text-right break-words max-w-[240px]">
+                      {site.title || <span className="text-slate-300 italic font-normal">없음</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-slate-400 font-bold flex-shrink-0">연결 주소</span>
+                    <a
+                      href={openUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 font-mono text-[10px] text-right break-all hover:underline max-w-[240px]"
+                    >
+                      {openUrl}
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 font-bold">생성일시</span>
+                    <span className="text-slate-600 font-semibold">{fmtDate(site.created_at)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400 font-bold">하위 페이지 수</span>
+                    <span className="text-slate-600 font-semibold">{site.page_count ?? 0}개</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                    <span className="text-slate-500 font-bold flex items-center gap-1.5">
+                      <BarChart3 className="w-3.5 h-3.5 text-blue-500" />
+                      누적 클릭
+                    </span>
+                    <span className="text-slate-800 font-extrabold text-lg">
+                      {site.click_count ?? 0}
+                      <span className="text-xs font-normal text-slate-400 ml-1">회</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 일별 접속 그래프 */}
+                <div className="space-y-3">
+                  <h4 className="font-bold text-sm text-slate-800">최근 30일 일별 접속 현황</h4>
+                  {isLoadingStats ? (
+                    <div className="flex items-center justify-center py-14">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <StatsBarChart dailyClicks={statsData?.daily_clicks || []} />
+                  )}
+                </div>
+
+                {/* 관리 조작 영역 */}
+                <div className="pt-4 border-t border-slate-100 space-y-2">
+                  <h4 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">페이지 설정/관리</h4>
+                  <Button
+                    className="w-full"
+                    color="primary"
+                    variant="flat"
+                    startContent={<Edit3 className="w-4 h-4" />}
+                    onClick={() => onNavigateEditor(site)}
+                  >
+                    편집기 열기
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="flat"
+                    startContent={<ExternalLink className="w-4 h-4" />}
+                    onClick={() => window.open(openUrl, '_blank')}
+                  >
+                    공개 페이지 열기
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="flat"
+                    isLoading={togglingPublic}
+                    startContent={site.is_public ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    onClick={handleTogglePublic}
+                    disabled={!published}
+                  >
+                    {!published ? '게시되지 않음 (공개 전환 불가)' : site.is_public ? '비공개로 전환' : '공개로 전환'}
+                  </Button>
+                  <Button
+                    className="w-full"
+                    color="danger"
+                    variant="flat"
+                    startContent={<Trash2 className="w-4 h-4" />}
+                    onClick={() => onConfirmDel(site)}
+                  >
+                    페이지 삭제
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
