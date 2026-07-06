@@ -179,7 +179,7 @@ export function registerSiteRoutes(api: ApiApp) {
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
             const { results: pages } = await c.env.DB.prepare(
-                `SELECT id, parent_id, slug, title, depth, sort
+                `SELECT id, parent_id, slug, title, depth, sort, icon
                  FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id`
             ).bind(id).all();
 
@@ -338,7 +338,7 @@ async function ownedSite(c: any, siteId: number | string, userId: number) {
 // 소유 페이지 검증 (site 소유권까지 조인)
 async function ownedPage(c: any, pageId: number | string, userId: number) {
     return await c.env.DB.prepare(
-        `SELECT p.id, p.site_id, p.parent_id, p.slug, p.title, p.depth, p.sort
+        `SELECT p.id, p.site_id, p.parent_id, p.slug, p.title, p.depth, p.sort, p.icon
          FROM site_pages p JOIN sites s ON s.id = p.site_id
          WHERE p.id = ? AND s.user_id = ?`
     ).bind(pageId, userId).first();
@@ -519,9 +519,11 @@ export function registerPageRoutes(api: ApiApp) {
             const newTitle = body.title !== undefined ? String(body.title).trim() : page.title;
             if (!newTitle) return c.json({ success: false, error: '페이지 제목이 비어 있습니다.' }, 400);
 
+            const newIcon = body.icon !== undefined ? (body.icon === null ? null : String(body.icon).slice(0, 10)) : page.icon;
+
             await c.env.DB.prepare(
-                "UPDATE site_pages SET title = ?, slug = ?, parent_id = ?, depth = ?, updated_at = datetime('now') WHERE id = ?"
-            ).bind(newTitle, newSlug, newParentId, newDepth, id).run();
+                "UPDATE site_pages SET title = ?, slug = ?, parent_id = ?, depth = ?, icon = ?, updated_at = datetime('now') WHERE id = ?"
+            ).bind(newTitle, newSlug, newParentId, newDepth, newIcon, id).run();
             await bumpRev(c, page.site_id);
 
             return c.json({ success: true });
@@ -694,7 +696,8 @@ function normalizeSectionContent(type: string, raw: any): any {
         if (url && !isHttpUrl(url)) throw new Error('버튼 주소는 http/https로 시작해야 합니다.');
         const style = raw?.style === 'link' ? 'link' : 'button';
         const newTab = raw?.newTab !== false;
-        return { label, url, style, newTab };
+        const align = ['center', 'right', 'left'].includes(raw?.align) ? raw.align : 'left';
+        return { label, url, style, newTab, align };
     }
     if (type === 'image') {
         // 자체 R2 프록시 경로(/media/...)만 허용 — 외부 핫링크 차단

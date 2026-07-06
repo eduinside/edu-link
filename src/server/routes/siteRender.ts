@@ -168,14 +168,16 @@ function renderNav(pages: Array<any>, siteSlug: string, currentPage: any): strin
     const childLink = (root: any, c: any) => `${base}/${encodeURIComponent(root.slug)}/${encodeURIComponent(c.slug)}`;
     const aClass = (p: any) => p.id === currentPage.id ? ' class="active"' : '';
 
+    const pageLabel = (p: any) => `${p.icon ? p.icon + ' ' : ''}${p.title}`;
+
     const items = roots.map(root => {
         const ch = kids(root.id);
         const rootActive = root.id === currentRootId;
         const sub = ch.length
-            ? `<ul class="nav-sub">${ch.map(c => `<li><a href="${childLink(root, c)}"${aClass(c)}>${escapeHtml(c.title)}</a></li>`).join('')}</ul>`
+            ? `<ul class="nav-sub">${ch.map(c => `<li><a href="${childLink(root, c)}"${aClass(c)}>${escapeHtml(pageLabel(c))}</a></li>`).join('')}</ul>`
             : '';
         const caret = ch.length ? '<span class="nav-caret">▾</span>' : '';
-        return `<li class="nav-li${rootActive ? ' active' : ''}${ch.length ? ' has-sub' : ''}"><a href="${rootLink(root)}"${aClass(root)}>${escapeHtml(root.title)}${caret}</a>${sub}</li>`;
+        return `<li class="nav-li${rootActive ? ' active' : ''}${ch.length ? ' has-sub' : ''}"><a href="${rootLink(root)}"${aClass(root)}>${escapeHtml(pageLabel(root))}${caret}</a>${sub}</li>`;
     }).join('');
 
     return `<input type="checkbox" id="nav-toggle" class="nav-toggle-cb"><label for="nav-toggle" class="nav-toggle" aria-label="메뉴 열기">☰</label><nav class="site-nav"><ul class="nav-list">${items}</ul></nav>`;
@@ -187,8 +189,9 @@ function renderBreadcrumb(page: any, pages: Array<any>, siteSlug: string): strin
     const parent = pages.find(p => p.id === page.parent_id);
     if (!parent) return '';
     const base = `/${encodeURIComponent(siteSlug)}`;
+    const pageLabel = (p: any) => `${p.icon ? p.icon + ' ' : ''}${p.title}`;
     // depth 최대 2단계이므로 브레드크럼도 상위 › 현재 2단만 노출(사이트 루트 링크 중복 제거)
-    return `<nav class="crumb"><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(parent.title)}</a><span>›</span><b>${escapeHtml(page.title)}</b></nav>`;
+    return `<nav class="crumb"><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(pageLabel(parent))}</a><span>›</span><b>${escapeHtml(pageLabel(page))}</b></nav>`;
 }
 
 function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navPos: 'top' | 'side' | 'right'; headerTitle: string; showTitle: boolean; showNavigation: boolean } {
@@ -222,11 +225,18 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
 
 function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: string, showNavigation: boolean): string {
     if (!showNavigation) return '';
-    const curIdx = pages.findIndex(p => p.id === currentPage.id);
+    const roots = pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort);
+    const kids = (id: number) => pages.filter(p => p.parent_id === id).sort((a, b) => a.sort - b.sort);
+    const flatPages: Array<any> = [];
+    for (const r of roots) {
+        flatPages.push(r);
+        flatPages.push(...kids(r.id));
+    }
+    const curIdx = flatPages.findIndex(p => p.id === currentPage.id);
     if (curIdx === -1) return '';
     
-    const prev = curIdx > 0 ? pages[curIdx - 1] : null;
-    const next = curIdx < pages.length - 1 ? pages[curIdx + 1] : null;
+    const prev = curIdx > 0 ? flatPages[curIdx - 1] : null;
+    const next = curIdx < flatPages.length - 1 ? flatPages[curIdx + 1] : null;
     if (!prev && !next) return '';
 
     const base = `/${encodeURIComponent(siteSlug)}`;
@@ -235,6 +245,7 @@ function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: str
         const parent = pages.find(parentPage => parentPage.id === p.parent_id);
         return parent ? `${base}/${encodeURIComponent(parent.slug)}/${encodeURIComponent(p.slug)}` : `${base}/${encodeURIComponent(p.slug)}`;
     };
+    const pageLabel = (p: any) => `${p.icon ? p.icon + ' ' : ''}${p.title}`;
 
     const prevHtml = prev ? `
         <a href="${getPageLink(prev)}" class="page-nav-card prev">
@@ -243,7 +254,7 @@ function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: str
             </div>
             <div style="flex: 1; text-align: right; min-width: 0;">
                 <span class="page-nav-label">Previous</span>
-                <span class="page-nav-title">${escapeHtml(prev.title)}</span>
+                <span class="page-nav-title">${escapeHtml(pageLabel(prev))}</span>
             </div>
         </a>
     ` : `<div></div>`;
@@ -252,7 +263,7 @@ function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: str
         <a href="${getPageLink(next)}" class="page-nav-card next">
             <div style="flex: 1; text-align: left; min-width: 0;">
                 <span class="page-nav-label">Next</span>
-                <span class="page-nav-title">${escapeHtml(next.title)}</span>
+                <span class="page-nav-title">${escapeHtml(pageLabel(next))}</span>
             </div>
             <div class="page-nav-icon">
                 <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>
@@ -292,7 +303,7 @@ function renderPage(site: any, page: any, sections: Array<any>, pages: Array<any
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 ${t.googleFontLink}
 <style>
-  :root { --c-primary:#5B8DEF; --c-bg:#FFFFFF; --c-text:#1F2937; --c-muted:#6B7280; --c-border:#E5E7EB; --c-accent:#F472B6; ${t.vars} }
+  :root { --c-primary:#5B8DEF; --c-bg:color-mix(in srgb, var(--c-primary) 5%, #FFFFFF); --c-text:#1F2937; --c-muted:#6B7280; --c-border:#E5E7EB; --c-accent:#F472B6; ${t.vars} }
   * { box-sizing: border-box; }
   body { margin:0; font-family:${t.fontFamily}; color:var(--c-text); background:#F8FAFC; line-height:1.7; }
   .layout { ${navSide ? `display:flex; align-items:flex-start; min-height:100vh; ${navRight ? 'flex-direction:row-reverse;' : ''}` : ''} }
@@ -310,7 +321,7 @@ ${t.googleFontLink}
   .nav-sub li a { display:block; padding:7px 10px; color:var(--c-text); text-decoration:none; font-size:.9rem; border-radius:6px; }
   .nav-sub li a:hover, .nav-sub li a.active { background:rgba(0,0,0,.04); color:var(--c-primary); font-weight:600; }
   .nav-toggle, .nav-toggle-cb { display:none; }
-  .content { flex:1; min-width:0; }
+  .content { flex:1; min-width:0; background:#FFFFFF; min-height:100vh; }
   main { max-width:760px; margin:0 auto; padding:32px 20px 80px; }
   main > .page-title { font-size:1.75rem; margin:0 0 24px; }
   .crumb { font-size:.8rem; color:var(--c-muted); margin:0 0 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -345,10 +356,10 @@ ${t.googleFontLink}
   .page-nav-card:hover .page-nav-title { color: var(--c-primary); }
   .page-nav-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--c-muted); }
   .page-nav-card:hover .page-nav-icon { color: var(--c-primary); }
-  .site-counter { font-size: 11px; color: var(--c-muted); }
-  .site-counter b { color: var(--c-primary); }
-  .top-counter { margin-left: auto; align-self: center; white-space: nowrap; padding: 4px 8px; background: rgba(0,0,0,0.02); border-radius: 6px; }
-  .side-counter { margin-top: auto; padding-top: 16px; border-t: 1px dashed var(--c-border); width: 100%; text-align: center; }
+  .site-counter { display: inline-flex; align-items: center; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:10px; font-weight:700; border-radius:4px; overflow:hidden; border:1px solid var(--c-border); line-height:1; }
+  .counter-label { background:#475569; color:#FFFFFF; padding:4px 6px; letter-spacing:0.05em; }
+  .counter-val { background:var(--c-primary); color:#FFFFFF; padding:4px 8px; }
+  .top-counter { margin-left: auto; align-self: center; }
   @media (max-width:640px){
     .layout{display:block;}
     .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
@@ -368,14 +379,15 @@ ${t.googleFontLink}
     <header class="site-header">
       ${t.showTitle ? `<h1><a href="/${encodeURIComponent(siteSlug)}">${escapeHtml(headerTitle)}</a></h1>` : ''}
       ${renderNav(pages, siteSlug, page)}
-      ${t.showCounter && !navSide ? `<div class="site-counter top-counter">방문자 수: <b>${site.click_count ?? 0}</b>회</div>` : ''}
-      ${t.showCounter && navSide ? `<div class="site-counter side-counter">방문자 수: <b>${site.click_count ?? 0}</b>회</div>` : ''}
+      ${t.showCounter && !navSide ? `<div class="site-counter top-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div>` : ''}
     </header>
     <div class="content">
       <main>
         ${renderBreadcrumb(page, pages, siteSlug)}
+        <h1 class="page-title">${page.icon ? `<span class="page-icon" style="margin-right:8px; font-size:1.15em; vertical-align: middle;">${page.icon}</span>` : ''}<span style="vertical-align: middle;">${escapeHtml(page.title)}</span></h1>
         ${sectionsHtml || '<p style="color:var(--c-muted)">아직 콘텐츠가 없습니다.</p>'}
         ${renderPageNavigation(page, pages, siteSlug, t.showNavigation)}
+        ${t.showCounter && navSide ? `<div style="display:flex; justify-content:center; margin-top:48px; width:100%;"><div class="site-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div></div>` : ''}
       </main>
     </div>
   </div>
@@ -436,7 +448,7 @@ export async function renderAllSnapshots(c: AnyCtx, siteId: number): Promise<{ s
     const siteSlug = site.custom_slug || site.base_slug;
 
     const { results: pagesRaw } = await c.env.DB.prepare(
-        "SELECT id, parent_id, slug, title, depth, sort FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
+        "SELECT id, parent_id, slug, title, depth, sort, icon FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
     ).bind(siteId).all();
     const pages = pagesRaw as Array<any>;
 
@@ -508,7 +520,7 @@ export async function renderDraftResponse(c: AnyCtx, siteId: number, segs: strin
     const siteSlug = site.custom_slug || site.base_slug;
 
     const { results: pagesRaw } = await c.env.DB.prepare(
-        "SELECT id, parent_id, slug, title, depth, sort FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
+        "SELECT id, parent_id, slug, title, depth, sort, icon FROM site_pages WHERE site_id = ? ORDER BY depth, sort, id"
     ).bind(siteId).all();
     const pages = pagesRaw as Array<any>;
 

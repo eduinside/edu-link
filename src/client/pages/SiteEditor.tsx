@@ -17,7 +17,7 @@ interface SiteDetail {
   home_page_id: number | null; rev: number; published_rev: number; published_at: string | null;
   slug: string; base_slug: string; custom_slug: string | null;
 }
-interface PageNode { id: number; parent_id: number | null; slug: string; title: string; depth: number; sort: number; }
+interface PageNode { id: number; parent_id: number | null; slug: string; title: string; depth: number; sort: number; icon: string | null; }
 interface SectionItem { id: number; type: string; content: any; sort: number; }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -167,26 +167,26 @@ export default function SiteEditor() {
   const rootPages = pages.filter(p => p.parent_id == null).sort((a, b) => a.sort - b.sort);
   const childrenOf = (pid: number) => pages.filter(p => p.parent_id === pid).sort((a, b) => a.sort - b.sort);
 
-  const submitPageModal = async (title: string, slug: string) => {
+  const submitPageModal = async (title: string, slug: string, icon: string | null) => {
     if (!pageModal) return;
     markSaving();
     try {
       if (pageModal.mode === 'create') {
         const res = await fetch(`/api/sites/${siteId}/pages`, {
           method: 'POST', headers: getHeaders(),
-          body: JSON.stringify({ title, slug, parent_id: pageModal.parentId }),
+          body: JSON.stringify({ title, slug, parent_id: pageModal.parentId, icon }),
         });
         const data = await res.json();
         if (!data.success) return markError(data.error);
-        const np: PageNode = { id: data.id, parent_id: pageModal.parentId, slug: data.slug, title, depth: data.depth, sort: data.sort };
+        const np: PageNode = { id: data.id, parent_id: pageModal.parentId, slug: data.slug, title, depth: data.depth, sort: data.sort, icon: data.icon ?? icon };
         setPages(prev => [...prev, np]);
         setPageModal(null); markSaved();
         selectPage(data.id, [...pages, np]);
       } else if (pageModal.page) {
-        const res = await fetch(`/api/pages/${pageModal.page.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ title, slug }) });
+        const res = await fetch(`/api/pages/${pageModal.page.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ title, slug, icon }) });
         const data = await res.json();
         if (!data.success) return markError(data.error);
-        setPages(prev => prev.map(p => p.id === pageModal.page!.id ? { ...p, title, slug } : p));
+        setPages(prev => prev.map(p => p.id === pageModal.page!.id ? { ...p, title, slug, icon } : p));
         setPageModal(null); markSaved();
       }
     } catch (e: any) { markError('네트워크 오류'); }
@@ -531,7 +531,11 @@ function TreeRow({ page, isHome, active, child, canChild, onSelect, onEdit, onDe
   return (
     <div className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 cursor-pointer ${active ? 'bg-blue-50' : 'hover:bg-slate-50'} ${child ? 'ml-4' : ''}`} onClick={onSelect}>
       {child && <CornerDownRight className="w-3 h-3 text-slate-300 shrink-0" />}
-      {isHome && <Home className="w-3 h-3 text-blue-500 shrink-0" />}
+      {page.icon ? (
+        <span className="text-sm shrink-0 mr-0.5" style={{ verticalAlign: 'middle' }}>{page.icon}</span>
+      ) : (
+        isHome && <Home className="w-3 h-3 text-blue-500 shrink-0" />
+      )}
       <span className={`flex-1 truncate text-sm ${active ? 'text-blue-700 font-semibold' : 'text-slate-600'}`}>{page.title}</span>
       <div className="hidden group-hover:flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
         <IconBtn disabled={!onUp} onClick={onUp} title="위로"><ArrowUp className="w-3.5 h-3.5" /></IconBtn>
@@ -705,9 +709,10 @@ function Backdrop({ children, onClose }: { children: React.ReactNode; onClose: (
   );
 }
 
-function PageModal({ modal, onClose, onSubmit }: { modal: { mode: 'create' | 'edit'; parentId: number | null; page?: PageNode }; onClose: () => void; onSubmit: (title: string, slug: string) => void }) {
+function PageModal({ modal, onClose, onSubmit }: { modal: { mode: 'create' | 'edit'; parentId: number | null; page?: PageNode }; onClose: () => void; onSubmit: (title: string, slug: string, icon: string | null) => void }) {
   const [title, setTitle] = useState(modal.page?.title ?? '');
   const [slug, setSlug] = useState(modal.page?.slug ?? '');
+  const [icon, setIcon] = useState(modal.page?.icon ?? '');
   const [slugTouched, setSlugTouched] = useState(modal.mode === 'edit');
   const onTitle = (v: string) => { setTitle(v); if (!slugTouched) setSlug(slugify(v)); };
   const valid = title.trim().length > 0 && /^[a-zA-Z0-9가-힣-]{4,20}$/.test(slug);
@@ -717,11 +722,13 @@ function PageModal({ modal, onClose, onSubmit }: { modal: { mode: 'create' | 'ed
       <label className="block text-xs font-bold text-slate-500 mb-1">제목</label>
       <input autoFocus className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-blue-400" value={title} onChange={(e) => onTitle(e.target.value)} placeholder="예: 학급 소개" />
       <label className="block text-xs font-bold text-slate-500 mb-1">주소(슬러그) · 4~20자 영숫자/한글/하이픈</label>
-      <input className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-400" value={slug} onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }} placeholder="about" />
+      <input className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-blue-400" value={slug} onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }} placeholder="about" />
+      <label className="block text-xs font-bold text-slate-500 mb-1">페이지 아이콘 (이모지 1개 입력, 선택사항)</label>
+      <input className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-400 text-center text-lg" value={icon} onChange={(e) => setIcon(e.target.value.trim())} placeholder="🏠" maxLength={4} />
       {!valid && (title || slug) && <p className="text-[11px] text-rose-500 mt-1.5">제목과 4~20자 슬러그를 입력하세요.</p>}
       <div className="flex justify-end gap-2 mt-4">
         <Button size="sm" variant="light" onClick={onClose}>취소</Button>
-        <Button size="sm" color="primary" isDisabled={!valid} onClick={() => onSubmit(title.trim(), slug.trim())}>{modal.mode === 'create' ? '추가' : '저장'}</Button>
+        <Button size="sm" color="primary" isDisabled={!valid} onClick={() => onSubmit(title.trim(), slug.trim(), icon.trim() || null)}>{modal.mode === 'create' ? '추가' : '저장'}</Button>
       </div>
     </Backdrop>
   );
@@ -997,7 +1004,7 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
           {customFonts.length > 0 && (
             <optgroup label="추가한 사용자 지정 글꼴">
               {customFonts.map(f => (
-                <option key={f.family} value={f.family}>{f.label} (로컬저장)</option>
+                <option key={f.family} value={f.family}>{f.label}</option>
               ))}
             </optgroup>
           )}
