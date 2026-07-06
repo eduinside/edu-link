@@ -79,6 +79,7 @@ export default function SiteEditor() {
   const [addressModal, setAddressModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState<{ kind: 'page' | 'section'; id: number; label: string } | null>(null);
   const [showDesign, setShowDesign] = useState(false);
+  const designDirtyRef = useRef(false);
 
   // ─────────── 저장 상태 래퍼 ───────────
   const markSaving = () => setSaveState('saving');
@@ -118,8 +119,12 @@ export default function SiteEditor() {
   }, [pages, site]);
 
   const selectPage = async (pageId: number, list = pages) => {
+    if (showDesign && designDirtyRef.current) {
+      if (!window.confirm('변경 사항이 저장되지 않았습니다. 디자인 설정을 닫으시겠습니까?')) return;
+    }
     setSelectedPageId(pageId);
     setShowDesign(false);
+    designDirtyRef.current = false;
     try {
       const res = await fetch(`/api/pages/${pageId}`, { headers: getHeaders() });
       const data = await res.json();
@@ -415,6 +420,7 @@ export default function SiteEditor() {
             <DesignPanel
               theme={activeTheme || safeParse(site.theme)}
               onClose={() => setShowDesign(false)}
+              onChangeDirty={(d) => { designDirtyRef.current = d; }}
               onPreview={(t) => {
                 setActiveTheme(t);
                 fetchPreviewTheme(t);
@@ -839,7 +845,7 @@ const FONT_PRESET_GROUPS: Array<{ category: string; fonts: FontPreset[] }> = [
 ];
 const DEFAULT_FONT: FontPreset = { label: '프리텐다드(기본)', family: 'Pretendard', url: '' };
 
-function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClose: () => void; onSave: (t: any) => void; onPreview: (t: any) => void }) {
+function DesignPanel({ theme, onClose, onSave, onPreview, onChangeDirty }: { theme: any; onClose: () => void; onSave: (t: any) => void; onPreview: (t: any) => void; onChangeDirty?: (d: boolean) => void }) {
   const [colors, setColors] = useState<any>(theme?.colors || {});
   const [headerTitle, setHeaderTitle] = useState<string>(theme?.header?.title || '');
   const [showTitle, setShowTitle] = useState<boolean>(theme?.header?.showTitle !== false);
@@ -869,6 +875,16 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
   });
   useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl, showNavigation, showCounter]);
 
+  // 마지막 저장 시점의 스냅샷을 추적하여, 닫기 시 비교 대상으로 사용
+  const savedSnapshot = useRef<string>(JSON.stringify(build()));
+
+  // 변경 상태 모니터링하여 부모 컴포넌트에 통보
+  const builtStr = JSON.stringify(build());
+  const isDirty = builtStr !== savedSnapshot.current;
+  useEffect(() => {
+    if (onChangeDirty) onChangeDirty(isDirty);
+  }, [isDirty, onChangeDirty]);
+
   const handleSave = () => {
     if (fontFamily && googleFontUrl.trim()) {
       const isPreset = FONT_PRESET_GROUPS.some(group => 
@@ -885,20 +901,13 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
         }
       }
     }
-    onSave(build());
+    const built = build();
+    savedSnapshot.current = JSON.stringify(built);
+    if (onChangeDirty) onChangeDirty(false);
+    onSave(built);
   };
 
   const handleClose = () => {
-    const isDirty = 
-      JSON.stringify(colors) !== JSON.stringify(theme?.colors || {}) ||
-      headerTitle.trim() !== (theme?.header?.title || '').trim() ||
-      showTitle !== (theme?.header?.showTitle !== false) ||
-      navPosition !== (['side', 'right'].includes(theme?.header?.navPosition) ? theme.header.navPosition : 'top') ||
-      fontFamily !== (theme?.font?.family || 'Pretendard') ||
-      googleFontUrl.trim() !== (theme?.font?.googleFontUrl || '').trim() ||
-      showNavigation !== (theme?.footer?.showNavigation !== false) ||
-      showCounter !== (theme?.counter?.showCounter === true);
-
     if (isDirty) {
       if (!window.confirm("변경 사항이 저장되지 않았습니다. 디자인 설정을 닫으시겠습니까?")) {
         return;
