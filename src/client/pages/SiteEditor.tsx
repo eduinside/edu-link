@@ -410,7 +410,6 @@ export default function SiteEditor() {
               onSave={async (t) => {
                 const ok = await patchSite({ theme: t });
                 if (ok) {
-                  setShowDesign(false);
                   showToast('ok', '디자인 저장됨. 게시하면 반영됩니다.');
                 }
               }}
@@ -622,14 +621,21 @@ function SectionBody({ sec, onSave, onUpload }: { sec: SectionItem; onSave: (c: 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <input className="text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
         defaultValue={c.label ?? ''} placeholder="버튼 이름"
-        onBlur={(e) => onSave({ ...c, label: e.target.value.trim() || '버튼', url: (c.url || '').trim(), style: c.style || 'button', newTab: c.newTab !== false })} />
+        onBlur={(e) => onSave({ ...c, label: e.target.value.trim() || '버튼', url: (c.url || '').trim(), style: c.style || 'button', newTab: c.newTab !== false, align: c.align || 'left' })} />
       <input className="text-sm border border-slate-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-400"
         defaultValue={c.url ?? ''} placeholder="https://..."
-        onBlur={(e) => onSave({ ...c, label: c.label || '버튼', url: e.target.value.trim(), style: c.style || 'button', newTab: c.newTab !== false })} />
-      <div className="flex gap-1.5 col-span-full">
+        onBlur={(e) => onSave({ ...c, label: c.label || '버튼', url: e.target.value.trim(), style: c.style || 'button', newTab: c.newTab !== false, align: c.align || 'left' })} />
+      <div className="flex gap-1.5 col-span-full items-center">
+        <span className="text-xs text-slate-400 font-bold mr-1">모양:</span>
         {['button', 'link'].map(st => (
-          <button key={st} className={`text-xs px-2.5 py-1 rounded ${(c.style || 'button') === st ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-slate-400 hover:bg-slate-100'}`}
-            onClick={() => onSave({ ...c, label: c.label || '버튼', url: (c.url || '').trim(), style: st, newTab: c.newTab !== false })}>{st === 'button' ? '버튼 모양' : '텍스트 링크'}</button>
+          <button key={st} type="button" className={`text-xs px-2.5 py-1 rounded ${(c.style || 'button') === st ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-slate-400 hover:bg-slate-100'}`}
+            onClick={() => onSave({ ...c, label: c.label || '버튼', url: (c.url || '').trim(), style: st, newTab: c.newTab !== false, align: c.align || 'left' })}>{st === 'button' ? '버튼 모양' : '텍스트 링크'}</button>
+        ))}
+        
+        <span className="text-xs text-slate-400 font-bold ml-4 mr-1">정렬:</span>
+        {['left', 'center', 'right'].map(al => (
+          <button key={al} type="button" className={`text-xs px-2.5 py-1 rounded ${(c.align || 'left') === al ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-slate-400 hover:bg-slate-100'}`}
+            onClick={() => onSave({ ...c, label: c.label || '버튼', url: (c.url || '').trim(), style: c.style || 'button', newTab: c.newTab !== false, align: al })}>{al === 'left' ? '좌측' : al === 'center' ? '중앙' : '우측'}</button>
         ))}
       </div>
     </div>
@@ -821,6 +827,7 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
   const [googleFontUrl, setGoogleFontUrl] = useState<string>(theme?.font?.googleFontUrl || '');
   const [showFontUrl, setShowFontUrl] = useState(false);
   const [showNavigation, setShowNavigation] = useState<boolean>(theme?.footer?.showNavigation !== false);
+  const [showCounter, setShowCounter] = useState<boolean>(theme?.counter?.showCounter === true);
 
   const [customFonts, setCustomFonts] = useState<FontPreset[]>(() => {
     try {
@@ -837,8 +844,9 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
     font: { family: fontFamily, googleFontUrl: googleFontUrl.trim() || null },
     header: { title: headerTitle.trim(), showTitle, navPosition },
     footer: { showNavigation },
+    counter: { showCounter }
   });
-  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl, showNavigation]);
+  useEffect(() => { onPreview(build()); }, [colors, headerTitle, showTitle, navPosition, fontFamily, googleFontUrl, showNavigation, showCounter]);
 
   const handleSave = () => {
     if (fontFamily && googleFontUrl.trim()) {
@@ -858,6 +866,31 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
     }
     onSave(build());
   };
+
+  const handleClose = () => {
+    const isDirty = 
+      JSON.stringify(colors) !== JSON.stringify(theme?.colors || {}) ||
+      headerTitle.trim() !== (theme?.header?.title || '').trim() ||
+      showTitle !== (theme?.header?.showTitle !== false) ||
+      navPosition !== (['side', 'right'].includes(theme?.header?.navPosition) ? theme.header.navPosition : 'top') ||
+      fontFamily !== (theme?.font?.family || 'Pretendard') ||
+      googleFontUrl.trim() !== (theme?.font?.googleFontUrl || '').trim() ||
+      showNavigation !== (theme?.footer?.showNavigation !== false) ||
+      showCounter !== (theme?.counter?.showCounter === true);
+
+    if (isDirty) {
+      if (!window.confirm("변경 사항이 저장되지 않았습니다. 디자인 설정을 닫으시겠습니까?")) {
+        return;
+      }
+    }
+    onClose();
+  };
+
+  const ALL_FONTS: FontPreset[] = [
+    DEFAULT_FONT,
+    ...FONT_PRESET_GROUPS.flatMap(g => g.fonts),
+    ...customFonts
+  ];
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-6 max-w-2xl mx-auto animate-fade-in">
@@ -899,8 +932,14 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <div className="text-xs font-bold text-slate-500">헤더 제목</div>
-          <input className="w-full text-sm border border-slate-200 bg-slate-50/20 hover:bg-slate-50/50 focus:bg-white rounded-lg px-3 py-2 transition-all focus:outline-none focus:border-blue-400" value={headerTitle} onChange={(e) => setHeaderTitle(e.target.value)} placeholder="비우면 사이트명" />
+          <div className="text-xs font-bold text-slate-500">헤더 제목 설정</div>
+          <div className="flex items-center gap-2">
+            <input className="flex-1 text-sm border border-slate-200 bg-slate-50/20 hover:bg-slate-50/50 focus:bg-white rounded-lg px-3 py-2 transition-all focus:outline-none focus:border-blue-400" value={headerTitle} onChange={(e) => setHeaderTitle(e.target.value)} placeholder="비우면 사이트명" />
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer select-none shrink-0 bg-slate-50 border border-slate-200/60 rounded-lg px-3 py-2">
+              <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <span>헤더 표시</span>
+            </label>
+          </div>
         </div>
         <div className="space-y-1.5">
           <div className="text-xs font-bold text-slate-500">메뉴 위치</div>
@@ -926,56 +965,45 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
         <div className="text-xs font-bold text-slate-500">레이아웃 및 기능 설정</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
           <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
-            <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-            <span>헤더에 제목 표시</span>
-          </label>
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
             <input type="checkbox" checked={showNavigation} onChange={(e) => setShowNavigation(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
             <span>페이지 하단 네비게이션 표시 (이전/다음)</span>
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" checked={showCounter} onChange={(e) => setShowCounter(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <span>방문자 수(클릭 수) 카운터 표시</span>
           </label>
         </div>
       </div>
 
       <div className="space-y-3">
         <div className="text-xs font-bold text-slate-500">글꼴 지정</div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => pickFont(DEFAULT_FONT)}
-            className={`text-xs px-3.5 py-1.5 rounded-full border transition-all ${fontFamily === DEFAULT_FONT.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-bold shadow-sm' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}>
-            {DEFAULT_FONT.label}
-          </button>
-        </div>
-
-        {customFonts.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">추가한 글꼴 (로컬 저장)</div>
-            <div className="flex flex-wrap gap-1.5">
-              {customFonts.map(f => (
-                <button key={f.family} onClick={() => pickFont(f)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-all ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-bold shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-white text-slate-600'}`}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <select 
+          value={fontFamily} 
+          onChange={(e) => {
+            const found = ALL_FONTS.find(f => f.family === e.target.value);
+            if (found) pickFont(found);
+            else pickFont({ label: e.target.value, family: e.target.value, url: googleFontUrl });
+          }}
+          className="w-full text-sm border border-slate-200 bg-white rounded-lg px-2.5 py-2.5 focus:outline-none focus:border-blue-400 font-semibold text-slate-700 shadow-sm"
+        >
+          <option value="Pretendard">프리텐다드(기본)</option>
           {FONT_PRESET_GROUPS.map(group => (
-            <div key={group.category} className="space-y-1.5">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{group.category}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {group.fonts.map(f => (
-                  <button key={f.family} onClick={() => pickFont(f)}
-                    className={`text-xs px-3 py-1 rounded-full border transition-all ${fontFamily === f.family ? 'border-purple-400 bg-purple-50 text-purple-700 font-bold shadow-sm' : 'border-slate-200 hover:border-slate-300 hover:bg-white text-slate-600'}`}>
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <optgroup key={group.category} label={group.category}>
+              {group.fonts.map(f => (
+                <option key={f.family} value={f.family}>{f.label}</option>
+              ))}
+            </optgroup>
           ))}
-        </div>
+          {customFonts.length > 0 && (
+            <optgroup label="추가한 사용자 지정 글꼴">
+              {customFonts.map(f => (
+                <option key={f.family} value={f.family}>{f.label} (로컬저장)</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
 
-        <div className="pt-2">
+        <div className="pt-1">
           <button className="text-[11px] font-bold text-blue-500 hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors" onClick={() => setShowFontUrl(v => !v)}>
             {showFontUrl ? '▴ 직접 입력 접기' : '▾ 구글폰트 URL 직접 입력'}
           </button>
@@ -998,7 +1026,7 @@ function DesignPanel({ theme, onClose, onSave, onPreview }: { theme: any; onClos
       </div>
 
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 mt-6">
-        <Button size="sm" variant="flat" onClick={onClose} className="font-bold">닫기</Button>
+        <Button size="sm" variant="flat" onClick={handleClose} className="font-bold">닫기</Button>
         <Button size="sm" color="secondary" onClick={handleSave} startContent={<Check className="w-4 h-4" />} className="font-bold shadow-md shadow-secondary/15">디자인 저장</Button>
       </div>
     </div>

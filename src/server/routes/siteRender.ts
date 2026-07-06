@@ -207,6 +207,7 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
     }
     const header = theme?.header && typeof theme.header === 'object' ? theme.header : {};
     const footer = theme?.footer && typeof theme.footer === 'object' ? theme.footer : {};
+    const counter = theme?.counter && typeof theme.counter === 'object' ? theme.counter : {};
     return {
         vars: overrides.join('; '),
         fontFamily: `'${fam}','Pretendard',-apple-system,sans-serif`,
@@ -215,6 +216,7 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
         headerTitle: typeof header.title === 'string' && header.title.trim() ? header.title : '',
         showTitle: header.showTitle !== false,
         showNavigation: footer.showNavigation !== false,
+        showCounter: counter.showCounter === true,
     };
 }
 
@@ -343,6 +345,10 @@ ${t.googleFontLink}
   .page-nav-card:hover .page-nav-title { color: var(--c-primary); }
   .page-nav-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--c-muted); }
   .page-nav-card:hover .page-nav-icon { color: var(--c-primary); }
+  .site-counter { font-size: 11px; color: var(--c-muted); }
+  .site-counter b { color: var(--c-primary); }
+  .top-counter { margin-left: auto; align-self: center; white-space: nowrap; padding: 4px 8px; background: rgba(0,0,0,0.02); border-radius: 6px; }
+  .side-counter { margin-top: auto; padding-top: 16px; border-t: 1px dashed var(--c-border); width: 100%; text-align: center; }
   @media (max-width:640px){
     .layout{display:block;}
     .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
@@ -362,6 +368,8 @@ ${t.googleFontLink}
     <header class="site-header">
       ${t.showTitle ? `<h1><a href="/${encodeURIComponent(siteSlug)}">${escapeHtml(headerTitle)}</a></h1>` : ''}
       ${renderNav(pages, siteSlug, page)}
+      ${t.showCounter && !navSide ? `<div class="site-counter top-counter">방문자 수: <b>${site.click_count ?? 0}</b>회</div>` : ''}
+      ${t.showCounter && navSide ? `<div class="site-counter side-counter">방문자 수: <b>${site.click_count ?? 0}</b>회</div>` : ''}
     </header>
     <div class="content">
       <main>
@@ -421,7 +429,7 @@ function resolveHome(pages: Array<any>, homePageId: number | null): any | null {
 // ── 게시(publish)용: 사이트의 모든 경로를 렌더해 스냅샷 배열 반환 ──
 export async function renderAllSnapshots(c: AnyCtx, siteId: number): Promise<{ siteSlug: string; rev: number; snapshots: Array<{ path: string; html: string }> } | null> {
     const site = await c.env.DB.prepare(
-        `SELECT s.id, s.title, s.theme, s.home_page_id, s.rev, u.base_slug, u.custom_slug
+        `SELECT s.id, s.title, s.theme, s.home_page_id, s.rev, u.base_slug, u.custom_slug, u.click_count AS click_count
          FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
     ).bind(siteId).first() as any;
     if (!site) return null;
@@ -492,7 +500,7 @@ export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, seg
 // ── 초안 미리보기(preview): 인증된 소유자용. D1 실시간 렌더, 캐시 없음. theme 오버라이드 지원 ──
 export async function renderDraftResponse(c: AnyCtx, siteId: number, segs: string[], themeOverride?: string): Promise<Response> {
     const site = await c.env.DB.prepare(
-        `SELECT s.id, s.title, s.theme, s.home_page_id, u.base_slug, u.custom_slug
+        `SELECT s.id, s.title, s.theme, s.home_page_id, u.base_slug, u.custom_slug, u.click_count AS click_count
          FROM sites s JOIN urls u ON u.id = s.url_id WHERE s.id = ?`
     ).bind(siteId).first() as any;
     if (!site) return htmlResponse(notFoundHtml(), 404);

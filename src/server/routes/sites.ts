@@ -732,7 +732,18 @@ function normalizeTheme(raw: any): any {
     if (typeof hIn.title === 'string') header.title = hIn.title.slice(0, 120);
     header.showTitle = hIn.showTitle !== false;
     header.navPosition = ['side', 'right'].includes(hIn.navPosition) ? hIn.navPosition : 'top';
-    return { colors, font, header };
+
+    const ftIn = t.footer && typeof t.footer === 'object' ? t.footer : {};
+    const footer: any = {
+        showNavigation: ftIn.showNavigation !== false
+    };
+
+    const cntIn = t.counter && typeof t.counter === 'object' ? t.counter : {};
+    const counter: any = {
+        showCounter: cntIn.showCounter === true
+    };
+
+    return { colors, font, header, footer, counter };
 }
 
 export function registerSectionRoutes(api: ApiApp) {
