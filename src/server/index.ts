@@ -25,6 +25,17 @@ app.use('*', async (c, next) => {
 });
 
 // ----------------------------------------------------
+// [글로벌 미들웨어] workers.dev 기본 도메인 접속 시 정식 도메인으로 리다이렉트
+// ----------------------------------------------------
+app.use('*', async (c, next) => {
+    const url = new URL(c.req.url);
+    if (url.hostname.endsWith('.workers.dev')) {
+        return c.redirect(`https://dgedu.link${url.pathname}${url.search}`, 301);
+    }
+    return next();
+});
+
+// ----------------------------------------------------
 // [글로벌 미들웨어] CORS 설정 적용
 // ----------------------------------------------------
 app.use('/api/v1/*', cors({
@@ -1667,6 +1678,37 @@ app.post('/api/v1/shorten', async (c) => {
 });
 
 
+
+// ----------------------------------------------------
+// [외부 앱 연동] 임의의 링크로 QR 이미지를 생성해 반환 (공개, 인증 불필요, CORS 허용)
+// ----------------------------------------------------
+
+app.use('/api/v1/qr', rateLimitMiddleware({ limit: 30, windowSec: 60 }));
+
+app.get('/api/v1/qr', async (c) => {
+    const data = (c.req.query('data') || c.req.query('url') || '').trim();
+    if (!data) {
+        return c.json({ success: false, error: 'data(또는 url) 쿼리 파라미터가 필요합니다.' }, 400);
+    }
+    if (data.length > 800) {
+        return c.json({ success: false, error: 'QR로 담을 수 있는 데이터 길이를 초과했습니다. (최대 800자)' }, 400);
+    }
+
+    const sizeParam = Number(c.req.query('size'));
+    const size = Number.isFinite(sizeParam) ? Math.min(1000, Math.max(100, Math.round(sizeParam))) : 600;
+
+    try {
+        const png = await generateQRPngBuffer(data, size);
+        return new Response(png, {
+            headers: {
+                'Content-Type': 'image/png',
+                'Cache-Control': 'public, max-age=86400',
+            },
+        });
+    } catch (err: any) {
+        return c.json({ success: false, error: 'QR 생성 실패: ' + err.message }, 400);
+    }
+});
 
 // ----------------------------------------------------
 // [edumaps 연동] 리소스 카드 클릭/다운로드 카운터 (공개, 인증 불필요)
