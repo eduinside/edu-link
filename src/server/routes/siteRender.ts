@@ -74,11 +74,46 @@ function renderMarkdown(src: string): string {
     return out.join('\n');
 }
 
+function unescapeHtml(s: string): string {
+    return String(s)
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
+function linkifyRawUrls(html: string): string {
+    const parts = html.split(/(<\/?[a-zA-Z0-9]+[^>]*>)/g);
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+            parts[i] = parts[i].replace(/(https?:\/\/[^\s<)"]+)/gi, (url) => {
+                const rawUrl = unescapeHtml(url);
+                const href = safeHref(rawUrl);
+                if (!href) return url;
+                
+                let cleanRawUrl = rawUrl;
+                let suffix = '';
+                const match = rawUrl.match(/[.,;:?!]+$/);
+                if (match) {
+                    suffix = match[0];
+                    cleanRawUrl = rawUrl.substring(0, rawUrl.length - suffix.length);
+                }
+                const cleanHref = safeHref(cleanRawUrl);
+                if (!cleanHref) return url;
+                return `<a href="${escapeHtml(cleanHref)}" target="_blank" rel="noopener noreferrer nofollow">${escapeHtml(cleanRawUrl)}</a>` + escapeHtml(suffix);
+            });
+        }
+    }
+    return parts.join('');
+}
+
 function renderSection(type: string, content: any): string {
     if (type === 'text') {
-        const body = content?.format === 'plain'
+        let body = content?.format === 'plain'
             ? `<p>${escapeHtml(content?.text ?? '').replace(/\n/g, '<br>')}</p>`
             : renderMarkdown(content?.text ?? '');
+        body = linkifyRawUrls(body);
         return `<section class="sec sec-text">${body}</section>`;
     }
     if (type === 'youtube') {
