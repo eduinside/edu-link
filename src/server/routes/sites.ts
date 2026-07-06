@@ -279,7 +279,11 @@ export function registerSiteRoutes(api: ApiApp) {
                 // 게시 중단 시 공개 KV 즉시 제거 (D1 serve는 is_public=1만 반환)
                 if (!is_public) await deletePubKeys(c, id, site.custom_slug || site.base_slug);
             }
-            if (theme !== undefined) { sets.push('theme = ?'); binds.push(JSON.stringify(normalizeTheme(theme))); contentChanged = true; }
+            if (theme !== undefined) {
+                let themeObj = theme;
+                if (typeof themeObj === 'string') { try { themeObj = JSON.parse(themeObj); } catch { themeObj = {}; } }
+                sets.push('theme = ?'); binds.push(JSON.stringify(normalizeTheme(themeObj))); contentChanged = true;
+            }
             if (home_page_id !== undefined) {
                 // 소유 사이트의 페이지인지 검증
                 if (home_page_id !== null) {

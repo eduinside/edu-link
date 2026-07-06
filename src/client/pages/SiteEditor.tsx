@@ -427,7 +427,7 @@ export default function SiteEditor() {
               }}
               onSave={async (t) => {
                 const themeStr = typeof t === 'string' ? t : JSON.stringify(t);
-                const ok = await patchSite({ theme: themeStr }, { theme: themeStr } as any);
+                const ok = await patchSite({ theme: t }, { theme: themeStr } as any);
                 if (ok) {
                   setActiveTheme(t);
                   showToast('ok', '디자인 저장됨. 게시하면 반영됩니다.');

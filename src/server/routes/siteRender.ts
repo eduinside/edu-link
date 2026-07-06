@@ -195,7 +195,7 @@ function renderBreadcrumb(page: any, pages: Array<any>, siteSlug: string): strin
     return `<nav class="crumb"><a href="${base}/${encodeURIComponent(parent.slug)}">${escapeHtml(pageLabel(parent))}</a><span>›</span><b>${escapeHtml(pageLabel(page))}</b></nav>`;
 }
 
-function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navPos: 'top' | 'side' | 'right'; headerTitle: string; showTitle: boolean; showNavigation: boolean } {
+function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleFontLink: string; navPos: 'top' | 'side' | 'right'; headerTitle: string; showTitle: boolean; showNavigation: boolean; showCounter: boolean } {
     const colors = theme?.colors && typeof theme.colors === 'object' ? theme.colors : {};
     const map: Record<string, string> = { primary: '--c-primary', bg: '--c-bg', text: '--c-text', muted: '--c-muted', accent: '--c-accent' };
     const hexRe = /^#[0-9A-Fa-f]{3,8}$/;
@@ -308,10 +308,11 @@ ${t.googleFontLink}
   * { box-sizing: border-box; }
   body { margin:0; font-family:${t.fontFamily}; color:var(--c-text); background:#F8FAFC; line-height:1.7; }
   .layout { ${navSide ? `display:flex; align-items:flex-start; min-height:100vh; ${navRight ? 'flex-direction:row-reverse;' : ''}` : ''} }
-  .site-header { background:var(--c-bg); border-bottom:1px solid var(--c-border); padding:18px 20px; ${navSide ? `width:220px; min-height:100vh; ${navRight ? 'border-left' : 'border-right'}:1px solid var(--c-border); border-bottom:none; flex-shrink:0;` : ''} }
+  .site-header { background:var(--c-bg); border-bottom:1px solid var(--c-border); padding:18px 20px; ${navSide ? `width:220px; min-height:100vh; display:flex; flex-direction:column; ${navRight ? 'border-left' : 'border-right'}:1px solid var(--c-border); border-bottom:none; flex-shrink:0;` : ''} }
   .site-header h1 { margin:0; font-size:1.25rem; }
   .site-header h1 a { color:var(--c-text); text-decoration:none; }
-  .site-nav { margin-top:${navSide ? '18px' : '10px'}; }
+  .site-header-row { ${navSide ? '' : 'display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px;'} }
+  .site-nav { margin-top:${navSide ? '18px' : '0'}; }
   .nav-list { list-style:none; margin:0; padding:0; display:flex; gap:4px; flex-wrap:wrap; ${navSide ? 'flex-direction:column;' : ''} }
   .nav-li { position:relative; }
   .nav-li > a { display:inline-flex; align-items:center; gap:4px; color:var(--c-muted); text-decoration:none; font-size:.95rem; padding:6px 10px; border-radius:8px; }
@@ -361,6 +362,7 @@ ${t.googleFontLink}
   .counter-label { background:#475569; color:#FFFFFF; padding:4px 6px; letter-spacing:0.05em; }
   .counter-val { background:var(--c-primary); color:#FFFFFF; padding:4px 8px; }
   .top-counter { margin-left: auto; align-self: center; }
+  .bottom-counter { margin-top: auto; align-self: flex-start; }
   @media (max-width:640px){
     .layout{display:block;}
     .site-header{width:auto;min-height:0;border-right:none;border-bottom:1px solid var(--c-border);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
@@ -372,6 +374,7 @@ ${t.googleFontLink}
     .nav-caret{display:none;}
     .nav-sub{position:static;display:block;border:none;box-shadow:none;padding:2px 0 4px 14px;min-width:0;background:transparent;}
     .page-nav-container { grid-template-columns: 1fr; gap: 12px; }
+    .bottom-counter { margin-top:0; margin-left:auto; align-self:center; }
   }
 </style>
 </head>
@@ -379,8 +382,9 @@ ${t.googleFontLink}
   <div class="layout">
     <header class="site-header">
       ${t.showTitle ? `<h1><a href="/${encodeURIComponent(siteSlug)}">${escapeHtml(headerTitle)}</a></h1>` : ''}
-      ${renderNav(pages, siteSlug, page)}
-      ${t.showCounter && !navSide ? `<div class="site-counter top-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div>` : ''}
+      ${navSide
+        ? `${renderNav(pages, siteSlug, page)}${t.showCounter ? `<div class="site-counter bottom-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div>` : ''}`
+        : `<div class="site-header-row">${renderNav(pages, siteSlug, page)}${t.showCounter ? `<div class="site-counter top-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div>` : ''}</div>`}
     </header>
     <div class="content">
       <main>
@@ -388,7 +392,6 @@ ${t.googleFontLink}
         <h1 class="page-title">${page.icon ? `<span class="page-icon" style="margin-right:8px; font-size:1.15em; vertical-align: middle;">${page.icon}</span>` : ''}<span style="vertical-align: middle;">${escapeHtml(page.title)}</span></h1>
         ${sectionsHtml || '<p style="color:var(--c-muted)">아직 콘텐츠가 없습니다.</p>'}
         ${renderPageNavigation(page, pages, siteSlug, t.showNavigation)}
-        ${t.showCounter && navSide ? `<div style="display:flex; justify-content:center; margin-top:48px; width:100%;"><div class="site-counter"><span class="counter-label">VIEWS</span><span class="counter-val">${site.click_count ?? 0}</span></div></div>` : ''}
       </main>
       <footer class="site-footer">
         최종 게시: ${site.published_at ? site.published_at : '미게시 상태'}
