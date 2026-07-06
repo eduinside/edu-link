@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { SignJWT } from 'jose';
 import { generateRandomSlug, isValidCustomSlug } from './utils/slug';
+import { generateQRPngBuffer } from '../utils/qr';
 import { authMiddleware, adminMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rateLimit';
 import { registerSiteRoutes, registerPageRoutes, registerSectionRoutes, registerMediaRoutes, registerPublishRoutes } from './routes/sites';
@@ -1736,7 +1737,7 @@ app.get('/api/v1/resource-stats/top', async (c) => {
 // [공개 리디렉션 및 SPA 서빙]
 // ----------------------------------------------------
 
-// /qr/:slug 및 /:slug.qr — DB 확인 후 외부 QR 이미지로 302 리다이렉트
+// /qr/:slug 및 /:slug.qr — DB 확인 후 자체 렌더링한 QR PNG 반환 (외부 서비스 의존 없음)
 async function handleQrRequest(slug: string, requestUrl: string, env: Env): Promise<Response> {
     try {
         const record = await env.DB.prepare(
@@ -1746,20 +1747,16 @@ async function handleQrRequest(slug: string, requestUrl: string, env: Env): Prom
         if (record && record.is_active === 1) {
             const host = new URL(requestUrl).host;
             const shortUrl = `https://${host}/${slug}`;
-            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=H&margin=10&format=png&data=${encodeURIComponent(shortUrl)}`;
-            // Worker가 직접 fetch → PNG 바이트를 dgedu.link 도메인으로 반환 (사용자 망에서 외부 API 차단 무관)
-            const qrRes = await fetch(qrApiUrl);
-            if (qrRes.ok) {
-                return new Response(qrRes.body, {
-                    headers: {
-                        'Content-Type': 'image/png',
-                        'Cache-Control': 'public, max-age=86400',
-                    },
-                });
-            }
+            const png = await generateQRPngBuffer(shortUrl, 600);
+            return new Response(png, {
+                headers: {
+                    'Content-Type': 'image/png',
+                    'Cache-Control': 'public, max-age=86400',
+                },
+            });
         }
     } catch (e) {
-        console.error('[qr] DB error:', e);
+        console.error('[qr] error:', e);
     }
 
     return new Response(

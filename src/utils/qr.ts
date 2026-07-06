@@ -1,5 +1,15 @@
 import QRCode from 'qrcode';
 
+// 자체 QR PNG 렌더링 (외부 QR 이미지 서비스 의존 제거용)
+export async function generateQRPngBuffer(data: string, size = 600): Promise<Buffer> {
+    return QRCode.toBuffer(data, {
+        errorCorrectionLevel: 'H',
+        type: 'png',
+        width: size,
+        margin: 2,
+    });
+}
+
 export async function generateQRCodeHTML(code: string): Promise<string> {
     const dataUrl = await QRCode.toDataURL(code, {
         errorCorrectionLevel: 'H',
