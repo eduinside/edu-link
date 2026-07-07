@@ -21,7 +21,7 @@
 | 프론트엔드 | React 19 + React Router 7 + TailwindCSS 4 |
 | UI 컴포넌트 | HeroUI |
 | 데이터베이스 | Cloudflare D1 (SQLite) |
-| 캐시 / Rate Limit | Cloudflare KV |
+| 캐시 / Rate Limit | Cloudflare KV (캐시) / In-Memory (Rate Limit) |
 | 미디어 저장 | Cloudflare R2 (페이지 이미지, 업로드 시 WebP 변환) |
 | 이미지 변환 | Cloudflare Images 바인딩 |
 | 인증 | 이메일 OTP (Resend) · Cloudflare Access JWT |

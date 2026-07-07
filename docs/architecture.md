@@ -38,7 +38,7 @@ edu-link/
 │   │   │   └── schema.sql        # D1 전체 스키마 (정규화)
 │   │   ├── middleware/
 │   │   │   ├── auth.ts           # JWT + Cloudflare Access + 모의권한 미들웨어
-│   │   │   └── rateLimit.ts      # KV 기반 고정 윈도우 Rate Limiter
+│   │   │   └── rateLimit.ts      # In-Memory 기반 Rate Limiter
 │   │   ├── routes/
 │   │   │   ├── sites.ts          # 페이지: 사이트/페이지/섹션/미디어/게시 API
 │   │   │   └── siteRender.ts     # 페이지: 공개 렌더·게시 스냅샷·초안 미리보기
@@ -182,7 +182,7 @@ edu-link/
 | KV (`URL_CACHE`) | 페이지 게시 스냅샷 `pub:{slug}:{path}` | 7일 (게시/미공개/삭제 시 갱신·삭제) |
 | R2 (`MEDIA`) | 페이지 업로드 이미지 `/media/*` | public, max-age=1y, immutable |
 | KV | OTP 코드 | 300초 (5분) |
-| KV | Rate Limit 카운터 | windowSec × 2 |
+| In-Memory | Rate Limit 카운터 | windowSec |
 | CF Assets | 정적 파일 (JS/CSS) | Vite 해시명으로 장기 캐시 |
 | qrserver.com 프록시 | QR PNG | public, max-age=86400 |
 
@@ -190,9 +190,9 @@ edu-link/
 
 ## Rate Limiting
 
-`src/server/middleware/rateLimit.ts` — KV 기반 고정 윈도우 방식
+`src/server/middleware/rateLimit.ts` — In-Memory 방식
 
 - 기본: IP당 분당 60회
 - OpenAPI v1(`/api/v1/*`): API Key당 분당 15회
-- KV 오류 시 바이패스 (서비스 중단 방지)
+- Edge 노드별로 독립 동작하며 메모리 초과 시 방어용 초기화 로직 존재
 - 응답 헤더: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`
