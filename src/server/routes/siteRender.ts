@@ -417,8 +417,7 @@ export async function lookupSiteBySlug(c: AnyCtx, slug: string): Promise<{ siteI
     return { siteId: row.site_id };
 }
 
-// KV 게시 캐시 키
-export function pubKey(slug: string, path: string): string { return `pub:${slug}:${path}`; }
+// pubKey 함수 제거됨 (KV 캐시 미사용)
 
 const PUBLIC_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=600' };
 
@@ -489,17 +488,10 @@ function bumpView(c: AnyCtx, siteId: number): void {
     try { c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE urls SET click_count = click_count + 1 WHERE site_id = ?").bind(siteId).run()); } catch { /* noop */ }
 }
 
-// ── 공개 서빙: 게시 스냅샷(KV → D1) 기반. 미게시/비공개/미스는 404 ──
 export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, segs: string[]): Promise<Response> {
     const path = segs.map(s => { try { return decodeURIComponent(s).normalize('NFC'); } catch { return s.normalize('NFC'); } }).join('/');
 
-    // 1) KV 게시 캐시
-    try {
-        const cached = await c.env.URL_CACHE.get(pubKey(slug, path));
-        if (cached) { bumpView(c, siteId); return htmlResponse(cached, 200, PUBLIC_CACHE_HEADERS); }
-    } catch { /* KV 실패는 D1로 폴백 */ }
-
-    // 2) D1 스냅샷 (is_public=1 게시분만)
+    // D1 스냅샷 (is_public=1 게시분만)
     const row = await c.env.DB.prepare(
         `SELECT snap.html AS html FROM site_snapshots snap
          JOIN sites s ON s.id = snap.site_id
@@ -510,8 +502,6 @@ export async function serveSiteById(c: AnyCtx, siteId: number, slug: string, seg
         return htmlResponse(notFoundHtml('아직 게시되지 않았습니다', '이 페이지는 아직 게시되지 않았거나 존재하지 않습니다.'), 404);
     }
 
-    // KV 재적재 (7일 TTL 안전망 — D1이 권위 소스)
-    try { c.executionCtx.waitUntil(c.env.URL_CACHE.put(pubKey(slug, path), row.html, { expirationTtl: 604800 })); } catch { /* noop */ }
     bumpView(c, siteId);
     return htmlResponse(row.html, 200, PUBLIC_CACHE_HEADERS);
 }

@@ -3,7 +3,7 @@
 // 기존 `api` Hono 인스턴스(authMiddleware 적용됨)에 등록한다.
 import { Hono } from 'hono';
 import { generateRandomSlug, isValidCustomSlug } from '../utils/slug';
-import { renderAllSnapshots, renderDraftResponse, pubKey } from './siteRender';
+import { renderAllSnapshots, renderDraftResponse } from './siteRender';
 
 type UserVariables = { user: { id: number; email: string; name: string; level: number } };
 type ApiApp = Hono<{ Bindings: Env; Variables: UserVariables }>;
@@ -60,15 +60,6 @@ async function issueBaseSlug(c: any, reservedSet: Set<string>): Promise<string |
     return cands.find(s => !taken.has(s)) ?? null;
 }
 
-// 사이트의 모든 게시 KV 키 삭제 (미공개 전환/삭제/슬러그 변경 시)
-async function deletePubKeys(c: any, siteId: number | string, slug: string): Promise<void> {
-    try {
-        const { results } = await c.env.DB.prepare("SELECT path FROM site_snapshots WHERE site_id = ?").bind(siteId).all();
-        for (const r of results as Array<{ path: string }>) {
-            try { await c.env.URL_CACHE.delete(pubKey(slug, r.path)); } catch { /* noop */ }
-        }
-    } catch { /* noop */ }
-}
 
 export function registerSiteRoutes(api: ApiApp) {
     // GET /api/sites — 내 사이트 목록
@@ -260,7 +251,7 @@ export function registerSiteRoutes(api: ApiApp) {
                 if (updatedCustomSlug !== site.custom_slug) {
                     contentChanged = true;
                     // 이전 슬러그의 게시 KV 키 정리 (재발행 전까지 stale 방지)
-                    await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+                    // (KV 캐시 삭제 로직 제거)
                 }
             }
 
@@ -277,7 +268,7 @@ export function registerSiteRoutes(api: ApiApp) {
             if (is_public !== undefined) {
                 sets.push('is_public = ?'); binds.push(is_public ? 1 : 0);
                 // 게시 중단 시 공개 KV 즉시 제거 (D1 serve는 is_public=1만 반환)
-                if (!is_public) await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+                // (KV 캐시 삭제 로직 제거)
             }
             if (theme !== undefined) {
                 let themeObj = theme;
@@ -319,7 +310,7 @@ export function registerSiteRoutes(api: ApiApp) {
             if (!site) return c.json({ success: false, error: '사이트를 찾을 수 없거나 권한이 없습니다.' }, 404);
 
             // 게시 KV 키 정리 (스냅샷 경로 기준) — 삭제 전에 수행
-            await deletePubKeys(c, id, site.custom_slug || site.base_slug);
+            // (KV 캐시 삭제 로직 제거)
 
             // R2 미디어 전량 삭제 (sites/{id}/ 프리픽스, 1000개 초과분까지 커서로 순회)
             await deleteMediaByPrefix(c, `sites/${id}/`);
@@ -994,33 +985,7 @@ export function registerPublishRoutes(api: ApiApp) {
             if (!rendered) return c.json({ success: false, error: '렌더에 실패했습니다.' }, 500);
             if (!rendered.snapshots.length) return c.json({ success: false, error: '게시할 페이지가 없습니다. 페이지를 먼저 추가하세요.' }, 400);
 
-            // 기존 스냅샷 경로 (제거된 경로의 KV 정리용)
-            const { results: oldRows } = await c.env.DB.prepare("SELECT path FROM site_snapshots WHERE site_id = ?").bind(id).all();
-            const oldPaths = new Set((oldRows as Array<{ path: string }>).map(r => r.path));
-            const newPaths = new Set(rendered.snapshots.map(s => s.path));
-
-            // D1: 스냅샷 전량 교체 + 게시 상태 갱신 (원자적 batch)
-            const stmts = [c.env.DB.prepare("DELETE FROM site_snapshots WHERE site_id = ?").bind(id)];
-            for (const snap of rendered.snapshots) {
-                stmts.push(c.env.DB.prepare(
-                    "INSERT INTO site_snapshots (site_id, path, html, rev) VALUES (?, ?, ?, ?)"
-                ).bind(id, snap.path, snap.html, rendered.rev));
-            }
-            stmts.push(c.env.DB.prepare(
-                "UPDATE sites SET published_rev = ?, published_at = datetime('now') WHERE id = ?"
-            ).bind(rendered.rev, id));
-            await c.env.DB.batch(stmts);
-
-            // KV: 신규 경로 적재 + 제거된 경로 삭제
-            const kvOps = async () => {
-                for (const snap of rendered.snapshots) {
-                    try { await c.env.URL_CACHE.put(pubKey(rendered.siteSlug, snap.path), snap.html, { expirationTtl: 604800 }); } catch { /* noop */ }
-                }
-                for (const p of oldPaths) {
-                    if (!newPaths.has(p)) { try { await c.env.URL_CACHE.delete(pubKey(rendered.siteSlug, p)); } catch { /* noop */ } }
-                }
-            };
-            try { c.executionCtx.waitUntil(kvOps()); } catch { await kvOps(); }
+            // KV 적재 제거 (D1 직접 서빙)
 
             const actualPageCount = rendered.snapshots.filter(s => s.path !== '').length;
             return c.json({ success: true, published: actualPageCount, rev: rendered.rev, slug: rendered.siteSlug });
