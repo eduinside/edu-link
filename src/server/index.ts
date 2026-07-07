@@ -2025,7 +2025,12 @@ app.get('/:slug', async (c) => {
         }
 
         // 1. KV 캐시 확인 (만료/비밀번호 없는 활성 링크만 캐싱됨)
-        let destination = await c.env.URL_CACHE.get(slug);
+        let destination: string | null = null;
+        try {
+            destination = await c.env.URL_CACHE.get(slug);
+        } catch (e) {
+            console.error('[redirect] KV get failed, falling back to D1:', e);
+        }
         let urlRecord: { id: number; original_url: string; is_active: number; expires_at: string | null; password: string | null; kind?: string; survey_config?: string | null; response_limit?: number | null; response_count?: number; site_id?: number | null } | null = null;
 
         if (!destination) {
@@ -2096,9 +2101,13 @@ app.get('/:slug', async (c) => {
 
                 destination = urlRecord.original_url;
 
-                // 만료/비밀번호 없는 활성 링크만 KV에 캐싱
+                // 만료/비밀번호 없는 활성 링크만 KV에 캐싱 (실패해도 무시)
                 if (!urlRecord.expires_at && !urlRecord.password) {
-                    await c.env.URL_CACHE.put(slug, destination);
+                    try {
+                        await c.env.URL_CACHE.put(slug, destination);
+                    } catch (e) {
+                        console.error('[redirect] KV put failed:', e);
+                    }
                 }
             }
         }
