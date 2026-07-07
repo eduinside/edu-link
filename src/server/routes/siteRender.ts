@@ -233,7 +233,7 @@ function renderPageNavigation(currentPage: any, pages: Array<any>, siteSlug: str
         flatPages.push(r);
         flatPages.push(...kids(r.id));
     }
-    const curIdx = flatPages.findIndex(p => p.id === currentPage.id);
+    const curIdx = flatPages.findIndex(p => Number(p.id) === Number(currentPage.id));
     if (curIdx === -1) return '';
     
     const prev = curIdx > 0 ? flatPages[curIdx - 1] : null;
@@ -308,10 +308,10 @@ ${t.googleFontLink}
   * { box-sizing: border-box; }
   body { margin:0; font-family:${t.fontFamily}; color:var(--c-text); background:#F8FAFC; line-height:1.7; }
   .layout { ${navSide ? `display:flex; align-items:flex-start; min-height:100vh; ${navRight ? 'flex-direction:row-reverse;' : ''}` : ''} }
-  .site-header { background:var(--c-bg); border-bottom:1px solid var(--c-border); padding:18px 20px; ${navSide ? `width:220px; min-height:100vh; display:flex; flex-direction:column; ${navRight ? 'border-left' : 'border-right'}:1px solid var(--c-border); border-bottom:none; flex-shrink:0;` : ''} }
+  .site-header { background:var(--c-bg); border-bottom:1px solid var(--c-border); padding:18px 20px; ${navSide ? `width:220px; min-height:100vh; display:flex; flex-direction:column; ${navRight ? 'border-left' : 'border-right'}:1px solid var(--c-border); border-bottom:none; flex-shrink:0;` : 'display:flex; align-items:center; flex-wrap:wrap; gap:16px;'} }
   .site-header h1 { margin:0; font-size:1.25rem; }
   .site-header h1 a { color:var(--c-text); text-decoration:none; }
-  .site-header-row { ${navSide ? '' : 'display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px;'} }
+  .site-header-row { ${navSide ? '' : 'display:flex; align-items:center; flex-wrap:wrap; gap:8px;'} }
   .site-nav { margin-top:${navSide ? '18px' : '0'}; }
   .nav-list { list-style:none; margin:0; padding:0; display:flex; gap:4px; flex-wrap:wrap; ${navSide ? 'flex-direction:column;' : ''} }
   .nav-li { position:relative; }
