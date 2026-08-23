@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS urls (
     click_count    INTEGER NOT NULL DEFAULT 0,
     expires_at     TEXT,
     password       TEXT,
-    created_by     TEXT NOT NULL DEFAULT 'web',
+    created_by     TEXT NOT NULL DEFAULT 'web',   -- 'web' | 'api'
+    api_key_id     INTEGER,                        -- created_by='api'일 때 생성 키(앱) → api_keys.id
     kind           TEXT NOT NULL DEFAULT 'link',   -- 'link' | 'survey' | 'site'
     survey_config  TEXT,                           -- kind='survey'
     response_limit INTEGER,                         -- kind='survey'
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS urls (
     site_id        INTEGER,                         -- kind='site' → sites.id
     created_at     TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
 );
 
 -- 3. API Keys 테이블 (외부 API 접근용)
