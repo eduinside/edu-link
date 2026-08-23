@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Globe,
   Terminal,
+  Search,
   Eye,
   EyeOff,
   QrCode,
@@ -60,8 +61,6 @@ interface LinkItem {
   password: string | null;
   created_at: string;
   created_by?: 'web' | 'api';
-  api_key_id?: number | null;
-  api_key_name?: string | null;
 }
 
 interface ApiKeyItem {
@@ -147,8 +146,10 @@ export default function Dashboard() {
     }
   }, [activeTab]);
   const [linkSourceFilter, setLinkSourceFilter] = useState<'web' | 'api'>('web');
-  // API 생성 링크를 키(앱) 단위로 좁혀 보기 위한 필터. 'all' = 전체, 'none' = 키 미지정(레거시)
-  const [apiKeyFilter, setApiKeyFilter] = useState<'all' | 'none' | number>('all');
+  // API 생성 링크를 앱별로 좁혀 보기 위한 필터.
+  // 외부 API로 만든 링크는 title에 앱 이름이 들어오므로 title을 앱 식별자로 사용한다.
+  const [apiTitleFilter, setApiTitleFilter] = useState<string | null>(null);
+  const [apiSearch, setApiSearch] = useState('');
   
   // 새 단축 링크 상태
   const [newUrl, setNewUrl] = useState('');
@@ -935,37 +936,36 @@ export default function Dashboard() {
 
   const apiLinks = links.filter(link => link.created_by === 'api');
 
-  // API 링크를 생성 키(앱)별로 집계.
-  // 이름은 링크에 담겨 온 api_key_name을 우선 쓰고, 키가 삭제된 경우 apiKeys 목록으로 보완한다.
-  const apiKeyGroups = (() => {
-    const map = new Map<number, { id: number; name: string; count: number }>();
-    let noneCount = 0;
+  // API 링크를 title(앱 이름)별로 집계. 건수 많은 순.
+  const apiTitleGroups = (() => {
+    const map = new Map<string, number>();
     for (const link of apiLinks) {
-      if (link.api_key_id == null) {
-        noneCount += 1;
-        continue;
-      }
-      const existing = map.get(link.api_key_id);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        const name =
-          link.api_key_name ||
-          apiKeys.find(k => k.id === link.api_key_id)?.name ||
-          '삭제된 키';
-        map.set(link.api_key_id, { id: link.api_key_id, name, count: 1 });
-      }
+      const key = (link.title || '').trim() || '(제목 없음)';
+      map.set(key, (map.get(key) ?? 0) + 1);
     }
-    const groups = Array.from(map.values()).sort((a, b) => b.count - a.count);
-    return { groups, noneCount };
+    return Array.from(map, ([title, count]) => ({ title, count }))
+      .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title));
   })();
+
+  // 앱마다 링크별 제목을 따로 넣는 경우 칩이 지나치게 늘어나므로, 그때는 검색으로만 좁힌다.
+  const showApiTitleChips = apiTitleGroups.length > 1 && apiTitleGroups.length <= 12;
 
   const filteredLinks = links.filter(link => {
     if (linkSourceFilter !== 'api') return link.created_by !== 'api';
     if (link.created_by !== 'api') return false;
-    if (apiKeyFilter === 'all') return true;
-    if (apiKeyFilter === 'none') return link.api_key_id == null;
-    return link.api_key_id === apiKeyFilter;
+
+    const title = (link.title || '').trim() || '(제목 없음)';
+    if (apiTitleFilter !== null && title !== apiTitleFilter) return false;
+
+    const q = apiSearch.trim().toLowerCase();
+    if (q) {
+      const haystack = [link.title, link.slug, link.custom_slug, link.base_slug, link.original_url]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
   });
 
   return (
@@ -1254,7 +1254,7 @@ export default function Dashboard() {
                         <Tooltip content="대시보드에서 직접 생성한 단축주소" delay={200}>
                         <button
                           type="button"
-                          onClick={() => { setLinkSourceFilter('web'); setApiKeyFilter('all'); }}
+                          onClick={() => { setLinkSourceFilter('web'); setApiTitleFilter(null); setApiSearch(''); }}
                           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             linkSourceFilter === 'web'
                               ? 'bg-white text-brand-600 shadow-sm'
@@ -1296,52 +1296,60 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* 키(앱)별 필터 — API 생성 링크 탭에서만 노출 */}
+                    {/* 앱별 필터 — API 생성 링크 탭에서만 노출. title을 앱 식별자로 사용한다. */}
                     {linkSourceFilter === 'api' && apiLinks.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 mr-0.5">생성 앱</span>
-                        <button
-                          type="button"
-                          onClick={() => setApiKeyFilter('all')}
-                          className={`px-2.5 py-1 rounded-full border text-[10px] font-bold transition-colors cursor-pointer ${
-                            apiKeyFilter === 'all'
-                              ? 'bg-brand-50 border-brand-200 text-brand-600'
-                              : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          전체 {apiLinks.length}
-                        </button>
-                        {apiKeyGroups.groups.map((group) => (
-                          <button
-                            key={group.id}
-                            type="button"
-                            onClick={() => setApiKeyFilter(group.id)}
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold transition-colors cursor-pointer ${
-                              apiKeyFilter === group.id
-                                ? 'bg-brand-50 border-brand-200 text-brand-600'
-                                : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            <KeyRound className="w-2.5 h-2.5" />
-                            <span className="max-w-[140px] truncate" title={group.name}>{group.name}</span>
-                            <span className="text-slate-400">{group.count}</span>
-                          </button>
-                        ))}
-                        {apiKeyGroups.noneCount > 0 && (
-                          <Tooltip content="키 기록 기능 도입 이전에 생성된 링크입니다." delay={200}>
-                          <button
-                            type="button"
-                            onClick={() => setApiKeyFilter('none')}
-                            className={`px-2.5 py-1 rounded-full border text-[10px] font-bold transition-colors cursor-pointer ${
-                              apiKeyFilter === 'none'
-                                ? 'bg-brand-50 border-brand-200 text-brand-600'
-                                : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            키 미지정 {apiKeyGroups.noneCount}
-                          </button>
-                          </Tooltip>
+                      <div className="flex flex-col gap-2">
+                        {showApiTitleChips && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="mr-0.5 text-[10px] font-bold text-slate-400">생성 앱</span>
+                            <button
+                              type="button"
+                              onClick={() => setApiTitleFilter(null)}
+                              className={`cursor-pointer rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors ${
+                                apiTitleFilter === null
+                                  ? 'border-brand-200 bg-brand-50 text-brand-600'
+                                  : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800'
+                              }`}
+                            >
+                              전체 {apiLinks.length}
+                            </button>
+                            {apiTitleGroups.map((group) => (
+                              <button
+                                key={group.title}
+                                type="button"
+                                onClick={() => setApiTitleFilter(group.title)}
+                                className={`flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors ${
+                                  apiTitleFilter === group.title
+                                    ? 'border-brand-200 bg-brand-50 text-brand-600'
+                                    : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800'
+                                }`}
+                              >
+                                <Terminal className="w-2.5 h-2.5" />
+                                <span className="max-w-[160px] truncate" title={group.title}>{group.title}</span>
+                                <span className="text-slate-400">{group.count}</span>
+                              </button>
+                            ))}
+                          </div>
                         )}
+                        <div className="flex items-center gap-2">
+                          <Input
+                            size="sm"
+                            value={apiSearch}
+                            onChange={(e) => setApiSearch(e.target.value)}
+                            placeholder="제목·슬러그·원본 주소로 검색"
+                            startContent={<Search className="w-3 h-3 text-slate-400" />}
+                            classNames={{ inputWrapper: 'h-8 min-h-8 bg-white border border-slate-200', input: 'text-[11px]' }}
+                          />
+                          {(apiSearch || apiTitleFilter !== null) && (
+                            <button
+                              type="button"
+                              onClick={() => { setApiSearch(''); setApiTitleFilter(null); }}
+                              className="shrink-0 cursor-pointer text-[10px] font-bold text-slate-400 hover:text-slate-700"
+                            >
+                              초기화
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -1352,9 +1360,9 @@ export default function Dashboard() {
                           <p className="text-xs text-slate-400 font-medium">
                             {linkSourceFilter !== 'api'
                               ? '아직 대시보드에서 직접 생성한 단축 링크가 존재하지 않습니다.'
-                              : apiKeyFilter === 'all'
+                              : apiLinks.length === 0
                                 ? '아직 API로 생성된 단축 링크가 존재하지 않습니다.'
-                                : '선택한 앱으로 생성된 단축 링크가 없습니다.'
+                                : '조건에 맞는 단축 링크가 없습니다.'
                             }
                           </p>
                         </CardContent>
@@ -1367,9 +1375,6 @@ export default function Dashboard() {
                               <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
                                 <th className="text-left p-3 pl-5 whitespace-nowrap">슬러그</th>
                                 <th className="text-left p-3 whitespace-nowrap">제목 / 원본 주소</th>
-                                {linkSourceFilter === 'api' && (
-                                  <th className="text-left p-3 whitespace-nowrap">생성 앱</th>
-                                )}
                                 <th className="text-left p-3 whitespace-nowrap">클릭</th>
                                 <th className="text-left p-3 whitespace-nowrap">생성일</th>
                                 <th className="text-left p-3 whitespace-nowrap">상태</th>
@@ -1410,27 +1415,6 @@ export default function Dashboard() {
                                         {link.original_url}
                                       </div>
                                     </td>
-
-                                    {/* 생성 앱 (API 생성 링크 전용) */}
-                                    {linkSourceFilter === 'api' && (
-                                      <td className="p-3 align-middle whitespace-nowrap">
-                                        {link.api_key_id == null ? (
-                                          <span className="text-slate-300 italic text-[10px]">키 미지정</span>
-                                        ) : (
-                                          <span
-                                            className="inline-flex items-center gap-1 max-w-[160px] font-semibold text-slate-600"
-                                            title={link.api_key_name || '삭제된 키'}
-                                          >
-                                            <KeyRound className="w-2.5 h-2.5 shrink-0 text-slate-400" />
-                                            <span className="truncate">
-                                              {link.api_key_name ||
-                                                apiKeys.find(k => k.id === link.api_key_id)?.name ||
-                                                '삭제된 키'}
-                                            </span>
-                                          </span>
-                                        )}
-                                      </td>
-                                    )}
 
                                     {/* 클릭 수 */}
                                     <td className="p-3 align-middle whitespace-nowrap">

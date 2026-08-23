@@ -634,13 +634,10 @@ api.get('/links', async (c) => {
     const user = c.get('user');
     try {
         const { results } = await c.env.DB.prepare(
-            `SELECT u.id, u.slug, u.base_slug, u.custom_slug, u.original_url, u.title, u.description, u.click_count,
-                    u.is_active, u.is_public, u.expires_at, u.password, u.created_at, u.created_by,
-                    u.api_key_id, k.name AS api_key_name
-             FROM urls u
-             LEFT JOIN api_keys k ON k.id = u.api_key_id
-             WHERE u.user_id = ? AND (u.kind IS NULL OR u.kind = 'link')
-             ORDER BY u.created_at DESC`
+            `SELECT id, slug, base_slug, custom_slug, original_url, title, description, click_count, is_active, is_public, expires_at, password, created_at, created_by
+             FROM urls
+             WHERE user_id = ? AND (kind IS NULL OR kind = 'link')
+             ORDER BY created_at DESC`
         )
         .bind(user.id)
         .all();
@@ -1651,9 +1648,9 @@ app.post('/api/v1/shorten', async (c) => {
 
         // D1 DB 기록 (is_public, expires_at, password, base_slug, created_by 추가)
         await c.env.DB.prepare(
-            `INSERT INTO urls (slug, base_slug, original_url, title, description, is_public, expires_at, password, user_id, created_by, api_key_id) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api', ?)`
-        ).bind(slug, slug, original_url, title || keyRecord.name, description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id, keyRecord.id).run();
+            `INSERT INTO urls (slug, base_slug, original_url, title, description, is_public, expires_at, password, user_id, created_by) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api')`
+        ).bind(slug, slug, original_url, title || keyRecord.name, description || 'Generated via Developer API', publicFlag, expiration, pass, keyRecord.user_id).run();
 
         // KV 캐시 업데이트
         if (!pass && !expiration) {

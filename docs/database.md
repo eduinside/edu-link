@@ -46,8 +46,7 @@ CREATE TABLE urls (
     title          TEXT DEFAULT '',
     description    TEXT DEFAULT '',
     user_id        INTEGER NOT NULL,
-    created_by     TEXT NOT NULL DEFAULT 'web', -- 생성 경로: 'web'=대시보드, 'api'=API Key
-    api_key_id     INTEGER,                    -- created_by='api'일 때 생성 키(앱) → api_keys.id, 키 삭제 시 NULL
+    created_by     INTEGER,                    -- 생성자 user_id (user_id와 동일, 후속 확장용)
     is_active      INTEGER NOT NULL DEFAULT 1,
     is_public      INTEGER NOT NULL DEFAULT 0, -- 0=비공개, 1=공개
     click_count    INTEGER NOT NULL DEFAULT 0,
@@ -347,7 +346,6 @@ CREATE INDEX idx_site_snapshots_site ON site_snapshots(site_id);
 | `0011_publish_model.sql` | sites.published_rev·published_at 추가; site_snapshots(게시 스냅샷) 테이블 생성 |
 | `0012_create_resource_stats.sql` | resource_stats 테이블 생성 |
 | `0013_add_icon_to_site_pages.sql` | site_pages.icon 컬럼 추가 |
-| `0014_add_api_key_id_to_urls.sql` | urls.api_key_id 추가 — API 생성 링크를 키(앱)별로 구분·필터 |
 
 ### 새 마이그레이션 실행
 
