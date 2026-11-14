@@ -6,17 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>에듀링크 - 스마트한 교육 단축주소 플랫폼</title>
     <meta name="description" content="교육청 및 공공기관 인증 사용자를 위한 안전하고 신뢰할 수 있는 단축 URL 공유 플랫폼" />
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-T9GZNBEXJ0"></script>
+    <!-- Google tag (gtag.js) — 명령은 바로 대기열(dataLayer)에 넣고, 스크립트(약 180KB)는 화면이 다 뜬 뒤 한가할 때 받는다
+         (dic·kit과 같은 방식). 처음 연 주소를 page_location으로 고정한다. -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-T9GZNBEXJ0');
+      gtag('config', 'G-T9GZNBEXJ0', { page_location: location.href });
+      window.addEventListener('load', function () {
+        var load = function () {
+          var s = document.createElement('script');
+          s.async = true;
+          s.src = 'https://www.googletagmanager.com/gtag/js?id=G-T9GZNBEXJ0';
+          document.head.appendChild(s);
+        };
+        if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 3000 });
+        else setTimeout(load, 1500);
+      });
     </script>
-    <!-- Pretendard Variable (school-portal R2 design tokens) -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <!-- Pretendard 가변 글꼴 조각 — 자체 호스팅, 화면에 나온 글자 조각만 받는다(scripts/copy-fonts.mjs) -->
+    <link rel="stylesheet" href="/fonts/pretendard-1.3.9/pretendardvariable-dynamic-subset.css" />
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
     <div id="root"></div>

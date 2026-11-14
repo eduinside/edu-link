@@ -214,7 +214,8 @@ function buildThemeVars(theme: any): { vars: string; fontFamily: string; googleF
     const counter = theme?.counter && typeof theme.counter === 'object' ? theme.counter : {};
     return {
         vars: overrides.join('; '),
-        fontFamily: `'${fam}','Pretendard',-apple-system,sans-serif`,
+        // 'Pretendard'(편집기 기본값)는 자체 호스팅 가변 글꼴 이름 'Pretendard Variable'로 받는다.
+        fontFamily: `'${fam}','Pretendard Variable','Pretendard',-apple-system,'Malgun Gothic',sans-serif`,
         googleFontLink,
         navPos: header.navPosition === 'side' ? 'side' : header.navPosition === 'right' ? 'right' : 'top',
         headerTitle: typeof header.title === 'string' && header.title.trim() ? header.title : '',
@@ -300,8 +301,7 @@ function renderPage(site: any, page: any, sections: Array<any>, pages: Array<any
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(page.title)} · ${escapeHtml(site.title)}</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="/fonts/pretendard-1.3.9/pretendardvariable-dynamic-subset.css">
 ${t.googleFontLink}
 <style>
   :root { --c-primary:#5B8DEF; --c-bg:color-mix(in srgb, var(--c-primary) 5%, #FFFFFF); --c-text:#1F2937; --c-muted:#6B7280; --c-border:#E5E7EB; --c-accent:#F472B6; ${t.vars} }

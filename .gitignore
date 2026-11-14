@@ -165,3 +165,6 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# Pretendard 글꼴 조각 - scripts/copy-fonts.mjs 가 node_modules/pretendard 에서 복사(predev·prebuild)
+public/fonts/

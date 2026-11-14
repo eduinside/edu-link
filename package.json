@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-fonts.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-fonts.mjs",
     "build": "vite build",
     "deploy": "npm run build && wrangler deploy",
     "wrangler:dev": "npm run build && wrangler dev",
@@ -34,6 +36,7 @@
     "hono": "^4.12.23",
     "jose": "^6.2.3",
     "lucide-react": "^1.16.0",
+    "pretendard": "1.3.9",
     "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

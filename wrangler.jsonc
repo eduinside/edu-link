@@ -14,7 +14,9 @@
 		"directory": "./dist/client",
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application",
-		"run_worker_first": true
+		// 단축주소(/abc)·교사 사이트는 Worker가 먼저 받아야 하므로 기본은 전부 Worker.
+		// 빌드 파일·글꼴·로고만 정적 자산으로 바로 낸다 → 1년 캐시(_headers) 적용, D1·KV 조회와 무료 요청 한도 절약.
+		"run_worker_first": ["/*", "!/assets/*", "!/fonts/*", "!/edulink_logo.png", "!/favicon.ico", "!/robots.txt"]
 	},
 	"kv_namespaces": [
 		{
