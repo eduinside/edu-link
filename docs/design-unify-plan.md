@@ -245,6 +245,8 @@ portal에서 가져오고 on·dic에서 보탠다.
   - kit: `public/_routes.json`(빌드 파일·OG 그림·아이콘·catalog.json은 Functions 제외), `public/_headers`(`/assets/*` 1년), 머리띠 로고 `logo-64.png`(321KB → 6KB, 원본 `logo.png`는 아이콘·공유용으로 남김), GA 지연. 로컬 `wrangler pages dev`에서 해시 파일 1년 캐시·꾸러미 경로 OG 주입 확인.
   - edu-link: `run_worker_first` 경로 목록, `public/_headers`(`/assets/*`·`/fonts/*` 1년), `pretendard@1.3.9` 패키지 + `scripts/copy-fonts.mjs`(predev·prebuild가 `public/fonts/pretendard-1.3.9/`로 복사, git 밖), `index.html`·`siteRender.ts` jsdelivr 제거, GA 지연. 로컬 `wrangler dev`에서 확인: 해시 파일·글꼴 1년 캐시, `/sitemap.xml`·`/wp-admin`은 그대로 Worker, KV 시험 단축주소 307 이동(브라우저 이동 요청·일반 요청 둘 다), 첫 화면 글꼴 조각 10개 약 280KB(전에는 2,009KB). vitest 6/6 통과. `tsc` 오류 5개는 원래 있던 것(`index.ts`·`auth.ts`).
   - 교사 사이트(`siteRender.ts`) 화면은 로컬에 데이터가 없어 직접 보지 못했다 - 배포 뒤 실제 사이트 하나를 열어 글꼴 확인.
+- 2026-11-14 kit 1단계 운영 반영(main `beacda8`, 원격 main의 통합교과 커밋 10개 위에 병합). 운영 확인: 새 JS `immutable` 1년, 꾸러미 경로 OG 제목, `/api/stats` 200, pages.dev → kit.dgedu.link 301 유지.
+  - **첫 바이트 시간은 거의 그대로다(정적 파일 0.9~2.0초).** `/cdn-cgi/trace`로 보니 커스텀 도메인(kit·dic.dgedu.link)은 `colo=LAX`(미국), 같은 배포의 `*.pages.dev`는 `colo=ICN`(서울, 0.1초 안팎)으로 간다. 무료 플랜에서 dgedu.link 영역 요청이 먼 엣지로 가는 문제이고(dic perf-plan 때는 CDG), 함수 우회로는 고쳐지지 않는다. 그래서 **두 번째 방문부터 아예 다시 받지 않게 하는 1년 캐시가 이 계열에서 가장 효과가 큰 처방**이고, 첫 방문은 받는 양을 줄이는 수밖에 없다(글꼴 조각·HeroUI 제거·콘텐츠 나누기). 함수 우회는 무료 요청 한도와 함수 실행 시간을 아끼는 효과로 본다.
 
 콘텐츠 나누기(2)는 화면 디자인과 겹치는 파일이 적어서 디자인보다 먼저 한다. 뷰어를 디자인할 때 이미 가벼워진 상태에서 확인할 수 있다.
 
